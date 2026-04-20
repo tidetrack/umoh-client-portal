@@ -1,0 +1,735 @@
+/* ============================================================
+   UMOH CLIENT PORTAL — Design System v1.0
+   umoh.css
+   ============================================================ */
+
+@import url('https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&display=swap');
+
+/* ── 1. CSS Variables ──────────────────────────────────────── */
+:root {
+  /* UMOH Brand */
+  --umoh-primary:     #161F2C;
+  --umoh-dark:        #253040;
+  --umoh-slate:       #5A7080;
+  --umoh-silver:      #8FA5A8;
+  --umoh-mist:        #C8D8DC;
+  --umoh-white:       #F0F5F5;
+  --umoh-accent:      #FF0040;
+  --umoh-accent-mid:  #FF4068;
+  --umoh-accent-soft: #FF80A0;
+  --umoh-black:       #000000;
+
+  /* Client: Prevención Salud */
+  --client-primary:   #E3007E;
+  --client-secondary: #2D3047;
+
+  /* Semantic aliases */
+  --bg-page:          var(--umoh-white);
+  --bg-card:          #FFFFFF;
+  --bg-header:        var(--umoh-primary);
+  --bg-nav:           var(--umoh-dark);
+  --border-subtle:    var(--umoh-mist);
+  --text-primary:     #111827;
+  --text-secondary:   var(--umoh-slate);
+  --text-muted:       var(--umoh-silver);
+
+  /* Spacing scale */
+  --sp-1:  4px;
+  --sp-2:  8px;
+  --sp-3:  12px;
+  --sp-4:  16px;
+  --sp-5:  20px;
+  --sp-6:  24px;
+  --sp-8:  32px;
+  --sp-10: 40px;
+  --sp-12: 48px;
+
+  /* Typography */
+  --font: 'Outfit', Arial, sans-serif;
+
+  /* Border radius */
+  --r-sm: 4px;
+  --r-md: 8px;
+  --r-lg: 12px;
+  --r-xl: 16px;
+
+  /* Shadows */
+  --shadow-sm: 0 1px 3px rgba(22,31,44,0.07), 0 1px 2px rgba(22,31,44,0.05);
+  --shadow-md: 0 4px 12px rgba(22,31,44,0.09), 0 2px 4px rgba(22,31,44,0.06);
+  --shadow-lg: 0 8px 24px rgba(22,31,44,0.12);
+
+  /* Layout */
+  --header-h:    64px;
+  --nav-h:       48px;
+  --content-max: 1280px;
+  --content-pad: var(--sp-6);
+}
+
+/* ── 2. Reset & Base ───────────────────────────────────────── */
+*, *::before, *::after {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+html {
+  font-size: 16px;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+body {
+  font-family: var(--font);
+  background: var(--bg-page);
+  color: var(--text-primary);
+  line-height: 1.5;
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+}
+
+/* ── 3. Header ─────────────────────────────────────────────── */
+.site-header {
+  position: sticky;
+  top: 0;
+  z-index: 100;
+  background: var(--bg-header);
+  height: var(--header-h);
+  border-bottom: 1px solid rgba(255,255,255,0.06);
+  box-shadow: 0 2px 12px rgba(0,0,0,0.25);
+}
+
+.header-inner {
+  max-width: var(--content-max);
+  margin: 0 auto;
+  padding: 0 var(--content-pad);
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--sp-4);
+}
+
+/* Brand */
+.header-brand {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-3);
+  flex-shrink: 0;
+}
+
+.brand-mark {
+  width: 36px;
+  height: 36px;
+  background: var(--umoh-accent);
+  border-radius: var(--r-sm);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.brand-mark-text {
+  font-family: var(--font);
+  font-weight: 700;
+  font-size: 18px;
+  color: #fff;
+  letter-spacing: -0.5px;
+}
+
+.brand-info {
+  display: flex;
+  flex-direction: column;
+  line-height: 1.2;
+}
+
+.brand-agency {
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--umoh-silver);
+}
+
+.brand-client {
+  font-size: 15px;
+  font-weight: 600;
+  color: #fff;
+}
+
+/* Period selector */
+.header-controls {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-4);
+}
+
+.period-selector {
+  display: flex;
+  background: rgba(255,255,255,0.07);
+  border: 1px solid rgba(255,255,255,0.1);
+  border-radius: var(--r-md);
+  padding: 3px;
+  gap: 2px;
+}
+
+.period-btn {
+  font-family: var(--font);
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--umoh-silver);
+  background: transparent;
+  border: none;
+  border-radius: 6px;
+  padding: 6px 14px;
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s;
+  white-space: nowrap;
+}
+
+.period-btn:hover {
+  background: rgba(255,255,255,0.1);
+  color: #fff;
+}
+
+.period-btn.active {
+  background: var(--umoh-accent);
+  color: #fff;
+  font-weight: 600;
+}
+
+/* ── 4. Navigation ─────────────────────────────────────────── */
+.dashboard-nav {
+  position: sticky;
+  top: var(--header-h);
+  z-index: 90;
+  background: var(--bg-nav);
+  height: var(--nav-h);
+  border-bottom: 1px solid rgba(255,255,255,0.05);
+}
+
+.nav-inner {
+  max-width: var(--content-max);
+  margin: 0 auto;
+  padding: 0 var(--content-pad);
+  height: 100%;
+  display: flex;
+  align-items: stretch;
+  gap: 0;
+}
+
+.nav-tab {
+  font-family: var(--font);
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--umoh-silver);
+  background: transparent;
+  border: none;
+  border-bottom: 2px solid transparent;
+  padding: 0 var(--sp-5);
+  cursor: pointer;
+  transition: color 0.15s, border-color 0.15s;
+  white-space: nowrap;
+  letter-spacing: 0.01em;
+}
+
+.nav-tab:hover {
+  color: var(--umoh-mist);
+}
+
+.nav-tab.active {
+  color: #fff;
+  border-bottom-color: var(--umoh-accent);
+  font-weight: 600;
+}
+
+/* ── 5. Main Layout ────────────────────────────────────────── */
+.dashboard-main {
+  flex: 1;
+  max-width: var(--content-max);
+  width: 100%;
+  margin: 0 auto;
+  padding: var(--sp-8) var(--content-pad) var(--sp-12);
+}
+
+/* Sections */
+.dashboard-section {
+  display: none;
+}
+
+.dashboard-section.active {
+  display: block;
+  animation: fadeSection 0.2s ease;
+}
+
+@keyframes fadeSection {
+  from { opacity: 0; transform: translateY(6px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+/* Section header */
+.section-header {
+  margin-bottom: var(--sp-6);
+}
+
+.section-title {
+  font-size: 22px;
+  font-weight: 700;
+  color: var(--text-primary);
+  letter-spacing: -0.3px;
+  line-height: 1.2;
+}
+
+.section-subtitle {
+  font-size: 13px;
+  color: var(--text-secondary);
+  margin-top: var(--sp-1);
+  font-weight: 400;
+}
+
+/* ── 6. KPI Cards ──────────────────────────────────────────── */
+.kpi-grid {
+  display: grid;
+  gap: var(--sp-4);
+  margin-bottom: var(--sp-6);
+}
+
+.kpi-grid--5 { grid-template-columns: repeat(5, 1fr); }
+.kpi-grid--4 { grid-template-columns: repeat(4, 1fr); }
+.kpi-grid--3 { grid-template-columns: repeat(3, 1fr); }
+.kpi-grid--2 { grid-template-columns: repeat(2, 1fr); }
+
+.kpi-card {
+  background: var(--bg-card);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--r-lg);
+  padding: var(--sp-5) var(--sp-6);
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-2);
+  box-shadow: var(--shadow-sm);
+  transition: box-shadow 0.15s, transform 0.15s;
+  position: relative;
+  overflow: hidden;
+}
+
+.kpi-card::before {
+  content: '';
+  position: absolute;
+  top: 0; left: 0; right: 0;
+  height: 3px;
+  background: var(--border-subtle);
+  border-radius: var(--r-lg) var(--r-lg) 0 0;
+}
+
+.kpi-card--accent::before {
+  background: var(--umoh-accent);
+}
+
+.kpi-card:hover {
+  box-shadow: var(--shadow-md);
+  transform: translateY(-1px);
+}
+
+.kpi-label {
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--text-secondary);
+}
+
+.kpi-value {
+  font-size: 28px;
+  font-weight: 700;
+  color: var(--text-primary);
+  letter-spacing: -0.5px;
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
+}
+
+.kpi-card--accent .kpi-value {
+  color: var(--umoh-accent);
+}
+
+/* ── 7. Chart Cards ────────────────────────────────────────── */
+.charts-grid {
+  display: grid;
+  gap: var(--sp-5);
+}
+
+.charts-grid--full {
+  grid-template-columns: 1fr;
+}
+
+.charts-grid--2col {
+  grid-template-columns: repeat(2, 1fr);
+}
+
+.charts-grid--centered {
+  grid-template-columns: repeat(3, 1fr);
+}
+
+.chart-card {
+  background: var(--bg-card);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--r-lg);
+  overflow: hidden;
+  box-shadow: var(--shadow-sm);
+  display: flex;
+  flex-direction: column;
+}
+
+.chart-card--wide {
+  grid-column: span 2;
+}
+
+.chart-card--narrow {
+  grid-column: 2;
+}
+
+.chart-card-header {
+  padding: var(--sp-4) var(--sp-5);
+  border-bottom: 1px solid var(--border-subtle);
+  display: flex;
+  align-items: center;
+  gap: var(--sp-3);
+  background: #FAFBFC;
+}
+
+.chart-title {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text-primary);
+  flex: 1;
+}
+
+.chart-badge {
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--umoh-accent);
+  background: rgba(255,0,64,0.08);
+  padding: 2px 8px;
+  border-radius: 20px;
+}
+
+.chart-note {
+  font-size: 11px;
+  color: var(--text-muted);
+  font-style: italic;
+}
+
+.chart-card-body {
+  padding: var(--sp-5);
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+}
+
+.chart-body--tall {
+  height: 280px;
+  padding-bottom: var(--sp-4);
+}
+
+.chart-body--donut {
+  align-items: center;
+  padding: var(--sp-6);
+  min-height: 260px;
+}
+
+.chart-body--donut canvas {
+  max-height: 260px;
+  max-width: 300px;
+}
+
+.chart-body--bars {
+  height: 280px;
+}
+
+/* ── 8. Search Terms Table ─────────────────────────────────── */
+.terms-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+
+.terms-table thead th {
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.07em;
+  color: var(--text-muted);
+  padding: 0 var(--sp-3) var(--sp-3);
+  text-align: left;
+  border-bottom: 1px solid var(--border-subtle);
+}
+
+.terms-table .th-bar {
+  width: 50%;
+}
+
+.terms-table .th-num {
+  text-align: right;
+}
+
+.terms-table tbody tr {
+  border-bottom: 1px solid var(--umoh-white);
+  transition: background 0.1s;
+}
+
+.terms-table tbody tr:hover {
+  background: var(--umoh-white);
+}
+
+.terms-table tbody tr:last-child {
+  border-bottom: none;
+}
+
+.terms-table td {
+  padding: var(--sp-2) var(--sp-3);
+  vertical-align: middle;
+}
+
+.term-name {
+  font-weight: 500;
+  color: var(--text-primary);
+  white-space: nowrap;
+  width: 220px;
+  max-width: 220px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.term-bar {
+  width: 100%;
+  padding-right: var(--sp-4);
+}
+
+.bar-wrap {
+  height: 8px;
+  background: var(--umoh-white);
+  border-radius: 4px;
+  overflow: hidden;
+}
+
+.bar-fill {
+  height: 100%;
+  background: linear-gradient(90deg, var(--umoh-accent), var(--umoh-accent-mid));
+  border-radius: 4px;
+  transition: width 0.4s ease;
+}
+
+.term-clicks {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+  color: var(--text-secondary);
+  font-weight: 500;
+  white-space: nowrap;
+}
+
+/* ── 9. Geo Map ────────────────────────────────────────────── */
+.geo-map {
+  width: 100%;
+  height: 380px;
+  border-radius: var(--r-md);
+  overflow: hidden;
+  background: var(--umoh-white);
+}
+
+.geo-legend {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-3);
+  margin-top: var(--sp-4);
+  justify-content: flex-end;
+}
+
+.geo-legend-label {
+  font-size: 11px;
+  color: var(--text-muted);
+  font-weight: 500;
+}
+
+.geo-legend-scale {
+  display: flex;
+  gap: 2px;
+}
+
+.geo-legend-scale span {
+  display: block;
+  width: 24px;
+  height: 12px;
+  border-radius: 2px;
+  border: 1px solid rgba(0,0,0,0.08);
+}
+
+.geo-tooltip {
+  font-family: var(--font);
+  font-size: 13px;
+  background: var(--umoh-primary);
+  color: #fff;
+  border: none;
+  border-radius: var(--r-sm);
+  padding: var(--sp-2) var(--sp-3);
+  box-shadow: var(--shadow-md);
+}
+
+.geo-tooltip::before {
+  border-top-color: var(--umoh-primary);
+}
+
+.map-error {
+  text-align: center;
+  color: var(--text-muted);
+  font-size: 13px;
+  padding: var(--sp-8);
+}
+
+/* ── 10. Footer ────────────────────────────────────────────── */
+.site-footer {
+  background: var(--umoh-primary);
+  border-top: 1px solid rgba(255,255,255,0.06);
+  padding: var(--sp-4) var(--content-pad);
+  margin-top: auto;
+}
+
+.footer-inner {
+  max-width: var(--content-max);
+  margin: 0 auto;
+  display: flex;
+  align-items: center;
+  gap: var(--sp-3);
+}
+
+.footer-brand {
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  color: #fff;
+}
+
+.footer-sep {
+  color: var(--umoh-slate);
+  font-size: 12px;
+}
+
+.footer-text {
+  font-size: 12px;
+  color: var(--umoh-silver);
+  flex: 1;
+}
+
+.footer-badge {
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--umoh-accent-soft);
+  background: rgba(255,0,64,0.15);
+  border: 1px solid rgba(255,0,64,0.3);
+  padding: 2px 8px;
+  border-radius: 20px;
+}
+
+/* ── 11. Leaflet overrides ─────────────────────────────────── */
+.leaflet-container {
+  font-family: var(--font);
+}
+
+.leaflet-control-zoom a {
+  font-family: var(--font);
+  color: var(--umoh-primary);
+}
+
+.leaflet-tooltip {
+  font-family: var(--font);
+  font-size: 13px;
+  background: var(--umoh-primary) !important;
+  color: #fff !important;
+  border: none !important;
+  border-radius: var(--r-sm) !important;
+  padding: 6px 10px !important;
+  box-shadow: var(--shadow-md) !important;
+}
+
+.leaflet-tooltip::before {
+  border-top-color: var(--umoh-primary) !important;
+}
+
+/* ── 12. Responsive ────────────────────────────────────────── */
+@media (max-width: 1100px) {
+  .kpi-grid--5 { grid-template-columns: repeat(3, 1fr); }
+}
+
+@media (max-width: 900px) {
+  .charts-grid--2col {
+    grid-template-columns: 1fr;
+  }
+  .chart-card--wide {
+    grid-column: span 1;
+  }
+  .chart-card--narrow {
+    grid-column: 1;
+  }
+  .charts-grid--centered {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 768px) {
+  :root {
+    --content-pad: var(--sp-4);
+  }
+
+  .kpi-grid--5,
+  .kpi-grid--4,
+  .kpi-grid--3 {
+    grid-template-columns: repeat(2, 1fr);
+  }
+
+  .kpi-grid--2 {
+    grid-template-columns: 1fr;
+  }
+
+  .kpi-value {
+    font-size: 22px;
+  }
+
+  .period-selector {
+    gap: 0;
+  }
+
+  .period-btn {
+    padding: 6px 10px;
+    font-size: 12px;
+  }
+
+  .nav-tab {
+    padding: 0 var(--sp-4);
+    font-size: 12px;
+  }
+
+  .geo-map {
+    height: 280px;
+  }
+}
+
+@media (max-width: 480px) {
+  .kpi-grid--5,
+  .kpi-grid--4,
+  .kpi-grid--3,
+  .kpi-grid--2 {
+    grid-template-columns: 1fr;
+  }
+
+  .brand-client {
+    display: none;
+  }
+
+  .header-inner {
+    gap: var(--sp-3);
+  }
+}

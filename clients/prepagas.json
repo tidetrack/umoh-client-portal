@@ -1,0 +1,31 @@
+{
+  "slug": "prepagas",
+  "name": "Prevención Salud",
+  "logo_url": "/clients/assets/prevencion-salud-logo.png",
+
+  "google_customer_id": "",
+  "google_campaign_ids": [],
+
+  "meta_account_id": "",
+  "meta_campaign_ids": [],
+
+  "client_colors": {
+    "primary": "#E3007E",
+    "secondary": "#2D3047"
+  },
+  "client_typography": "Montserrat",
+
+  "geo_focus": {
+    "country": "AR",
+    "province": "Mendoza",
+    "region": "Gran Mendoza",
+    "departments": ["Capital", "Godoy Cruz", "Guaymallén", "Las Heras", "Luján de Cuyo", "Maipú"]
+  },
+
+  "currency": "ARS",
+  "timezone": "America/Argentina/Mendoza",
+  "date_range_default": "30d",
+
+  "mofu_source": "meistertask",
+  "meistertask_project_id": ""
+}

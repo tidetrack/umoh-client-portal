@@ -1,0 +1,36 @@
+# Config cliente: Prevención Salud Mendoza (prepagas)
+# Reemplazar los valores entre comillas con los IDs reales antes de usar.
+
+client_id: prepagas
+client_name: "Prevencion Salud Mendoza"
+dashboard_slug: prepagas
+active: true
+
+platforms:
+  google_ads:
+    enabled: true
+    customer_id: "REEMPLAZAR_CON_CUSTOMER_ID"   # Ej: "123-456-7890"
+  meta:
+    enabled: false   # Activar en Fase 2
+    ad_account_id: "REEMPLAZAR_CON_AD_ACCOUNT_ID"  # Ej: "act_123456789"
+  linkedin:
+    enabled: false
+
+sheets:
+  bofu_input_id: "REEMPLAZAR_CON_SHEET_ID"     # Sheet donde el cliente carga BOFU manualmente
+  output_id: "REEMPLAZAR_CON_SHEET_ID"         # Sheet de salida que lee el dashboard
+
+reporting:
+  timezone: "America/Argentina/Mendoza"
+  currency: "ARS"
+  segments:
+    - Voluntario
+    - Monotributista
+    - Obligatorio
+  lead_statuses:
+    - Contactado
+    - No Prospera
+    - A Futuro
+    - En Emision
+    - Erroneo
+    - En Blanco
