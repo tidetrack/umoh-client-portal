@@ -9,7 +9,7 @@ active: true
 platforms:
   google_ads:
     enabled: true
-    customer_id: "REEMPLAZAR_CON_CUSTOMER_ID"   # Ej: "123-456-7890"
+    customer_id: "384-763-4137"
   meta:
     enabled: false   # Activar en Fase 2
     ad_account_id: "REEMPLAZAR_CON_AD_ACCOUNT_ID"  # Ej: "act_123456789"
@@ -17,8 +17,8 @@ platforms:
     enabled: false
 
 sheets:
-  bofu_input_id: "REEMPLAZAR_CON_SHEET_ID"     # Sheet donde el cliente carga BOFU manualmente
-  output_id: "REEMPLAZAR_CON_SHEET_ID"         # Sheet de salida que lee el dashboard
+  bofu_input_id: "12iVYwOtU969NVZ1v6kP32GBbv-AUOkqV25KhN1tDAew"
+  output_id: "12iVYwOtU969NVZ1v6kP32GBbv-AUOkqV25KhN1tDAew"
 
 reporting:
   timezone: "America/Argentina/Mendoza"
