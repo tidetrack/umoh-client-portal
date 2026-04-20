@@ -1,0 +1,16 @@
+# Pipeline UMOH — dependencias Python
+# Instalar con: pip install -r requirements.txt
+
+# Google Ads API — libreria oficial de Python
+google-ads==24.1.0
+
+# Google Sheets API + autenticacion Service Account
+google-api-python-client==2.127.0
+google-auth==2.29.0
+google-auth-httplib2==0.2.0
+
+# Manipulacion de datos
+pandas==2.2.2
+
+# Lectura de archivos de configuracion YAML
+pyyaml==6.0.1

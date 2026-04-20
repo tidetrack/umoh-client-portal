@@ -1,0 +1,145 @@
+# .github/workflows/extract_all.yml
+# ---------------------------------------------------------------------------
+# Pipeline de extracción de datos UMOH — corre cada 6 horas
+#
+# Orquesta la extraccion de datos de todas las plataformas activas,
+# la normalizacion al schema canonico y la escritura en Google Sheets.
+#
+# Plataformas activas por fase:
+#   Fase 2 (actual): Google Ads
+#   Fase 3 (pendiente): Meta Ads
+#   Fase 4 (pendiente): LinkedIn Ads
+#
+# Secrets requeridos en el repositorio:
+#   GOOGLE_ADS_DEVELOPER_TOKEN
+#   GOOGLE_ADS_CLIENT_ID
+#   GOOGLE_ADS_CLIENT_SECRET
+#   GOOGLE_ADS_REFRESH_TOKEN
+#   GOOGLE_ADS_LOGIN_CUSTOMER_ID
+#   GOOGLE_SHEETS_SA_JSON
+# ---------------------------------------------------------------------------
+
+name: Extract & Load — All Platforms
+
+on:
+  schedule:
+    # Cada 6 horas. Google Ads tiene lag de ~3h; Meta puede tardar hasta 24h.
+    # Mas frecuente que esto no agrega valor y consume minutos de Actions.
+    - cron: "0 */6 * * *"
+
+  # Permite correr el pipeline manualmente desde la UI de GitHub Actions.
+  # Util para pruebas, recuperacion de errores y onboarding de clientes nuevos.
+  workflow_dispatch:
+    inputs:
+      days_back:
+        description: "Cuantos dias hacia atras extraer (default: 7)"
+        required: false
+        default: "7"
+      client_filter:
+        description: "Filtrar por client_id especifico (vacio = todos los activos)"
+        required: false
+        default: ""
+
+env:
+  PYTHON_VERSION: "3.11"
+
+jobs:
+  # ---------------------------------------------------------------------------
+  # Job 1: Google Ads → Normalizar → Escribir en Sheets
+  # ---------------------------------------------------------------------------
+  google-ads:
+    name: Google Ads — Extraer y cargar TOFU
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    env:
+      GOOGLE_ADS_DEVELOPER_TOKEN: ${{ secrets.GOOGLE_ADS_DEVELOPER_TOKEN }}
+      GOOGLE_ADS_CLIENT_ID: ${{ secrets.GOOGLE_ADS_CLIENT_ID }}
+      GOOGLE_ADS_CLIENT_SECRET: ${{ secrets.GOOGLE_ADS_CLIENT_SECRET }}
+      GOOGLE_ADS_REFRESH_TOKEN: ${{ secrets.GOOGLE_ADS_REFRESH_TOKEN }}
+      GOOGLE_ADS_LOGIN_CUSTOMER_ID: ${{ secrets.GOOGLE_ADS_LOGIN_CUSTOMER_ID }}
+      GOOGLE_SHEETS_SA_JSON: ${{ secrets.GOOGLE_SHEETS_SA_JSON }}
+
+    steps:
+      - name: Checkout repositorio
+        uses: actions/checkout@v4
+
+      - name: Configurar Python ${{ env.PYTHON_VERSION }}
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: "pip"
+
+      - name: Instalar dependencias
+        run: pip install -r requirements.txt
+
+      - name: Extraer, normalizar y cargar datos de Google Ads
+        run: |
+          python - <<'EOF'
+          import logging
+          import sys
+
+          logging.basicConfig(
+              level=logging.INFO,
+              format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
+              stream=sys.stdout,
+          )
+
+          from extractors.google_ads import run as extract
+          from normalizers.canonical import normalize
+          from loaders.sheets_writer import write_normalized_data
+          import pandas as pd
+
+          # Parametros del workflow_dispatch (con fallback al default)
+          days_back = int("${{ github.event.inputs.days_back || '7' }}")
+          client_filter = "${{ github.event.inputs.client_filter || '' }}".strip()
+
+          print(f"Iniciando extraccion — days_back={days_back}, client_filter='{client_filter or 'todos'}'")
+
+          raw_results = extract(config_dir="config/clients", days_back=days_back)
+
+          if client_filter:
+              raw_results = [r for r in raw_results if r.get("client_id") == client_filter]
+              print(f"Filtrado: {len(raw_results)} cliente(s) con client_id='{client_filter}'")
+
+          if not raw_results:
+              print("No hay datos para procesar. Finalizando.")
+              sys.exit(0)
+
+          dfs = []
+          for raw in raw_results:
+              try:
+                  df = normalize(raw)
+                  dfs.append(df)
+                  print(f"  Normalizado: {raw['client_id']} — {len(df)} filas")
+              except Exception as e:
+                  print(f"  ERROR normalizando {raw.get('client_id')}: {e}", file=sys.stderr)
+
+          if not dfs:
+              print("No hay DataFrames para cargar. Finalizando.", file=sys.stderr)
+              sys.exit(1)
+
+          combined = pd.concat(dfs, ignore_index=True)
+          write_normalized_data(combined)
+          print(f"Pipeline completado: {len(combined)} filas escritas en Sheets.")
+          EOF
+
+      - name: Notificar fallo por email
+        if: failure()
+        uses: dawidd6/action-send-mail@v3
+        with:
+          server_address: smtp.gmail.com
+          server_port: 465
+          username: ${{ secrets.MAIL_USERNAME }}
+          password: ${{ secrets.MAIL_PASSWORD }}
+          subject: "[UMOH] ERROR en pipeline Google Ads — ${{ github.run_id }}"
+          to: hola@umohcrew.com
+          from: "UMOH Pipeline <hola@umohcrew.com>"
+          body: |
+            El pipeline de extraccion de Google Ads fallo.
+
+            Repositorio: ${{ github.repository }}
+            Run ID: ${{ github.run_id }}
+            Commit: ${{ github.sha }}
+
+            Ver logs en: https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}
