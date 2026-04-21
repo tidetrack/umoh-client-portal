@@ -2,6 +2,9 @@
 .env
 *.env.local
 
+# Auth credentials — subir manualmente via FTP, nunca al repo
+dashboard/config/credentials.php
+
 # Python
 __pycache__/
 *.py[cod]
@@ -20,6 +23,9 @@ client_secret*.json
 token.json
 credentials.json
 service_account.json
+eco-league-*.json
+*-sa-key.json
+*.key.json
 
 # OS
 .DS_Store

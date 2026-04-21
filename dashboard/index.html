@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="es">
+<html lang="es" data-theme="light">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -20,27 +20,109 @@
 <body>
 
   <!-- ══════════════════════════════════════════════
+       AUTH GUARD — verifica sesión antes de renderizar
+  ══════════════════════════════════════════════ -->
+  <script>
+    (function () {
+      // Fase 4: PHP session username injected here
+      window.DASHBOARD_USERNAME = 'Admin';
+
+      fetch('auth_check.php', { credentials: 'include' })
+        .then(function (res) {
+          if (res.status === 401) {
+            window.location.replace('login.php');
+          }
+        })
+        .catch(function () {
+          // Si el fetch falla (ej. offline), no bloqueamos — el PHP protegerá igual
+        });
+    })();
+  </script>
+
+  <!-- ══════════════════════════════════════════════
        HEADER
   ══════════════════════════════════════════════ -->
   <header class="site-header">
     <div class="header-inner">
+
+      <!-- Brand -->
       <div class="header-brand">
         <div class="brand-mark" aria-hidden="true">
-          <span class="brand-mark-text">U</span>
+          <img src="assets/img/asterisco.png" alt="" width="22" height="22">
         </div>
         <div class="brand-info">
-          <span class="brand-agency">UMOH</span>
+          <span class="brand-agency">umoh</span>
           <span class="brand-client">Prevención Salud</span>
         </div>
       </div>
 
+      <!-- Controls -->
       <div class="header-controls">
-        <div class="period-selector" role="group" aria-label="Selector de período">
-          <button class="period-btn" data-period="7d">7 días</button>
-          <button class="period-btn active" data-period="30d">30 días</button>
-          <button class="period-btn" data-period="90d">90 días</button>
-          <button class="period-btn" data-period="custom">Personalizado</button>
+
+        <!-- Period selector + date picker -->
+        <div class="period-selector-wrap">
+          <div class="period-selector" role="group" aria-label="Selector de período">
+            <button class="period-btn" data-period="7d">7 días</button>
+            <button class="period-btn active" data-period="30d">30 días</button>
+            <button class="period-btn" data-period="90d">90 días</button>
+            <button class="period-btn" data-period="custom">Personalizado</button>
+          </div>
+          <div id="date-picker-popover" class="date-picker-popover" hidden aria-hidden="true">
+            <div class="date-picker-inner">
+              <div class="date-picker-row">
+                <label class="date-picker-label" for="date-start">Desde</label>
+                <input type="date" id="date-start" class="date-picker-input">
+              </div>
+              <div class="date-picker-row">
+                <label class="date-picker-label" for="date-end">Hasta</label>
+                <input type="date" id="date-end" class="date-picker-input">
+              </div>
+              <button id="date-apply-btn" class="date-apply-btn">Aplicar</button>
+            </div>
+          </div>
         </div>
+
+        <!-- Theme toggle -->
+        <button id="theme-toggle" class="theme-toggle-btn" title="Cambiar tema" aria-label="Cambiar modo claro/oscuro">
+          <!-- Sun icon (shown in dark mode) -->
+          <svg class="theme-icon theme-icon--sun" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/>
+          </svg>
+          <!-- Moon icon (shown in light mode) -->
+          <svg class="theme-icon theme-icon--moon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/>
+          </svg>
+        </button>
+
+        <!-- User menu -->
+        <div class="user-menu" id="user-menu">
+          <button class="user-menu-trigger" aria-haspopup="true" aria-expanded="false">
+            <div class="user-avatar" id="user-avatar">U</div>
+            <span class="user-greeting">Hola, <strong id="user-display-name">Usuario</strong></span>
+            <svg class="user-chevron" width="12" height="12" viewBox="0 0 12 12" fill="none">
+              <path d="M2 4l4 4 4-4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+            </svg>
+          </button>
+          <div class="user-menu-dropdown" role="menu">
+            <div class="user-menu-header">
+              <div class="user-menu-avatar-lg" id="user-avatar-lg">U</div>
+              <div>
+                <div class="user-menu-fullname" id="user-menu-fullname">Usuario</div>
+                <div class="user-menu-role">Administrador</div>
+              </div>
+            </div>
+            <div class="user-menu-divider"></div>
+            <a href="logout.php" class="user-menu-item user-menu-item--danger" role="menuitem">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/>
+                <polyline points="16 17 21 12 16 7"/>
+                <line x1="21" y1="12" x2="9" y2="12"/>
+              </svg>
+              Cerrar sesión
+            </a>
+          </div>
+        </div>
+
       </div>
     </div>
   </header>
@@ -72,26 +154,37 @@
         <p class="section-subtitle">Resumen general de inversión y resultados del período seleccionado</p>
       </div>
 
-      <div class="kpi-grid kpi-grid--5">
-        <div class="kpi-card">
+      <div class="kpi-grid kpi-grid--6">
+        <div class="kpi-card" data-kpi="revenue">
           <span class="kpi-label">Ingreso por Ventas</span>
           <span class="kpi-value" id="kpi-revenue">—</span>
+          <span class="kpi-delta" id="delta-revenue"></span>
         </div>
-        <div class="kpi-card">
+        <div class="kpi-card" data-kpi="spend">
           <span class="kpi-label">Costo Publicitario</span>
           <span class="kpi-value" id="kpi-spend">—</span>
+          <span class="kpi-delta" id="delta-spend"></span>
         </div>
-        <div class="kpi-card">
+        <div class="kpi-card" data-kpi="roi">
+          <span class="kpi-label">ROI</span>
+          <span class="kpi-value" id="kpi-roi">—</span>
+          <span class="kpi-delta" id="delta-roi"></span>
+          <span class="kpi-formula">(Ingresos − Inv.) ÷ Inv.</span>
+        </div>
+        <div class="kpi-card" data-kpi="impressions">
           <span class="kpi-label">Total Impresiones</span>
           <span class="kpi-value" id="kpi-impressions">—</span>
+          <span class="kpi-delta" id="delta-impressions"></span>
         </div>
-        <div class="kpi-card">
+        <div class="kpi-card" data-kpi="leads">
           <span class="kpi-label">Total Leads</span>
           <span class="kpi-value" id="kpi-leads">—</span>
+          <span class="kpi-delta" id="delta-leads"></span>
         </div>
-        <div class="kpi-card kpi-card--accent">
+        <div class="kpi-card kpi-card--accent" data-kpi="sales">
           <span class="kpi-label">Ventas Cerradas</span>
           <span class="kpi-value" id="kpi-sales">—</span>
+          <span class="kpi-delta" id="delta-sales"></span>
         </div>
       </div>
 
@@ -99,6 +192,7 @@
         <div class="chart-card">
           <div class="chart-card-header">
             <h3 class="chart-title">Inversión vs Ingresos</h3>
+            <span class="chart-badge">evolución por período</span>
           </div>
           <div class="chart-card-body chart-body--tall">
             <canvas id="chart-trend"></canvas>
@@ -119,17 +213,34 @@
       </div>
 
       <div class="kpi-grid kpi-grid--3">
-        <div class="kpi-card">
+        <div class="kpi-card" data-kpi="tofu-impressions">
           <span class="kpi-label">Impresiones</span>
           <span class="kpi-value" id="tofu-impressions">—</span>
+          <span class="kpi-delta" id="delta-tofu-impressions"></span>
         </div>
         <div class="kpi-card">
           <span class="kpi-label">Clicks</span>
           <span class="kpi-value" id="tofu-clicks">—</span>
+          <span class="kpi-delta" id="delta-tofu-clicks"></span>
         </div>
-        <div class="kpi-card kpi-card--accent">
+        <div class="kpi-card kpi-card--accent" data-kpi="tofu-cpc">
           <span class="kpi-label">CPC Promedio</span>
           <span class="kpi-value" id="tofu-cpc">—</span>
+          <span class="kpi-delta" id="delta-tofu-cpc"></span>
+          <span class="kpi-formula">Inversión ÷ Clicks</span>
+        </div>
+      </div>
+
+      <!-- Trend chart -->
+      <div class="charts-grid charts-grid--full">
+        <div class="chart-card">
+          <div class="chart-card-header">
+            <h3 class="chart-title">Evolución de Impresiones y Clicks</h3>
+            <span class="chart-badge">tendencia del período</span>
+          </div>
+          <div class="chart-card-body chart-body--tall">
+            <canvas id="chart-tofu-trend"></canvas>
+          </div>
         </div>
       </div>
 
@@ -213,21 +324,39 @@
       </div>
 
       <div class="kpi-grid kpi-grid--4">
-        <div class="kpi-card">
+        <div class="kpi-card" data-kpi="leads">
           <span class="kpi-label">Leads Totales</span>
           <span class="kpi-value" id="mofu-leads">—</span>
+          <span class="kpi-delta" id="delta-mofu-leads"></span>
         </div>
-        <div class="kpi-card">
-          <span class="kpi-label">Costo por Lead</span>
+        <div class="kpi-card" data-kpi="mofu-cpl">
+          <span class="kpi-label">CPL — Costo por Lead</span>
           <span class="kpi-value" id="mofu-cpl">—</span>
+          <span class="kpi-delta" id="delta-mofu-cpl"></span>
+          <span class="kpi-formula">Inversión ÷ Leads</span>
         </div>
-        <div class="kpi-card">
+        <div class="kpi-card" data-kpi="mofu-tipif">
           <span class="kpi-label">Tasa de Tipificación</span>
           <span class="kpi-value" id="mofu-tipif">—</span>
+          <span class="kpi-delta" id="delta-mofu-tipif"></span>
         </div>
-        <div class="kpi-card kpi-card--accent">
+        <div class="kpi-card kpi-card--accent" data-kpi="mofu-highintent">
           <span class="kpi-label">Leads Alta Intención</span>
           <span class="kpi-value" id="mofu-highintent">—</span>
+          <span class="kpi-delta" id="delta-mofu-highintent"></span>
+        </div>
+      </div>
+
+      <!-- Trend chart -->
+      <div class="charts-grid charts-grid--full">
+        <div class="chart-card">
+          <div class="chart-card-header">
+            <h3 class="chart-title">Evolución de Leads y CPL</h3>
+            <span class="chart-badge">tendencia del período</span>
+          </div>
+          <div class="chart-card-body chart-body--tall">
+            <canvas id="chart-mofu-trend"></canvas>
+          </div>
         </div>
       </div>
 
@@ -268,21 +397,25 @@
       </div>
 
       <div class="kpi-grid kpi-grid--4">
-        <div class="kpi-card">
+        <div class="kpi-card" data-kpi="revenue">
           <span class="kpi-label">Ingresos Totales</span>
           <span class="kpi-value" id="bofu-revenue">—</span>
+          <span class="kpi-delta" id="delta-bofu-revenue"></span>
         </div>
-        <div class="kpi-card">
+        <div class="kpi-card" data-kpi="sales">
           <span class="kpi-label">Ventas Cerradas</span>
           <span class="kpi-value" id="bofu-sales">—</span>
+          <span class="kpi-delta" id="delta-bofu-sales"></span>
         </div>
-        <div class="kpi-card">
+        <div class="kpi-card" data-kpi="bofu-ticket">
           <span class="kpi-label">Ticket Promedio</span>
           <span class="kpi-value" id="bofu-ticket">—</span>
+          <span class="kpi-delta" id="delta-bofu-ticket"></span>
         </div>
-        <div class="kpi-card kpi-card--accent">
+        <div class="kpi-card kpi-card--accent" data-kpi="bofu-conversion">
           <span class="kpi-label">Tasa de Conversión</span>
           <span class="kpi-value" id="bofu-conversion">—</span>
+          <span class="kpi-delta" id="delta-bofu-conversion"></span>
         </div>
       </div>
 
@@ -290,10 +423,25 @@
         <div class="kpi-card">
           <span class="kpi-label">Cápitas Cerradas</span>
           <span class="kpi-value" id="bofu-capitas">—</span>
+          <span class="kpi-delta" id="delta-bofu-capitas"></span>
         </div>
         <div class="kpi-card">
           <span class="kpi-label">Ticket Promedio por Cápita</span>
           <span class="kpi-value" id="bofu-ticket-capita">—</span>
+          <span class="kpi-delta" id="delta-bofu-ticket-capita"></span>
+        </div>
+      </div>
+
+      <!-- Trend chart -->
+      <div class="charts-grid charts-grid--full">
+        <div class="chart-card">
+          <div class="chart-card-header">
+            <h3 class="chart-title">Evolución de Ingresos y Ventas</h3>
+            <span class="chart-badge">tendencia del período</span>
+          </div>
+          <div class="chart-card-body chart-body--tall">
+            <canvas id="chart-bofu-trend"></canvas>
+          </div>
         </div>
       </div>
 
@@ -317,10 +465,10 @@
   ══════════════════════════════════════════════ -->
   <footer class="site-footer">
     <div class="footer-inner">
-      <span class="footer-brand">UMOH</span>
+      <span class="footer-brand">umoh</span>
       <span class="footer-sep">—</span>
       <span class="footer-text">Todos los derechos reservados &copy; 2025</span>
-      <span class="footer-badge">MOCK DATA</span>
+      <span class="footer-badge">LIVE DATA</span>
     </div>
   </footer>
 
@@ -332,6 +480,20 @@
   <!-- Leaflet JS -->
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
           integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV/XN/WLEg=" crossorigin=""></script>
+
+  <!-- KPI Info Modal -->
+  <div id="kpi-modal" class="kpi-modal-overlay" role="dialog" aria-modal="true" aria-labelledby="kpi-modal-title" hidden>
+    <div class="kpi-modal">
+      <button class="kpi-modal-close" id="kpi-modal-close" aria-label="Cerrar">&times;</button>
+      <h2 class="kpi-modal-title" id="kpi-modal-title">—</h2>
+      <p class="kpi-modal-formula" id="kpi-modal-formula"></p>
+      <p class="kpi-modal-desc" id="kpi-modal-desc"></p>
+      <div class="kpi-modal-example">
+        <span class="kpi-modal-example-label">Ejemplo aplicado</span>
+        <p id="kpi-modal-example"></p>
+      </div>
+    </div>
+  </div>
 
   <!-- Dashboard scripts -->
   <script src="assets/js/mockdata.js"></script>

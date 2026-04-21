@@ -8,13 +8,13 @@
  * Para pasar a producción solo cambiar USE_MOCK a false.
  */
 
-const USE_MOCK = true;
-const API_BASE = '../api/endpoints';
+const USE_MOCK = true; // Cambiar a false en producción (el servidor ya tiene USE_MOCK=false)
+const API_BASE = 'api/endpoints';
 
 /**
  * Obtiene datos para un endpoint dado.
  * @param {string} endpoint  - 'summary' | 'tofu' | 'mofu' | 'bofu'
- * @param {Object} params    - { period: '7d' | '30d' | '90d' }
+ * @param {Object} params    - { period: '7d' | '30d' | '90d' | 'custom', start?, end? }
  * @returns {Promise<Object>}
  */
 async function fetchData(endpoint, params = {}) {
@@ -46,6 +46,12 @@ async function fetchData(endpoint, params = {}) {
 function getMockData(endpoint, params) {
   const period = params.period || '30d';
 
+  /* Rango personalizado: generar datos con granularidad correcta de fechas */
+  if (period === 'custom' && params.start && params.end) {
+    const data = generateCustomMockData(endpoint, params.start, params.end);
+    return new Promise(resolve => setTimeout(() => resolve(data), 80));
+  }
+
   const map = {
     summary: MOCK_DATA.performance,
     tofu:    MOCK_DATA.tofu,
@@ -62,6 +68,5 @@ function getMockData(endpoint, params) {
     return Promise.reject(new Error(`Sin datos para período: ${period}`));
   }
 
-  // Simular latencia mínima de red para que la UI no salte instantáneamente
   return new Promise(resolve => setTimeout(() => resolve(data), 80));
 }
