@@ -14,6 +14,9 @@ on:
         type: choice
         options: [staging, production]
 
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+
 jobs:
   # ── STAGING — cualquier rama que no sea main ───────────────────────────────
   deploy-staging:
