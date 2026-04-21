@@ -16,47 +16,45 @@ on:
 
 env:
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+  # Hostinger shared hosting usa puerto 65002 para SSH/SFTP (no el 22 estándar)
+  SSH_PORT: 65002
 
 jobs:
-  # ── DIAGNÓSTICO — muestra qué credenciales llegan al runner ───────────────
-  ftp-check:
-    name: Verificar conectividad FTP
+  # ── DIAGNÓSTICO — verifica conectividad SFTP ───────────────────────────────
+  sftp-check:
+    name: Verificar conectividad SFTP
     runs-on: ubuntu-latest
     steps:
-      - name: Instalar lftp
-        run: sudo apt-get install -y lftp
+      - name: Instalar sshpass
+        run: sudo apt-get install -y sshpass
 
-      - name: Mostrar config (sin exponer contraseña)
-        run: |
-          echo "HOST:  ${{ secrets.FTP_HOST }}"
-          echo "USER:  ${{ secrets.FTP_USER }}"
-          echo "PASS length: ${#FTP_PASS}"
-        env:
-          FTP_PASS: ${{ secrets.FTP_PASSWORD }}
-
-      - name: Test login FTP con lftp
+      - name: Test conexión SFTP
         env:
           FTP_PASS: ${{ secrets.FTP_PASSWORD }}
         run: |
-          lftp -u "${{ secrets.FTP_USER }}","$FTP_PASS" \
-               -e "set ssl:verify-certificate no; ls; quit" \
-               ftp://${{ secrets.FTP_HOST }} \
-               2>&1 || echo "EXIT CODE: $?"
+          echo "→ Probando SFTP a ${{ secrets.FTP_HOST }} puerto $SSH_PORT..."
+          sshpass -p "$FTP_PASS" sftp \
+            -o StrictHostKeyChecking=no \
+            -o ConnectTimeout=15 \
+            -P $SSH_PORT \
+            "${{ secrets.FTP_USER }}@${{ secrets.FTP_HOST }}" \
+            <<< "ls" \
+            2>&1 || echo "EXIT CODE: $?"
 
   # ── STAGING — cualquier rama que no sea main ───────────────────────────────
   deploy-staging:
     name: Deploy → Staging
     runs-on: ubuntu-latest
     timeout-minutes: 15
-    needs: ftp-check
+    needs: sftp-check
     if: github.ref != 'refs/heads/main' || (github.event_name == 'workflow_dispatch' && github.event.inputs.environment == 'staging')
 
     steps:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Instalar lftp
-        run: sudo apt-get install -y lftp
+      - name: Instalar sshpass
+        run: sudo apt-get install -y sshpass
 
       - name: Preparar build de staging
         run: |
@@ -68,34 +66,29 @@ jobs:
           rm -f build/staging/config/credentials.php
           rm -f build/staging/api/config/sa.json
 
-      - name: Deploy via lftp → /prepagas/staging/
+      - name: Deploy via SFTP → /public_html/prepagas/staging/
         env:
           FTP_PASS: ${{ secrets.FTP_PASSWORD }}
         run: |
-          lftp -u "${{ secrets.FTP_USER }}","$FTP_PASS" \
-               ftp://${{ secrets.FTP_HOST }} <<'LFTP'
-            set ssl:verify-certificate no
-            set ftp:passive-mode true
-            set net:timeout 30
-            mirror --reverse --delete --verbose \
-              build/staging/ /public_html/prepagas/staging/
-            quit
-          LFTP
+          sshpass -p "$FTP_PASS" rsync -avz --delete \
+            -e "ssh -p $SSH_PORT -o StrictHostKeyChecking=no" \
+            build/staging/ \
+            "${{ secrets.FTP_USER }}@${{ secrets.FTP_HOST }}:/public_html/prepagas/staging/"
 
   # ── PRODUCCIÓN — solo main ─────────────────────────────────────────────────
   deploy-production:
     name: Deploy → Producción
     runs-on: ubuntu-latest
     timeout-minutes: 15
-    needs: ftp-check
+    needs: sftp-check
     if: github.ref == 'refs/heads/main' && (github.event_name == 'push' || github.event.inputs.environment == 'production')
 
     steps:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Instalar lftp
-        run: sudo apt-get install -y lftp
+      - name: Instalar sshpass
+        run: sudo apt-get install -y sshpass
 
       - name: Preparar build de producción
         run: |
@@ -107,16 +100,11 @@ jobs:
           rm -f build/prepagas/config/credentials.php
           rm -f build/prepagas/api/config/sa.json
 
-      - name: Deploy via lftp → /prepagas/
+      - name: Deploy via SFTP → /public_html/prepagas/
         env:
           FTP_PASS: ${{ secrets.FTP_PASSWORD }}
         run: |
-          lftp -u "${{ secrets.FTP_USER }}","$FTP_PASS" \
-               ftp://${{ secrets.FTP_HOST }} <<'LFTP'
-            set ssl:verify-certificate no
-            set ftp:passive-mode true
-            set net:timeout 30
-            mirror --reverse --delete --verbose \
-              build/prepagas/ /public_html/prepagas/
-            quit
-          LFTP
+          sshpass -p "$FTP_PASS" rsync -avz --delete \
+            -e "ssh -p $SSH_PORT -o StrictHostKeyChecking=no" \
+            build/prepagas/ \
+            "${{ secrets.FTP_USER }}@${{ secrets.FTP_HOST }}:/public_html/prepagas/"
