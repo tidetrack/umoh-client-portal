@@ -18,21 +18,30 @@ env:
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
 
 jobs:
-  # ── DIAGNÓSTICO — corre siempre primero ────────────────────────────────────
+  # ── DIAGNÓSTICO — muestra qué credenciales llegan al runner ───────────────
   ftp-check:
     name: Verificar conectividad FTP
     runs-on: ubuntu-latest
     steps:
-      - name: Test FTP login con curl
+      - name: Instalar lftp
+        run: sudo apt-get install -y lftp
+
+      - name: Mostrar config (sin exponer contraseña)
         run: |
-          echo "→ Probando conexión FTP a ${{ secrets.FTP_HOST }}..."
-          curl -v \
-            --user "${{ secrets.FTP_USER }}:${{ secrets.FTP_PASSWORD }}" \
-            "ftp://${{ secrets.FTP_HOST }}/" \
-            --connect-timeout 15 \
-            --max-time 20 \
-            2>&1 | grep -E "(Connected|220|230|530|331|Login|USER|PASS|error|curl)" || true
-          echo "→ Exit code: $?"
+          echo "HOST:  ${{ secrets.FTP_HOST }}"
+          echo "USER:  ${{ secrets.FTP_USER }}"
+          echo "PASS length: ${#FTP_PASS}"
+        env:
+          FTP_PASS: ${{ secrets.FTP_PASSWORD }}
+
+      - name: Test login FTP con lftp
+        env:
+          FTP_PASS: ${{ secrets.FTP_PASSWORD }}
+        run: |
+          lftp -u "${{ secrets.FTP_USER }}","$FTP_PASS" \
+               -e "ls; quit" \
+               ftp://${{ secrets.FTP_HOST }} \
+               2>&1 || echo "EXIT CODE: $?"
 
   # ── STAGING — cualquier rama que no sea main ───────────────────────────────
   deploy-staging:
@@ -46,37 +55,31 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
+      - name: Instalar lftp
+        run: sudo apt-get install -y lftp
+
       - name: Preparar build de staging
         run: |
           mkdir -p build/staging
-
           cp -r product/dashboard/. build/staging/
           cp -r product/api/.       build/staging/api/
-
           sed -i 's/const USE_MOCK = false.*/const USE_MOCK = true;/' \
             build/staging/assets/js/api.js || true
-
-          echo "✓ USE_MOCK en staging:"
-          grep "const USE_MOCK" build/staging/assets/js/api.js || echo "(no encontrado)"
-
           rm -f build/staging/config/credentials.php
           rm -f build/staging/api/config/sa.json
 
-      - name: Deploy via FTP → /prepagas/staging/
-        uses: SamKirkland/FTP-Deploy-Action@v4.3.5
-        with:
-          server:      ${{ secrets.FTP_HOST }}
-          username:    ${{ secrets.FTP_USER }}
-          password:    ${{ secrets.FTP_PASSWORD }}
-          protocol:    ftp
-          port:        21
-          local-dir:   ./build/staging/
-          server-dir:  /prepagas/staging/
-          log-level:   verbose
-          exclude: |
-            **/.DS_Store
-            **/Thumbs.db
-            **/.gitkeep
+      - name: Deploy via lftp → /prepagas/staging/
+        env:
+          FTP_PASS: ${{ secrets.FTP_PASSWORD }}
+        run: |
+          lftp -u "${{ secrets.FTP_USER }}","$FTP_PASS" \
+               ftp://${{ secrets.FTP_HOST }} <<'LFTP'
+            set ftp:passive-mode true
+            set net:timeout 30
+            mirror --reverse --delete --verbose \
+              build/staging/ /prepagas/staging/
+            quit
+          LFTP
 
   # ── PRODUCCIÓN — solo main ─────────────────────────────────────────────────
   deploy-production:
@@ -90,34 +93,28 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
+      - name: Instalar lftp
+        run: sudo apt-get install -y lftp
+
       - name: Preparar build de producción
         run: |
           mkdir -p build/prepagas
-
           cp -r product/dashboard/. build/prepagas/
           cp -r product/api/.       build/prepagas/api/
-
           sed -i 's/const USE_MOCK = true.*/const USE_MOCK = false;/' \
             build/prepagas/assets/js/api.js
-
-          echo "✓ USE_MOCK en build:"
-          grep "const USE_MOCK" build/prepagas/assets/js/api.js
-
           rm -f build/prepagas/config/credentials.php
           rm -f build/prepagas/api/config/sa.json
 
-      - name: Deploy via FTP → /prepagas/
-        uses: SamKirkland/FTP-Deploy-Action@v4.3.5
-        with:
-          server:      ${{ secrets.FTP_HOST }}
-          username:    ${{ secrets.FTP_USER }}
-          password:    ${{ secrets.FTP_PASSWORD }}
-          protocol:    ftp
-          port:        21
-          local-dir:   ./build/prepagas/
-          server-dir:  /prepagas/
-          log-level:   verbose
-          exclude: |
-            **/.DS_Store
-            **/Thumbs.db
-            **/.gitkeep
+      - name: Deploy via lftp → /prepagas/
+        env:
+          FTP_PASS: ${{ secrets.FTP_PASSWORD }}
+        run: |
+          lftp -u "${{ secrets.FTP_USER }}","$FTP_PASS" \
+               ftp://${{ secrets.FTP_HOST }} <<'LFTP'
+            set ftp:passive-mode true
+            set net:timeout 30
+            mirror --reverse --delete --verbose \
+              build/prepagas/ /prepagas/
+            quit
+          LFTP
