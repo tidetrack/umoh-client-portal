@@ -68,9 +68,20 @@ jobs:
       - name: Configurar SSH
         run: |
           mkdir -p ~/.ssh
-          echo "${{ secrets.SSH_PRIVATE_KEY }}" > ~/.ssh/deploy_key
+          printf '%s\n' "${{ secrets.SSH_PRIVATE_KEY }}" > ~/.ssh/deploy_key
           chmod 600 ~/.ssh/deploy_key
           ssh-keyscan -p $SSH_PORT ${{ secrets.FTP_HOST }} >> ~/.ssh/known_hosts 2>/dev/null
+
+      - name: Test SSH verbose (debug)
+        run: |
+          echo "→ Usuario FTP_USER: ${{ secrets.FTP_USER }}"
+          echo "→ Host: ${{ secrets.FTP_HOST }}"
+          echo "→ Intentando conexión SSH verbose..."
+          ssh -v -p $SSH_PORT \
+            -i ~/.ssh/deploy_key \
+            -o StrictHostKeyChecking=no \
+            -o BatchMode=yes \
+            "${{ secrets.FTP_USER }}@${{ secrets.FTP_HOST }}" exit 2>&1 | tail -20 || true
 
       - name: Preparar build de producción
         run: |
