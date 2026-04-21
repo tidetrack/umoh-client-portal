@@ -374,9 +374,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
     /* ── Responsive ───────────────────────────────── */
     @media (max-width: 768px) {
-      .planet-1 { width: 140px; top: 20px; left: 20px; }
-      .planet-2 { width: 220px; bottom: -40px; right: -40px; }
-      .planet-3 { width: 420px; left: -120px; }
+      .planet-3  { width: 300px; }
+      .planet-7  { width: 180px; }
+      .planet-9  { width: 130px; left: -30px; }   /* más a la izquierda, parcial off-screen */
+      .planet-12 { width: 150px; }
+      .planet-13 { width: 200px; right: -40px; }  /* más a la derecha, parcial off-screen */
     }
   </style>
 </head>
