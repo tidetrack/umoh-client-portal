@@ -18,11 +18,28 @@ env:
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
 
 jobs:
+  # ── DIAGNÓSTICO — corre siempre primero ────────────────────────────────────
+  ftp-check:
+    name: Verificar conectividad FTP
+    runs-on: ubuntu-latest
+    steps:
+      - name: Test FTP login con curl
+        run: |
+          echo "→ Probando conexión FTP a ${{ secrets.FTP_HOST }}..."
+          curl -v \
+            --user "${{ secrets.FTP_USER }}:${{ secrets.FTP_PASSWORD }}" \
+            "ftp://${{ secrets.FTP_HOST }}/" \
+            --connect-timeout 15 \
+            --max-time 20 \
+            2>&1 | grep -E "(Connected|220|230|530|331|Login|USER|PASS|error|curl)" || true
+          echo "→ Exit code: $?"
+
   # ── STAGING — cualquier rama que no sea main ───────────────────────────────
   deploy-staging:
     name: Deploy → Staging
     runs-on: ubuntu-latest
     timeout-minutes: 15
+    needs: ftp-check
     if: github.ref != 'refs/heads/main' || (github.event_name == 'workflow_dispatch' && github.event.inputs.environment == 'staging')
 
     steps:
@@ -36,7 +53,6 @@ jobs:
           cp -r product/dashboard/. build/staging/
           cp -r product/api/.       build/staging/api/
 
-          # Staging usa mock data para no depender de APIs reales
           sed -i 's/const USE_MOCK = false.*/const USE_MOCK = true;/' \
             build/staging/assets/js/api.js || true
 
@@ -52,9 +68,11 @@ jobs:
           server:      ${{ secrets.FTP_HOST }}
           username:    ${{ secrets.FTP_USER }}
           password:    ${{ secrets.FTP_PASSWORD }}
+          protocol:    ftp
+          port:        21
           local-dir:   ./build/staging/
           server-dir:  /prepagas/staging/
-          log-level:   minimal
+          log-level:   verbose
           exclude: |
             **/.DS_Store
             **/Thumbs.db
@@ -65,6 +83,7 @@ jobs:
     name: Deploy → Producción
     runs-on: ubuntu-latest
     timeout-minutes: 15
+    needs: ftp-check
     if: github.ref == 'refs/heads/main' && (github.event_name == 'push' || github.event.inputs.environment == 'production')
 
     steps:
@@ -93,9 +112,11 @@ jobs:
           server:      ${{ secrets.FTP_HOST }}
           username:    ${{ secrets.FTP_USER }}
           password:    ${{ secrets.FTP_PASSWORD }}
+          protocol:    ftp
+          port:        21
           local-dir:   ./build/prepagas/
           server-dir:  /prepagas/
-          log-level:   minimal
+          log-level:   verbose
           exclude: |
             **/.DS_Store
             **/Thumbs.db
