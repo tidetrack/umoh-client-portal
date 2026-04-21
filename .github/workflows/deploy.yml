@@ -1,0 +1,99 @@
+name: Deploy → prepagas.umohcrew.com
+
+on:
+  push:
+    paths:
+      - 'product/dashboard/**'
+      - 'product/api/**'
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: 'Entorno destino'
+        required: true
+        default: 'staging'
+        type: choice
+        options: [staging, production]
+
+jobs:
+  # ── STAGING — cualquier rama que no sea main ───────────────────────────────
+  deploy-staging:
+    name: Deploy → Staging
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    if: github.ref != 'refs/heads/main' || (github.event_name == 'workflow_dispatch' && github.event.inputs.environment == 'staging')
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Preparar build de staging
+        run: |
+          mkdir -p build/staging
+
+          cp -r product/dashboard/. build/staging/
+          cp -r product/api/.       build/staging/api/
+
+          # Staging usa mock data para no depender de APIs reales
+          sed -i 's/const USE_MOCK = false.*/const USE_MOCK = true;/' \
+            build/staging/assets/js/api.js || true
+
+          echo "✓ USE_MOCK en staging:"
+          grep "const USE_MOCK" build/staging/assets/js/api.js || echo "(no encontrado)"
+
+          rm -f build/staging/config/credentials.php
+          rm -f build/staging/api/config/sa.json
+
+      - name: Deploy via FTP → /prepagas/staging/
+        uses: SamKirkland/FTP-Deploy-Action@v4.3.5
+        with:
+          server:      ${{ secrets.FTP_HOST }}
+          username:    ${{ secrets.FTP_USER }}
+          password:    ${{ secrets.FTP_PASSWORD }}
+          local-dir:   ./build/staging/
+          server-dir:  /prepagas/staging/
+          log-level:   minimal
+          exclude: |
+            **/.DS_Store
+            **/Thumbs.db
+            **/.gitkeep
+
+  # ── PRODUCCIÓN — solo main ─────────────────────────────────────────────────
+  deploy-production:
+    name: Deploy → Producción
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    if: github.ref == 'refs/heads/main' && (github.event_name == 'push' || github.event.inputs.environment == 'production')
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Preparar build de producción
+        run: |
+          mkdir -p build/prepagas
+
+          cp -r product/dashboard/. build/prepagas/
+          cp -r product/api/.       build/prepagas/api/
+
+          sed -i 's/const USE_MOCK = true.*/const USE_MOCK = false;/' \
+            build/prepagas/assets/js/api.js
+
+          echo "✓ USE_MOCK en build:"
+          grep "const USE_MOCK" build/prepagas/assets/js/api.js
+
+          rm -f build/prepagas/config/credentials.php
+          rm -f build/prepagas/api/config/sa.json
+
+      - name: Deploy via FTP → /prepagas/
+        uses: SamKirkland/FTP-Deploy-Action@v4.3.5
+        with:
+          server:      ${{ secrets.FTP_HOST }}
+          username:    ${{ secrets.FTP_USER }}
+          password:    ${{ secrets.FTP_PASSWORD }}
+          local-dir:   ./build/prepagas/
+          server-dir:  /prepagas/
+          log-level:   minimal
+          exclude: |
+            **/.DS_Store
+            **/Thumbs.db
+            **/.gitkeep

@@ -43,7 +43,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 }
 ?>
 <!DOCTYPE html>
-<html lang="es">
+<html lang="es" data-theme="dark">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -55,25 +55,66 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
   <style>
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
+    /* ── Design tokens — dark (default) ─────────────── */
     :root {
-      --navy:       #212A38;
-      --navy-deep:  #0E1520;
-      --navy-light: #2A3647;
       --red:        #FF003B;
       --red-dark:   #CC002F;
-      --white:      #FFFFFF;
-      --text:       rgba(255,255,255,0.90);
-      --muted:      rgba(255,255,255,0.45);
-      --border:     rgba(255,255,255,0.10);
-      --input-bg:   rgba(255,255,255,0.06);
+
+      --bg:              #0E1520;
+      --card-bg:         rgba(22, 31, 44, 0.80);
+      --text:            rgba(255,255,255,0.90);
+      --text-strong:     #FFFFFF;
+      --muted:           rgba(255,255,255,0.45);
+      --border:          rgba(255,255,255,0.10);
+      --input-bg:        rgba(255,255,255,0.06);
+      --input-color:     #FFFFFF;
+      --placeholder:     rgba(255,255,255,0.20);
+      --badge-bg:        rgba(255,255,255,0.06);
+      --help-text:       rgba(255,255,255,0.30);
+      --help-link:       rgba(255,255,255,0.50);
+      --footer-tagline:  rgba(255,255,255,0.90);
+      --footer-meta:     rgba(255,255,255,0.18);
+      --footer-link:     rgba(255,255,255,0.32);
+      --footer-link-hover: rgba(255,255,255,0.60);
+      --logo-filter:     none;
+      --toggle-bg:       rgba(255,255,255,0.08);
+      --toggle-border:   rgba(255,255,255,0.14);
+      --toggle-color:    rgba(255,255,255,0.65);
+      --toggle-hover-bg: rgba(255,255,255,0.14);
+    }
+
+    /* ── Design tokens — light ───────────────────────── */
+    [data-theme="light"] {
+      --bg:              #EEF1F7;
+      --card-bg:         rgba(255,255,255,0.92);
+      --text:            rgba(14,21,32,0.90);
+      --text-strong:     #0E1520;
+      --muted:           rgba(14,21,32,0.50);
+      --border:          rgba(14,21,32,0.12);
+      --input-bg:        rgba(14,21,32,0.04);
+      --input-color:     #0E1520;
+      --placeholder:     rgba(14,21,32,0.25);
+      --badge-bg:        rgba(14,21,32,0.07);
+      --help-text:       rgba(14,21,32,0.40);
+      --help-link:       rgba(14,21,32,0.65);
+      --footer-tagline:  rgba(14,21,32,0.90);
+      --footer-meta:     rgba(14,21,32,0.25);
+      --footer-link:     rgba(14,21,32,0.45);
+      --footer-link-hover: rgba(14,21,32,0.75);
+      --logo-filter:     invert(1) brightness(0.15);
+      --toggle-bg:       rgba(14,21,32,0.06);
+      --toggle-border:   rgba(14,21,32,0.14);
+      --toggle-color:    rgba(14,21,32,0.60);
+      --toggle-hover-bg: rgba(14,21,32,0.12);
     }
 
     html, body {
       height: 100%;
       font-family: 'Outfit', system-ui, sans-serif;
-      background: var(--navy-deep);
+      background: var(--bg);
       color: var(--text);
       -webkit-font-smoothing: antialiased;
+      transition: background 0.25s, color 0.25s;
     }
 
     body {
@@ -86,18 +127,55 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
       overflow: hidden;
     }
 
+    /* ── Theme toggle ─────────────────────────────────── */
+    .theme-toggle {
+      position: fixed;
+      top: 20px;
+      right: 20px;
+      z-index: 10;
+      width: 38px;
+      height: 38px;
+      border-radius: 50%;
+      border: 1px solid var(--toggle-border);
+      background: var(--toggle-bg);
+      color: var(--toggle-color);
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: background 0.2s, border-color 0.2s, color 0.2s;
+      backdrop-filter: blur(8px);
+      -webkit-backdrop-filter: blur(8px);
+    }
+
+    .theme-toggle:hover {
+      background: var(--toggle-hover-bg);
+    }
+
+    .theme-toggle svg {
+      width: 16px;
+      height: 16px;
+      fill: none;
+      stroke: currentColor;
+      stroke-width: 1.75;
+      stroke-linecap: round;
+      stroke-linejoin: round;
+      flex-shrink: 0;
+    }
+
+    .icon-sun  { display: none; }
+    .icon-moon { display: block; }
+
+    [data-theme="light"] .icon-sun  { display: block; }
+    [data-theme="light"] .icon-moon { display: none; }
+
     /* ── Planets ──────────────────────────────────── */
-    /*
-     * Cada imagen recortada contiene únicamente el planeta (≈265×243 px original).
-     * p02-cropped → x30 visible  ≈ 1400px → posición arriba-derecha
-     * p03-cropped → x50 visible  ≈ 2300px → posición abajo-izquierda (parcial)
-     * p04-cropped → tamaño medio ≈  700px → posición izquierda-centro
-     */
     .planet {
       position: fixed;
       pointer-events: none;
       user-select: none;
       z-index: 0;
+      transition: opacity 0.3s;
     }
 
     /* Planeta 3 — centrado en pantalla, levemente a la derecha, 450px */
@@ -127,8 +205,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
       50%       { transform: translate(-30%, calc(-50% - 10px)) rotate(1.5deg); }
     }
 
-    /* ── Planetas extra (4–8) — TEST: eliminables individualmente ── */
-
     /* Planeta 7 — izquierda baja — 260px (p03) */
     .planet-7 {
       width: 260px;
@@ -138,9 +214,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
       animation-delay: -3s;
       opacity: 0.68;
     }
-
-
-    /* ── Planetas extra (9, 12, 13) — definitivos ── */
 
     /* Planeta 9  — superior izquierda — 170px — p04 */
     .planet-9 {
@@ -172,6 +245,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
       opacity: 0.68;
     }
 
+    [data-theme="light"] .planet { opacity: 0.35; }
+
     /* ── Wrapper ──────────────────────────────────── */
     .wrapper {
       position: relative;
@@ -199,6 +274,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
       height: 32px;
       width: auto;
       display: block;
+      filter: var(--logo-filter);
+      transition: filter 0.25s;
     }
 
     .logo-badge {
@@ -208,7 +285,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
       letter-spacing: 0.14em;
       text-transform: uppercase;
       color: var(--muted);
-      background: rgba(255,255,255,0.06);
+      background: var(--badge-bg);
       border: 1px solid var(--border);
       border-radius: 20px;
       padding: 4px 14px;
@@ -216,18 +293,19 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
     /* ── Card ─────────────────────────────────────── */
     .card {
-      background: rgba(22, 31, 44, 0.80);
+      background: var(--card-bg);
       backdrop-filter: blur(20px);
       -webkit-backdrop-filter: blur(20px);
       border: 1px solid var(--border);
       border-radius: 16px;
       padding: 40px 36px 36px;
+      transition: background 0.25s, border-color 0.25s;
     }
 
     .card-title {
       font-size: 22px;
       font-weight: 700;
-      color: var(--white);
+      color: var(--text-strong);
       letter-spacing: -0.3px;
       margin-bottom: 8px;
     }
@@ -291,7 +369,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
       font-size: 14px;
       font-family: 'Outfit', sans-serif;
       font-weight: 400;
-      color: var(--white);
+      color: var(--input-color);
       outline: none;
       transition: border-color 0.2s, background 0.2s;
     }
@@ -299,10 +377,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     input[type="text"]:focus,
     input[type="password"]:focus {
       border-color: var(--red);
-      background: rgba(255,255,255,0.09);
+      background: var(--input-bg);
     }
 
-    input::placeholder { color: rgba(255,255,255,0.20); }
+    input::placeholder { color: var(--placeholder); }
 
     /* ── Submit button ────────────────────────────── */
     .btn-submit {
@@ -310,7 +388,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
       margin-top: 8px;
       padding: 14px 20px;
       background: var(--red);
-      color: var(--white);
+      color: #FFFFFF;
       border: none;
       border-radius: 8px;
       font-size: 14px;
@@ -342,6 +420,22 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
       margin: 28px 0;
     }
 
+    /* ── Help text ────────────────────────────────── */
+    .help-text {
+      font-size: 12px;
+      color: var(--help-text);
+      text-align: center;
+      line-height: 1.5;
+    }
+
+    .help-text a {
+      color: var(--help-link);
+      text-decoration: none;
+      transition: color 0.15s;
+    }
+
+    .help-text a:hover { color: var(--text); }
+
     /* ── Footer ───────────────────────────────────── */
     .footer {
       text-align: center;
@@ -353,53 +447,62 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
       font-weight: 800;
       letter-spacing: 0.18em;
       text-transform: uppercase;
-      color: rgba(255,255,255,0.90);
+      color: var(--footer-tagline);
       margin-bottom: 10px;
     }
 
     .footer-meta {
       font-size: 11px;
       font-weight: 500;
-      color: rgba(255,255,255,0.18);
+      color: var(--footer-meta);
       letter-spacing: 0.06em;
     }
 
     .footer-meta a {
-      color: rgba(255,255,255,0.32);
+      color: var(--footer-link);
       text-decoration: none;
       transition: color 0.15s;
     }
 
-    .footer-meta a:hover { color: rgba(255,255,255,0.6); }
+    .footer-meta a:hover { color: var(--footer-link-hover); }
 
     /* ── Responsive ───────────────────────────────── */
     @media (max-width: 768px) {
       .planet-3  { width: 300px; }
       .planet-7  { width: 180px; }
-      .planet-9  { width: 130px; left: -30px; }   /* más a la izquierda, parcial off-screen */
+      .planet-9  { width: 130px; left: -30px; }
       .planet-12 { width: 150px; }
-      .planet-13 { width: 200px; right: -40px; }  /* más a la derecha, parcial off-screen */
+      .planet-13 { width: 200px; right: -40px; }
     }
   </style>
 </head>
 <body>
 
+  <!-- Theme toggle -->
+  <button class="theme-toggle" id="themeToggle" aria-label="Cambiar tema" title="Cambiar tema">
+    <!-- Sun (shown in light mode) -->
+    <svg class="icon-sun" viewBox="0 0 24 24">
+      <circle cx="12" cy="12" r="5"/>
+      <line x1="12" y1="2"  x2="12" y2="4"/>
+      <line x1="12" y1="20" x2="12" y2="22"/>
+      <line x1="4.22" y1="4.22"  x2="5.64" y2="5.64"/>
+      <line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/>
+      <line x1="2"  y1="12" x2="4"  y2="12"/>
+      <line x1="20" y1="12" x2="22" y2="12"/>
+      <line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/>
+      <line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/>
+    </svg>
+    <!-- Moon (shown in dark mode) -->
+    <svg class="icon-moon" viewBox="0 0 24 24">
+      <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/>
+    </svg>
+  </button>
+
   <!-- PLANETAS DECORATIVOS — definitivos: 3, 7, 9, 12, 13 -->
-
-  <!-- Planeta 3 — centro pantalla (derecha) — 450px — p04 -->
-  <img src="assets/img/p04-cropped.png" alt="" class="planet planet-3" aria-hidden="true">
-
-  <!-- Planeta 7 — izquierda baja — 260px — p03 -->
-  <img src="assets/img/p03-cropped.png" alt="" class="planet planet-7" aria-hidden="true">
-
-
-  <!-- Planeta 9  — superior izquierda — 170px — p04 -->
-  <img src="assets/img/p04-cropped.png" alt="" class="planet planet-9" aria-hidden="true">
-
-  <!-- Planeta 12 — inferior derecha — 200px — p04 -->
+  <img src="assets/img/p04-cropped.png" alt="" class="planet planet-3"  aria-hidden="true">
+  <img src="assets/img/p03-cropped.png" alt="" class="planet planet-7"  aria-hidden="true">
+  <img src="assets/img/p04-cropped.png" alt="" class="planet planet-9"  aria-hidden="true">
   <img src="assets/img/p04-cropped.png" alt="" class="planet planet-12" aria-hidden="true">
-
-  <!-- Planeta 13 — superior derecha — 280px — p03 -->
   <img src="assets/img/p03-cropped.png" alt="" class="planet planet-13" aria-hidden="true">
 
   <div class="wrapper">
@@ -448,9 +551,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
       <div class="divider"></div>
 
-      <p style="font-size:12px; color:rgba(255,255,255,0.30); text-align:center; line-height:1.5;">
+      <p class="help-text">
         ¿Necesitás acceso? Escribinos a<br>
-        <a href="mailto:hola@umohcrew.com" style="color:rgba(255,255,255,0.50); text-decoration:none;">hola@umohcrew.com</a>
+        <a href="mailto:hola@umohcrew.com">hola@umohcrew.com</a>
       </p>
     </div>
 
@@ -462,5 +565,26 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     </div>
 
   </div>
+
+  <script>
+    (function () {
+      var html = document.documentElement;
+      var btn  = document.getElementById('themeToggle');
+      var key  = 'umoh-theme';
+
+      // Apply saved theme (or system preference) before first paint
+      var saved = localStorage.getItem(key);
+      if (!saved) {
+        saved = window.matchMedia('(prefers-color-scheme: light)').matches ? 'light' : 'dark';
+      }
+      html.setAttribute('data-theme', saved);
+
+      btn.addEventListener('click', function () {
+        var next = html.getAttribute('data-theme') === 'dark' ? 'light' : 'dark';
+        html.setAttribute('data-theme', next);
+        localStorage.setItem(key, next);
+      });
+    })();
+  </script>
 </body>
 </html>
