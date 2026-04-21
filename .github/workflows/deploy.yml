@@ -78,7 +78,7 @@ jobs:
             set ftp:passive-mode true
             set net:timeout 30
             mirror --reverse --delete --verbose \
-              build/staging/ /prepagas/staging/
+              build/staging/ /public_html/prepagas/staging/
             quit
           LFTP
 
@@ -117,6 +117,6 @@ jobs:
             set ftp:passive-mode true
             set net:timeout 30
             mirror --reverse --delete --verbose \
-              build/prepagas/ /prepagas/
+              build/prepagas/ /public_html/prepagas/
             quit
           LFTP
