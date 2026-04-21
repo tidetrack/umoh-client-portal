@@ -12,7 +12,7 @@ session_set_cookie_params([
 session_start();
 
 if (!empty($_SESSION['umoh_user'])) {
-    header('Location: index.html');
+    header('Location: index.php');
     exit;
 }
 
@@ -34,7 +34,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $_SESSION['umoh_role']    = $user['role'];
                 $_SESSION['umoh_clients'] = $user['clients'];
                 $_SESSION['umoh_name']    = $user['name'];
-                header('Location: index.html');
+                header('Location: index.php');
                 exit;
             }
         }
@@ -76,7 +76,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
       --footer-meta:     rgba(255,255,255,0.18);
       --footer-link:     rgba(255,255,255,0.32);
       --footer-link-hover: rgba(255,255,255,0.60);
-      --logo-filter:     none;
       --toggle-bg:       rgba(255,255,255,0.08);
       --toggle-border:   rgba(255,255,255,0.14);
       --toggle-color:    rgba(255,255,255,0.65);
@@ -101,7 +100,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
       --footer-meta:     rgba(14,21,32,0.25);
       --footer-link:     rgba(14,21,32,0.45);
       --footer-link-hover: rgba(14,21,32,0.75);
-      --logo-filter:     invert(1) brightness(0.15);
       --toggle-bg:       rgba(14,21,32,0.06);
       --toggle-border:   rgba(14,21,32,0.14);
       --toggle-color:    rgba(14,21,32,0.60);
@@ -274,8 +272,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
       height: 32px;
       width: auto;
       display: block;
-      filter: var(--logo-filter);
-      transition: filter 0.25s;
     }
 
     .logo-badge {
@@ -568,9 +564,17 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
   <script>
     (function () {
-      var html = document.documentElement;
-      var btn  = document.getElementById('themeToggle');
-      var key  = 'umoh-theme';
+      var html    = document.documentElement;
+      var btn     = document.getElementById('themeToggle');
+      var logoImg = document.querySelector('.logo-img');
+      var key     = 'umoh-theme';
+
+      function _applyLogo(theme) {
+        if (!logoImg) return;
+        logoImg.src = theme === 'light'
+          ? 'assets/img/logo-dark.png'
+          : 'assets/img/logo-white.png';
+      }
 
       // Apply saved theme (or system preference) before first paint
       var saved = localStorage.getItem(key);
@@ -578,11 +582,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         saved = window.matchMedia('(prefers-color-scheme: light)').matches ? 'light' : 'dark';
       }
       html.setAttribute('data-theme', saved);
+      _applyLogo(saved);
 
       btn.addEventListener('click', function () {
         var next = html.getAttribute('data-theme') === 'dark' ? 'light' : 'dark';
         html.setAttribute('data-theme', next);
         localStorage.setItem(key, next);
+        _applyLogo(next);
       });
     })();
   </script>

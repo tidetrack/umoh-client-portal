@@ -1,3 +1,30 @@
+<?php
+/**
+ * UMOH — Dashboard principal
+ *
+ * Gate de sesion PHP. Con PHASE1_BYPASS = true permite acceso libre (staging/Fase 1).
+ * Para activar auth real en Fase 4: cambiar PHASE1_BYPASS a false en auth_check.php
+ * y asegurarse de que credentials.php existe en /config/credentials.php.
+ */
+define('PHASE1_BYPASS', true);
+
+if (!PHASE1_BYPASS) {
+    ini_set('session.cookie_domain', '.umohcrew.com');
+    session_set_cookie_params([
+        'lifetime' => 86400 * 30,
+        'path'     => '/',
+        'domain'   => '.umohcrew.com',
+        'secure'   => true,
+        'httponly' => true,
+        'samesite' => 'Lax',
+    ]);
+    session_start();
+    if (empty($_SESSION['umoh_user'])) {
+        header('Location: login.php');
+        exit;
+    }
+}
+?>
 <!DOCTYPE html>
 <html lang="es" data-theme="light">
 <head>
@@ -28,94 +55,9 @@
 <body>
 
   <!-- ══════════════════════════════════════════════
-       LOGIN SCREEN
-       Mock auth: usuario=admin / contraseña=umoh2024
-       Fase 4: reemplazar _validateCredentials() con
-       fetch a /api/auth/login.php
+       DASHBOARD WRAPPER
   ══════════════════════════════════════════════ -->
-  <div id="login-screen" class="login-screen" role="main" aria-label="Acceso al portal">
-    <div class="login-card">
-
-      <!-- Theme toggle -->
-      <button id="login-theme-toggle" class="login-theme-toggle" title="Cambiar tema" aria-label="Cambiar modo claro/oscuro">
-        <svg class="theme-icon theme-icon--sun" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-          <circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/>
-        </svg>
-        <svg class="theme-icon theme-icon--moon" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-          <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/>
-        </svg>
-      </button>
-
-      <!-- Brand -->
-      <div class="login-brand">
-        <div class="login-brand-mark" aria-hidden="true">
-          <img src="assets/img/asterisco.png" alt="" width="36" height="36">
-        </div>
-        <span class="login-brand-name">umoh</span>
-        <span class="login-brand-tagline">Portal de Performance</span>
-      </div>
-
-      <!-- Form -->
-      <form id="login-form" class="login-form" novalidate>
-
-        <div class="login-field">
-          <label class="login-label" for="login-username">Usuario</label>
-          <div class="login-input-wrap">
-            <input
-              type="text"
-              id="login-username"
-              class="login-input"
-              placeholder="usuario"
-              autocomplete="username"
-              autocapitalize="none"
-              spellcheck="false"
-              required
-            >
-          </div>
-        </div>
-
-        <div class="login-field">
-          <label class="login-label" for="login-password">Contraseña</label>
-          <div class="login-input-wrap">
-            <input
-              type="password"
-              id="login-password"
-              class="login-input login-input--password"
-              placeholder="••••••••"
-              autocomplete="current-password"
-              required
-            >
-            <button type="button" id="login-pw-toggle" class="login-pw-toggle" aria-label="Mostrar contraseña">
-              <!-- Eye icon (default: password hidden) -->
-              <svg id="pw-icon-show" width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/>
-                <circle cx="12" cy="12" r="3"/>
-              </svg>
-              <!-- Eye-off icon (shown when password is visible) -->
-              <svg id="pw-icon-hide" width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:none">
-                <path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94"/>
-                <path d="M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19"/>
-                <line x1="1" y1="1" x2="23" y2="23"/>
-              </svg>
-            </button>
-          </div>
-        </div>
-
-        <p id="login-error" class="login-error" role="alert" aria-live="polite"></p>
-
-        <button type="submit" id="login-submit" class="login-submit">Ingresar</button>
-
-      </form>
-
-    </div>
-
-    <p class="login-footer">umoh &copy; 2025 &mdash; Acceso restringido</p>
-  </div>
-
-  <!-- ══════════════════════════════════════════════
-       DASHBOARD WRAPPER (hidden until auth)
-  ══════════════════════════════════════════════ -->
-  <div id="dashboard-wrapper" class="dashboard-wrapper" hidden>
+  <div id="dashboard-wrapper" class="dashboard-wrapper">
 
   <!-- ══════════════════════════════════════════════
        HEADER
@@ -577,122 +519,6 @@
       </div>
     </div>
   </div>
-
-  <!-- Login Gate -->
-  <script>
-    (function () {
-      var MOCK_USER = 'admin';
-      var MOCK_PASS = 'umoh2024';
-
-      var loginScreen    = document.getElementById('login-screen');
-      var dashWrapper    = document.getElementById('dashboard-wrapper');
-      var loginForm      = document.getElementById('login-form');
-      var usernameInput  = document.getElementById('login-username');
-      var passwordInput  = document.getElementById('login-password');
-      var errorEl        = document.getElementById('login-error');
-      var submitBtn      = document.getElementById('login-submit');
-      var pwToggleBtn    = document.getElementById('login-pw-toggle');
-      var pwIconShow     = document.getElementById('pw-icon-show');
-      var pwIconHide     = document.getElementById('pw-icon-hide');
-      var loginThemeBtn  = document.getElementById('login-theme-toggle');
-
-      /* Session key */
-      var SESSION_KEY = 'umoh-session';
-
-      /* Check if already authenticated */
-      function _isAuthenticated() {
-        return sessionStorage.getItem(SESSION_KEY) === '1';
-      }
-
-      /* Show dashboard, hide login */
-      function _revealDashboard(username) {
-        window.DASHBOARD_USERNAME = username || 'Admin';
-        loginScreen.hidden = true;
-        dashWrapper.hidden = false;
-        dashWrapper.classList.add('is-revealed');
-        sessionStorage.setItem(SESSION_KEY, '1');
-      }
-
-      /* Show inline error */
-      function _setError(msg) {
-        errorEl.textContent = msg;
-      }
-
-      /* Clear inline error */
-      function _clearError() {
-        errorEl.textContent = '';
-      }
-
-      /* Validate credentials (mock — Fase 4: fetch /api/auth/login.php) */
-      function _validateCredentials(user, pass) {
-        return user.trim().toLowerCase() === MOCK_USER && pass === MOCK_PASS;
-      }
-
-      /* Handle form submit */
-      function _handleSubmit(e) {
-        e.preventDefault();
-        _clearError();
-
-        var user = usernameInput.value;
-        var pass = passwordInput.value;
-
-        if (!user || !pass) {
-          _setError('Completá usuario y contraseña.');
-          return;
-        }
-
-        submitBtn.classList.add('is-loading');
-        submitBtn.textContent = 'Ingresando…';
-
-        /* Simulate a brief async check (Fase 4: fetch here) */
-        setTimeout(function () {
-          if (_validateCredentials(user, pass)) {
-            _revealDashboard('Admin');
-          } else {
-            submitBtn.classList.remove('is-loading');
-            submitBtn.textContent = 'Ingresar';
-            _setError('Usuario o contraseña incorrectos.');
-            passwordInput.value = '';
-            passwordInput.focus();
-          }
-        }, 420);
-      }
-
-      /* Password show/hide toggle */
-      function _togglePassword() {
-        var isHidden = passwordInput.type === 'password';
-        passwordInput.type = isHidden ? 'text' : 'password';
-        pwIconShow.style.display = isHidden ? 'none' : '';
-        pwIconHide.style.display = isHidden ? '' : 'none';
-        pwToggleBtn.setAttribute('aria-label', isHidden ? 'Ocultar contraseña' : 'Mostrar contraseña');
-      }
-
-      /* Theme toggle (login screen + whole app) */
-      function _toggleTheme() {
-        var current = document.documentElement.getAttribute('data-theme') || 'light';
-        var next    = current === 'dark' ? 'light' : 'dark';
-        document.documentElement.setAttribute('data-theme', next);
-        localStorage.setItem('umoh-theme', next);
-      }
-
-      /* Bind events */
-      loginForm.addEventListener('submit', _handleSubmit);
-      pwToggleBtn.addEventListener('click', _togglePassword);
-      loginThemeBtn.addEventListener('click', _toggleTheme);
-
-      /* Clear error on typing */
-      usernameInput.addEventListener('input', _clearError);
-      passwordInput.addEventListener('input', _clearError);
-
-      /* If already authenticated (page refresh within session), skip login */
-      if (_isAuthenticated()) {
-        _revealDashboard('Admin');
-      }
-
-      /* Focus username field on load */
-      usernameInput.focus();
-    }());
-  </script>
 
   <!-- Dashboard scripts -->
   <script src="assets/js/mockdata.js"></script>

@@ -35,7 +35,7 @@ BASE="dashboard"
 FTP="ftp://147.93.37.161/prepagas"
 AUTH="u475803516.umohdasboards:PASSWORD"
 
-curl -s -T "$BASE/index.html"           "$FTP/index.html"           --user "$AUTH" -w "%{filename} → %{http_code}\n" &
+curl -s -T "$BASE/index.php"            "$FTP/index.php"            --user "$AUTH" -w "%{filename} → %{http_code}\n" &
 curl -s -T "$BASE/assets/css/umoh.css"  "$FTP/assets/css/umoh.css"  --user "$AUTH" -w "%{filename} → %{http_code}\n" &
 wait
 ```
