@@ -49,7 +49,7 @@ jobs:
 
       - name: Deploy via rsync → /public_html/prepagas/staging/
         run: |
-          rsync -avz --delete \
+          rsync -avz --delete --mkpath \
             -e "ssh -p $SSH_PORT -i ~/.ssh/deploy_key -o StrictHostKeyChecking=no" \
             build/staging/ \
             "${{ secrets.SSH_USER }}@${{ secrets.FTP_HOST }}:/public_html/prepagas/staging/"
@@ -95,7 +95,7 @@ jobs:
 
       - name: Deploy via rsync → /public_html/prepagas/
         run: |
-          rsync -avz --delete \
+          rsync -avz --delete --mkpath \
             -e "ssh -p $SSH_PORT -i ~/.ssh/deploy_key -o StrictHostKeyChecking=no" \
             build/prepagas/ \
             "${{ secrets.SSH_USER }}@${{ secrets.FTP_HOST }}:/public_html/prepagas/"
