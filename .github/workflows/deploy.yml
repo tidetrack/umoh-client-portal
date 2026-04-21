@@ -39,13 +39,14 @@ jobs:
 
       - name: Preparar build de staging
         run: |
-          mkdir -p build/staging
+          mkdir -p build/staging/api/config
           cp -r product/dashboard/. build/staging/
           cp -r product/api/.       build/staging/api/
           sed -i 's/const USE_MOCK = false.*/const USE_MOCK = true;/' \
             build/staging/assets/js/api.js || true
           rm -f build/staging/config/credentials.php
-          rm -f build/staging/api/config/sa.json
+          # Escribir SA key desde GitHub Secret (nunca desde disco)
+          echo '${{ secrets.GOOGLE_SHEETS_SA_JSON }}' > build/staging/api/config/sa.json
 
       - name: Deploy via rsync → /public_html/prepagas/staging/
         run: |
@@ -74,13 +75,17 @@ jobs:
 
       - name: Preparar build de producción
         run: |
-          mkdir -p build/prepagas
+          mkdir -p build/prepagas/api/config
           cp -r product/dashboard/. build/prepagas/
           cp -r product/api/.       build/prepagas/api/
+          # Flags de seguridad: nunca llegan activos a producción
           sed -i 's/const USE_MOCK = true.*/const USE_MOCK = false;/' \
             build/prepagas/assets/js/api.js
+          sed -i "s/define('PHASE1_BYPASS', true)/define('PHASE1_BYPASS', false)/g" \
+            build/prepagas/auth_check.php build/prepagas/index.php 2>/dev/null || true
           rm -f build/prepagas/config/credentials.php
-          rm -f build/prepagas/api/config/sa.json
+          # Escribir SA key desde GitHub Secret (nunca desde disco)
+          echo '${{ secrets.GOOGLE_SHEETS_SA_JSON }}' > build/prepagas/api/config/sa.json
 
       - name: Deploy via rsync → /public_html/prepagas/
         run: |
