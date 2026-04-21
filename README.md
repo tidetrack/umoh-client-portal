@@ -6,16 +6,50 @@ El diferencial no es mostrar métricas de ads — es conectar el funnel completo
 
 ---
 
-## Tabla de contenidos
+## Estructura del repositorio
 
-1. [Arquitectura](#arquitectura)
-2. [Código fuente](#código-fuente)
-3. [Producción](#producción)
-4. [Conexiones](#conexiones)
-5. [Entornos de prueba](#entornos-de-prueba)
-6. [Wiki y documentación](#wiki-y-documentación)
-7. [Estado del proyecto](#estado-del-proyecto)
-8. [Agentes de IA](#agentes-de-ia)
+El repositorio está organizado como las áreas de una empresa. Cada carpeta raíz es un área de trabajo independiente pero interconectada.
+
+```
+umoh-client-portal/
+│
+├── product/            INGENIERÍA — el producto (frontend + backend)
+│   ├── dashboard/      SPA con las 4 vistas del funnel
+│   └── api/            Endpoints PHP + helpers + configuración
+│
+├── data/               DATA PLATFORM — cómo se obtienen y procesan los datos
+│   ├── extractors/     Scripts Python: extracción de APIs externas
+│   ├── normalizers/    Transformación al schema canónico TOFU/MOFU/BOFU
+│   ├── loaders/        Escritura de datos normalizados en Google Sheets
+│   └── connections/    Documentación de cada integración
+│
+├── clients/            CUENTAS — configuración de cada cliente
+│   ├── {slug}.json     Config del dashboard (IDs, moneda, timezone)
+│   └── {slug}.yaml     Config del pipeline Python
+│
+├── ops/                OPERACIONES — deploy, entornos y testing
+│   ├── production/     Guías de deploy, scripts de producción, .env.example
+│   └── testing/        Entornos de prueba y checklist de validación
+│
+├── docs/               CONOCIMIENTO — wiki técnica y procedimientos
+│   ├── wiki/           Arquitectura, procedures, referencia de API y schema
+│   ├── PROMPT_MAESTRO.md
+│   ├── plan-implementacion.md
+│   └── manual-alta-clientes.md
+│
+├── .agent/             EQUIPO IA — skills y workflows de agentes
+│   ├── skills/         Definición de cada agente especializado
+│   └── workflows/      System prompts operativos
+│
+├── .github/            CI/CD — GitHub Actions (debe estar en root)
+│   └── workflows/extract_all.yml   Pipeline cron cada 6h
+│
+├── README.md           Este archivo
+├── CHANGELOG.md        Historial de cambios del código madre
+├── ARCHITECTURE.md     Decisiones de arquitectura
+├── CLAUDE.md           Instrucciones para Claude Code
+└── requirements.txt    Dependencias Python
+```
 
 ---
 
@@ -27,109 +61,62 @@ Browser → filters.js → api.js
                           └─ USE_MOCK=false → PHP endpoint → Google Sheets → charts.js
 
 GitHub Actions (cron cada 6h)
-  └─ extractors/ → normalizers/ → loaders/ → Google Sheets
+  └─ data/extractors/ → data/normalizers/ → data/loaders/ → Google Sheets
 ```
 
 | Capa | Tecnología |
 |------|-----------|
 | Frontend | HTML + CSS + Vanilla JS (sin frameworks) |
 | Backend | PHP 8.3 — Hostinger shared hosting |
-| Base de datos | MySQL en Hostinger (Fase 4) |
-| Charts | Chart.js 4 (CDN) |
 | Pipeline | Python 3 + GitHub Actions |
 | APIs externas | Google Ads, Meta Marketing, MeisterTask |
 | Almacenamiento intermedio | Google Sheets (leída por PHP) |
 
 ---
 
-## Código fuente
-
-```
-umoh-client-portal/
-├── dashboard/               ← Frontend SPA
-│   ├── index.html           ← Vista principal (performance / tofu / mofu / bofu)
-│   ├── login.php            ← Login con autenticación PHP
-│   ├── auth_check.php       ← Verificación de sesión (AJAX endpoint)
-│   ├── logout.php           ← Cierre de sesión
-│   └── assets/
-│       ├── css/umoh.css     ← Design system completo
-│       ├── js/
-│       │   ├── api.js       ← Abstracción mock ↔ PHP (USE_MOCK flag)
-│       │   ├── charts.js    ← Render de gráficos (Chart.js 4)
-│       │   ├── filters.js   ← Navegación, períodos, KPI modals
-│       │   └── mockdata.js  ← Datos de prueba realistas
-│       └── img/             ← Logos, planetas decorativos, favicon
-│
-├── api/                     ← Backend PHP
-│   ├── config/
-│   │   ├── database.php     ← PDO singleton MySQL
-│   │   ├── env.php          ← Loader de .env sin Composer
-│   │   └── .htaccess        ← Restricciones de acceso directo
-│   ├── lib/
-│   │   ├── config.php       ← Helpers: period_dates(), filter_range(), build_trend()
-│   │   └── sheets.php       ← Lector de Google Sheets via API
-│   └── endpoints/
-│       ├── summary.php      ← GET ?period=30d — métricas consolidadas
-│       ├── tofu.php         ← GET ?period=30d — awareness (Google Ads)
-│       ├── mofu.php         ← GET ?period=30d — leads (MeisterTask)
-│       └── bofu.php         ← GET ?period=30d — ventas cerradas
-│
-├── extractors/              ← Extracción de datos desde APIs externas
-├── normalizers/             ← Transformación al schema canónico
-├── loaders/                 ← Escritura en Google Sheets
-├── clients/                 ← Config por cliente ({slug}.json)
-└── config/clients/          ← Config del pipeline por cliente ({slug}.yaml)
-```
-
----
-
 ## Producción
 
-Ver [`production/`](./production/README.md) para la guía completa.
+Ver [`ops/production/`](./ops/production/README.md) para la guía completa.
 
 | Dato | Valor |
 |------|-------|
 | Hosting | Hostinger shared hosting |
 | FTP | `ftp://147.93.37.161` |
 | Subdominio activo | `prepagas.umohcrew.com` |
-| Deploy | FTP manual — ver [`production/deploy/hostinger-guide.md`](./production/deploy/hostinger-guide.md) |
-| Variables de entorno | [`production/environments/.env.example`](./production/environments/.env.example) — el `.env` real va solo en el servidor |
-| Script producción | [`production/api.production.js`](./production/api.production.js) — `api.js` con `USE_MOCK=false` |
-| Credenciales pipeline | GitHub Secrets — ver [`connections/`](./connections/README.md) |
+| Deploy | FTP manual — [`ops/production/deploy/`](./ops/production/deploy/hostinger-guide.md) |
+| Variables de entorno | [`ops/production/environments/.env.example`](./ops/production/environments/.env.example) |
+| Script producción | [`ops/production/api.production.js`](./ops/production/api.production.js) |
 
 ---
 
 ## Conexiones
 
-Ver [`connections/`](./connections/README.md) para la documentación completa de cada integración.
+Ver [`data/connections/`](./data/connections/README.md) para documentación completa.
 
-| Servicio | Estado | Docs |
-|---------|--------|------|
-| Google Ads API | Activo | [connections/google-ads.md](./connections/google-ads.md) |
-| Google Sheets API | Activo | [connections/google-sheets.md](./connections/google-sheets.md) |
-| Meta Marketing API | Pendiente (Fase 3) | [connections/meta-ads.md](./connections/meta-ads.md) |
-| MeisterTask API | Pendiente (Fase 5) | [connections/meistertask.md](./connections/meistertask.md) |
-| MySQL Hostinger | Pendiente (Fase 4) | Auth por subdominio |
+| Servicio | Estado |
+|---------|--------|
+| Google Ads API | Activo (Fase 1) |
+| Google Sheets API | Activo (Fase 1) |
+| Meta Marketing API | Pendiente (Fase 3) |
+| MeisterTask API | Pendiente (Fase 5) |
 
 ---
 
 ## Entornos de prueba
 
-Ver [`testing/`](./testing/README.md) para la guía completa.
+Ver [`ops/testing/`](./ops/testing/README.md).
 
-**Activar modo mock (desarrollo local):**
 ```javascript
-// dashboard/assets/js/api.js
-const USE_MOCK = true;
+// product/dashboard/assets/js/api.js
+const USE_MOCK = true;   // desarrollo local
+const USE_MOCK = false;  // producción
 ```
 
-**Activar auth bypass (sin login):**
 ```php
-// dashboard/auth_check.php
-define('PHASE1_BYPASS', true);
+// product/dashboard/auth_check.php
+define('PHASE1_BYPASS', true);   // sin login (Fase 1)
+define('PHASE1_BYPASS', false);  // login real (Fase 4)
 ```
-
-Antes de hacer push a producción: `USE_MOCK = false` y `PHASE1_BYPASS = false`.
 
 ---
 
@@ -138,14 +125,13 @@ Antes de hacer push a producción: `USE_MOCK = false` y `PHASE1_BYPASS = false`.
 | Documento | Descripción |
 |-----------|-------------|
 | [docs/wiki/](./docs/wiki/README.md) | Índice completo de la wiki |
-| [docs/wiki/architecture.md](./docs/wiki/architecture.md) | Arquitectura técnica detallada |
+| [docs/wiki/architecture.md](./docs/wiki/architecture.md) | Arquitectura técnica |
 | [docs/wiki/procedures/deploy.md](./docs/wiki/procedures/deploy.md) | Deploy paso a paso |
-| [docs/wiki/procedures/client-onboarding.md](./docs/wiki/procedures/client-onboarding.md) | Alta de nuevos clientes |
-| [docs/wiki/procedures/data-pipeline.md](./docs/wiki/procedures/data-pipeline.md) | Pipeline de datos end-to-end |
-| [docs/wiki/api-reference/endpoints.md](./docs/wiki/api-reference/endpoints.md) | Referencia de endpoints PHP |
-| [docs/wiki/api-reference/schema.md](./docs/wiki/api-reference/schema.md) | Schema canónico TOFU/MOFU/BOFU |
-| [docs/PROMPT_MAESTRO.md](./docs/PROMPT_MAESTRO.md) | Prompt de inicio de sesión para Claude Code |
-| [CHANGELOG.md](./CHANGELOG.md) | Historial de cambios del código madre |
+| [docs/wiki/procedures/client-onboarding.md](./docs/wiki/procedures/client-onboarding.md) | Alta de clientes |
+| [docs/wiki/procedures/data-pipeline.md](./docs/wiki/procedures/data-pipeline.md) | Pipeline end-to-end |
+| [docs/wiki/api-reference/endpoints.md](./docs/wiki/api-reference/endpoints.md) | Referencia endpoints PHP |
+| [docs/wiki/api-reference/schema.md](./docs/wiki/api-reference/schema.md) | Schema TOFU/MOFU/BOFU |
+| [CHANGELOG.md](./CHANGELOG.md) | Historial de cambios |
 
 ---
 
@@ -153,20 +139,16 @@ Antes de hacer push a producción: `USE_MOCK = false` y `PHASE1_BYPASS = false`.
 
 | Fase | Estado | Descripción |
 |------|--------|-------------|
-| 1 | Completa | Dashboard frontend + pipeline Google Ads real + login |
-| 2 | En progreso | Conectar datos reales al dashboard (PHP → Sheets) |
-| 3 | Pendiente | Integración Meta Ads API |
-| 4 | Pendiente | Auth con MySQL por subdominio |
-| 5 | Pendiente | MeisterTask API para MOFU automático |
+| 1 | Completa | Dashboard + pipeline Google Ads + login |
+| 2 | En progreso | Conectar datos reales al dashboard |
+| 3 | Pendiente | Meta Ads API |
+| 4 | Pendiente | Auth MySQL por subdominio |
+| 5 | Pendiente | MeisterTask API |
 
 ---
 
-## Agentes de IA
+## Equipo de agentes
 
-Este proyecto usa Claude Code con un sistema de agentes especializados. El punto de entrada es:
+Punto de entrada: `.agent/skills/ceo/SKILL.md`
 
-```
-/ceo
-```
-
-El agente CEO orquesta todos los subagentes. Ver [`.agent/skills/ceo/SKILL.md`](./.agent/skills/ceo/SKILL.md).
+Al inicio de cada sesión: *"Actuá como CEO del proyecto. Leé `.agent/skills/ceo/SKILL.md`."*

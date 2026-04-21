@@ -85,6 +85,7 @@ jobs:
               stream=sys.stdout,
           )
 
+          sys.path.insert(0, 'data')
           from extractors.google_ads import run as extract
           from normalizers.canonical import normalize
           from loaders.sheets_writer import write_normalized_data
@@ -96,7 +97,7 @@ jobs:
 
           print(f"Iniciando extraccion — days_back={days_back}, client_filter='{client_filter or 'todos'}'")
 
-          raw_results = extract(config_dir="config/clients", days_back=days_back)
+          raw_results = extract(config_dir="clients", days_back=days_back)
 
           if client_filter:
               raw_results = [r for r in raw_results if r.get("client_id") == client_filter]
