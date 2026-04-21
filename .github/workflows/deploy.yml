@@ -52,7 +52,7 @@ jobs:
           rsync -avz --delete --mkpath \
             -e "ssh -p $SSH_PORT -i ~/.ssh/deploy_key -o StrictHostKeyChecking=no" \
             build/staging/ \
-            "${{ secrets.SSH_USER }}@${{ secrets.FTP_HOST }}:/public_html/prepagas/staging/"
+            "${{ secrets.SSH_USER }}@${{ secrets.FTP_HOST }}:public_html/prepagas/staging/"
 
   # ── PRODUCCIÓN — solo main ─────────────────────────────────────────────────
   deploy-production:
@@ -81,7 +81,7 @@ jobs:
             -i ~/.ssh/deploy_key \
             -o StrictHostKeyChecking=no \
             -o BatchMode=yes \
-            "${{ secrets.SSH_USER }}@${{ secrets.FTP_HOST }}" exit 2>&1 | tail -20 || true
+            "${{ secrets.SSH_USER }}@${{ secrets.FTP_HOST }}" "ls public_html/" 2>&1 | tail -20 || true
 
       - name: Preparar build de producción
         run: |
@@ -98,4 +98,4 @@ jobs:
           rsync -avz --delete --mkpath \
             -e "ssh -p $SSH_PORT -i ~/.ssh/deploy_key -o StrictHostKeyChecking=no" \
             build/prepagas/ \
-            "${{ secrets.SSH_USER }}@${{ secrets.FTP_HOST }}:/public_html/prepagas/"
+            "${{ secrets.SSH_USER }}@${{ secrets.FTP_HOST }}:public_html/prepagas/"
