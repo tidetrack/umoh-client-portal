@@ -109,6 +109,8 @@ function renderPerformance(data) {
   _setDelta('delta-leads',       data.leads,        prev.leads);
   _setDelta('delta-sales',       data.closed_sales, prev.closed_sales);
 
+  renderSparklines(data);
+
   /* ── Stacked bar: Inversión (bottom) + Resultado Neto (top) ── */
   _destroyChart('chart-trend');
   const ctx = document.getElementById('chart-trend');
@@ -564,6 +566,117 @@ function renderBofu(data) {
       options: _donutOpts()
     });
   }
+
+  /* Segment sales table */
+  const segBody = document.getElementById('bofu-segment-body');
+  if (segBody && data.typification) {
+    const total = data.typification.data.reduce((a, b) => a + b, 0);
+    segBody.innerHTML = data.typification.labels.map((label, i) => {
+      const val = data.typification.data[i];
+      const pct = total > 0 ? ((val / total) * 100).toFixed(1) : '0.0';
+      const color = data.typification.colors[i];
+      return `
+        <tr>
+          <td class="segment-name">
+            <span class="segment-swatch" style="background:${color}"></span>${label}
+          </td>
+          <td class="segment-value">${fmtNumber(val)}</td>
+          <td class="segment-pct">${pct}%</td>
+        </tr>
+      `;
+    }).join('');
+  }
+}
+
+/* ══════════════════════════════════════════════════════════
+   SPARKLINES — micro line charts inside Performance KPI cards
+══════════════════════════════════════════════════════════ */
+
+/**
+ * Renders a single sparkline chart.
+ * @param {string} id      - canvas element ID (e.g. 'sparkline-revenue')
+ * @param {number[]} values - array of data points
+ * @param {boolean} positive - true = accent color, false = red
+ */
+function _renderSparkline(id, values, positive) {
+  _destroyChart(id);
+  const ctx = document.getElementById(id);
+  if (!ctx || !values || values.length < 2) return;
+
+  const color = positive ? _cssVar('--umoh-accent') : '#FF0040';
+  const colorAlpha = positive ? 'rgba(255,0,64,0.12)' : 'rgba(255,0,64,0.12)';
+
+  _charts[id] = new Chart(ctx, {
+    type: 'line',
+    data: {
+      labels: values.map(() => ''),
+      datasets: [{
+        data:            values,
+        borderColor:     color,
+        backgroundColor: colorAlpha,
+        borderWidth:     1.5,
+        pointRadius:     0,
+        tension:         0.4,
+        fill:            true
+      }]
+    },
+    options: {
+      responsive:          true,
+      maintainAspectRatio: false,
+      animation:           { duration: 400 },
+      plugins: {
+        legend:  { display: false },
+        tooltip: { enabled: false }
+      },
+      scales: {
+        x: { display: false },
+        y: { display: false }
+      },
+      elements: { line: { borderCapStyle: 'round' } }
+    }
+  });
+}
+
+/**
+ * Renders sparklines for all 6 Performance KPI cards.
+ * Revenue and spend come directly from trend data.
+ * ROI, impressions, leads, sales are derived point-by-point.
+ */
+function renderSparklines(data) {
+  if (!data.trend) return;
+
+  const trend   = data.trend;
+  const revenue = trend.revenue;
+  const spend   = trend.spend;
+
+  /* ROI per data point */
+  const roi = revenue.map((r, i) =>
+    spend[i] > 0 ? ((r - spend[i]) / spend[i]) * 100 : 0
+  );
+
+  /* Impressions: scale proportionally from revenue shape */
+  const revTotal = revenue.reduce((a, b) => a + b, 0);
+  const impressions = revenue.map(r =>
+    revTotal > 0 ? Math.round((r / revTotal) * data.impressions) : 0
+  );
+
+  /* Leads and sales: same proportional shape from revenue */
+  const leads = revenue.map(r =>
+    revTotal > 0 ? Math.round((r / revTotal) * data.leads) : 0
+  );
+  const sales = revenue.map(r =>
+    revTotal > 0 ? Math.round((r / revTotal) * data.closed_sales) : 0
+  );
+
+  /* Determine trend direction for each metric (last vs first point) */
+  const isUp = arr => arr[arr.length - 1] >= arr[0];
+
+  _renderSparkline('sparkline-revenue',     revenue,     isUp(revenue));
+  _renderSparkline('sparkline-spend',       spend,       !isUp(spend));   /* lower spend = better */
+  _renderSparkline('sparkline-roi',         roi,         isUp(roi));
+  _renderSparkline('sparkline-impressions', impressions, isUp(impressions));
+  _renderSparkline('sparkline-leads',       leads,       isUp(leads));
+  _renderSparkline('sparkline-sales',       sales,       isUp(sales));
 }
 
 /* ── Entry point ────────────────────────────────────────── */

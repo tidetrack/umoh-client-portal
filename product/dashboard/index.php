@@ -179,32 +179,38 @@ if (!PHASE1_BYPASS) {
           <span class="kpi-label">Ingreso por Ventas</span>
           <span class="kpi-value" id="kpi-revenue">—</span>
           <span class="kpi-delta" id="delta-revenue"></span>
+          <canvas class="kpi-sparkline" id="sparkline-revenue" aria-hidden="true"></canvas>
         </div>
         <div class="kpi-card" data-kpi="spend">
           <span class="kpi-label">Costo Publicitario</span>
           <span class="kpi-value" id="kpi-spend">—</span>
           <span class="kpi-delta" id="delta-spend"></span>
+          <canvas class="kpi-sparkline" id="sparkline-spend" aria-hidden="true"></canvas>
         </div>
         <div class="kpi-card" data-kpi="roi">
           <span class="kpi-label">ROI</span>
           <span class="kpi-value" id="kpi-roi">—</span>
           <span class="kpi-delta" id="delta-roi"></span>
           <span class="kpi-formula">(Ingresos − Inv.) ÷ Inv.</span>
+          <canvas class="kpi-sparkline" id="sparkline-roi" aria-hidden="true"></canvas>
         </div>
         <div class="kpi-card" data-kpi="impressions">
           <span class="kpi-label">Total Impresiones</span>
           <span class="kpi-value" id="kpi-impressions">—</span>
           <span class="kpi-delta" id="delta-impressions"></span>
+          <canvas class="kpi-sparkline" id="sparkline-impressions" aria-hidden="true"></canvas>
         </div>
         <div class="kpi-card" data-kpi="leads">
           <span class="kpi-label">Total Leads</span>
           <span class="kpi-value" id="kpi-leads">—</span>
           <span class="kpi-delta" id="delta-leads"></span>
+          <canvas class="kpi-sparkline" id="sparkline-leads" aria-hidden="true"></canvas>
         </div>
         <div class="kpi-card kpi-card--accent" data-kpi="sales">
           <span class="kpi-label">Ventas Cerradas</span>
           <span class="kpi-value" id="kpi-sales">—</span>
           <span class="kpi-delta" id="delta-sales"></span>
+          <canvas class="kpi-sparkline" id="sparkline-sales" aria-hidden="true"></canvas>
         </div>
       </div>
 
@@ -465,13 +471,33 @@ if (!PHASE1_BYPASS) {
         </div>
       </div>
 
-      <div class="charts-grid charts-grid--centered">
-        <div class="chart-card chart-card--narrow">
+      <div class="charts-grid charts-grid--2col">
+        <div class="chart-card">
           <div class="chart-card-header">
             <h3 class="chart-title">Ventas por Tipificación</h3>
           </div>
           <div class="chart-card-body chart-body--donut">
             <canvas id="chart-typification" aria-label="Ventas por tipificación"></canvas>
+          </div>
+        </div>
+        <div class="chart-card">
+          <div class="chart-card-header">
+            <h3 class="chart-title">Ventas por Segmento</h3>
+            <span class="chart-badge">cierre por tipo</span>
+          </div>
+          <div class="chart-card-body">
+            <table class="segment-table" aria-label="Ventas por segmento">
+              <thead>
+                <tr>
+                  <th>Segmento</th>
+                  <th class="th-num">Ventas</th>
+                  <th class="th-num">% del total</th>
+                </tr>
+              </thead>
+              <tbody id="bofu-segment-body">
+                <!-- populated by charts.js -->
+              </tbody>
+            </table>
           </div>
         </div>
       </div>

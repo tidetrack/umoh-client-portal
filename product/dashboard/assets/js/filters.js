@@ -13,10 +13,17 @@ function _setLoading(on) {
   document.body.style.cursor = on ? 'wait' : '';
 }
 
+function _setSkeletons(on) {
+  document.querySelectorAll('.kpi-card').forEach(card => {
+    card.classList.toggle('kpi-skeleton', on);
+  });
+}
+
 /* ── Refresh: fetch + render ────────────────────────────── */
 async function refreshDashboard(section, period, extraParams = {}) {
   if (_loading) return;
   _setLoading(true);
+  _setSkeletons(true);
 
   const endpointMap = { performance: 'summary', tofu: 'tofu', mofu: 'mofu', bofu: 'bofu' };
 
@@ -27,6 +34,7 @@ async function refreshDashboard(section, period, extraParams = {}) {
     console.error('[Dashboard] Error al cargar datos:', err);
   } finally {
     _setLoading(false);
+    _setSkeletons(false);
   }
 }
 

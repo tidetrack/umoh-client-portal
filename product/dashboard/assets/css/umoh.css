@@ -969,6 +969,102 @@ body {
 /* Dark mode: ⓘ badge en cards más visible */
 [data-theme="dark"] .kpi-card[data-kpi]::after { color: var(--umoh-silver); }
 
+/* ── 9b. KPI Skeleton loader ───────────────────────────────── */
+@keyframes shimmer {
+  0%   { background-position: -400px 0; }
+  100% { background-position:  400px 0; }
+}
+
+.kpi-skeleton .kpi-value,
+.kpi-skeleton .kpi-delta {
+  color: transparent;
+  border-radius: var(--r-sm);
+  background: linear-gradient(
+    90deg,
+    var(--border-subtle) 25%,
+    var(--bg-card-header) 50%,
+    var(--border-subtle) 75%
+  );
+  background-size: 800px 100%;
+  animation: shimmer 1.4s ease-in-out infinite;
+  pointer-events: none;
+  user-select: none;
+}
+
+/* ── 9c. KPI Sparklines ────────────────────────────────────── */
+.kpi-sparkline {
+  width: 100%;
+  height: 40px;
+  display: block;
+  margin-top: var(--sp-2);
+}
+
+/* ── 9d. BOFU Segment Table ────────────────────────────────── */
+.segment-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+
+.segment-table thead th {
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.07em;
+  color: var(--text-muted);
+  padding: 0 var(--sp-3) var(--sp-3);
+  text-align: left;
+  border-bottom: 1px solid var(--border-subtle);
+}
+
+.segment-table .th-num { text-align: right; }
+
+.segment-table tbody tr {
+  border-bottom: 1px solid var(--border-subtle);
+  transition: background 0.1s;
+}
+
+.segment-table tbody tr:hover   { background: var(--bg-page); }
+.segment-table tbody tr:last-child { border-bottom: none; }
+
+.segment-table td {
+  padding: var(--sp-3) var(--sp-3);
+  vertical-align: middle;
+}
+
+.segment-name {
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.segment-swatch {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  display: inline-block;
+  margin-right: var(--sp-2);
+  flex-shrink: 0;
+  vertical-align: middle;
+}
+
+.segment-value {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+  font-weight: 700;
+  color: var(--text-primary);
+  white-space: nowrap;
+}
+
+.segment-pct {
+  text-align: right;
+  font-size: 12px;
+  color: var(--text-secondary);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+[data-theme="dark"] .segment-table tbody tr:hover { background: rgba(255,255,255,0.03); }
+
 /* ── 10. Footer ────────────────────────────────────────────── */
 .site-footer {
   background: var(--bg-header);
