@@ -27,6 +27,10 @@ eco-league-*.json
 *-sa-key.json
 *.key.json
 
+# Brand assets & local tools — no necesarios en el repo
+marca/
+scripts/
+
 # OS
 .DS_Store
 Thumbs.db
