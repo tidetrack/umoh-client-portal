@@ -92,9 +92,10 @@ Ver [`production/`](./production/README.md) para la guía completa.
 | Hosting | Hostinger shared hosting |
 | FTP | `ftp://147.93.37.161` |
 | Subdominio activo | `prepagas.umohcrew.com` |
-| Deploy | FTP manual (ver `production/deploy/`) |
-| Variables de entorno | `.env` en el servidor — nunca en el repo |
-| Credenciales pipeline | GitHub Secrets (ver `connections/`) |
+| Deploy | FTP manual — ver [`production/deploy/hostinger-guide.md`](./production/deploy/hostinger-guide.md) |
+| Variables de entorno | [`production/environments/.env.example`](./production/environments/.env.example) — el `.env` real va solo en el servidor |
+| Script producción | [`production/api.production.js`](./production/api.production.js) — `api.js` con `USE_MOCK=false` |
+| Credenciales pipeline | GitHub Secrets — ver [`connections/`](./connections/README.md) |
 
 ---
 
@@ -143,6 +144,7 @@ Antes de hacer push a producción: `USE_MOCK = false` y `PHASE1_BYPASS = false`.
 | [docs/wiki/procedures/data-pipeline.md](./docs/wiki/procedures/data-pipeline.md) | Pipeline de datos end-to-end |
 | [docs/wiki/api-reference/endpoints.md](./docs/wiki/api-reference/endpoints.md) | Referencia de endpoints PHP |
 | [docs/wiki/api-reference/schema.md](./docs/wiki/api-reference/schema.md) | Schema canónico TOFU/MOFU/BOFU |
+| [docs/PROMPT_MAESTRO.md](./docs/PROMPT_MAESTRO.md) | Prompt de inicio de sesión para Claude Code |
 | [CHANGELOG.md](./CHANGELOG.md) | Historial de cambios del código madre |
 
 ---
