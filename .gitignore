@@ -17,6 +17,9 @@ build/
 
 # Cowork local settings (no necesario en el repo)
 .claude/
+# Excepciones: los agentes del equipo sí van al repo
+!.claude/agents/
+!.claude/agents/**
 
 # Credentials descargadas localmente
 client_secret*.json
