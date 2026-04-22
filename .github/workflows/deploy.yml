@@ -47,27 +47,9 @@ jobs:
           cp -r product/api/.       build/staging/api/
           sed -i 's/const USE_MOCK = false.*/const USE_MOCK = true;/' \
             build/staging/assets/js/api.js || true
-          # Generar credentials.php desde secrets (nunca desde disco)
-          cat > build/staging/config/credentials.php << 'PHPEOF'
-<?php
-const UMOH_USERS = [
-    'admin' => [
-        'password_hash' => 'ADMIN_HASH_PLACEHOLDER',
-        'role'          => 'admin',
-        'clients'       => ['prepagas'],
-        'name'          => 'Admin UMOH',
-    ],
-    'prepagas' => [
-        'password_hash' => 'PREPAGAS_HASH_PLACEHOLDER',
-        'role'          => 'client',
-        'clients'       => ['prepagas'],
-        'name'          => 'Prevención Salud',
-    ],
-];
-PHPEOF
-          sed -i "s|ADMIN_HASH_PLACEHOLDER|${ADMIN_HASH}|g"    build/staging/config/credentials.php
+          cp build/staging/config/credentials.template.php build/staging/config/credentials.php
+          sed -i "s|ADMIN_HASH_PLACEHOLDER|${ADMIN_HASH}|g"       build/staging/config/credentials.php
           sed -i "s|PREPAGAS_HASH_PLACEHOLDER|${PREPAGAS_HASH}|g" build/staging/config/credentials.php
-          # Escribir SA key desde GitHub Secret (nunca desde disco)
           echo '${{ secrets.GOOGLE_SHEETS_SA_JSON }}' > build/staging/api/config/sa.json
 
       - name: Deploy via rsync → /public_html/prepagas/staging/
@@ -107,28 +89,11 @@ PHPEOF
             build/prepagas/assets/js/api.js
           grep -q "USE_MOCK = false" build/prepagas/assets/js/api.js \
             || { echo "ERROR: USE_MOCK no quedó en false"; exit 1; }
-          # Generar credentials.php desde secrets (nunca desde disco)
-          cat > build/prepagas/config/credentials.php << 'PHPEOF'
-<?php
-const UMOH_USERS = [
-    'admin' => [
-        'password_hash' => 'ADMIN_HASH_PLACEHOLDER',
-        'role'          => 'admin',
-        'clients'       => ['prepagas'],
-        'name'          => 'Admin UMOH',
-    ],
-    'prepagas' => [
-        'password_hash' => 'PREPAGAS_HASH_PLACEHOLDER',
-        'role'          => 'client',
-        'clients'       => ['prepagas'],
-        'name'          => 'Prevención Salud',
-    ],
-];
-PHPEOF
-          sed -i "s|ADMIN_HASH_PLACEHOLDER|${ADMIN_HASH}|g"    build/prepagas/config/credentials.php
+          cp build/prepagas/config/credentials.template.php build/prepagas/config/credentials.php
+          sed -i "s|ADMIN_HASH_PLACEHOLDER|${ADMIN_HASH}|g"       build/prepagas/config/credentials.php
           sed -i "s|PREPAGAS_HASH_PLACEHOLDER|${PREPAGAS_HASH}|g" build/prepagas/config/credentials.php
-          [ -s build/prepagas/config/credentials.php ] \
-            || { echo "ERROR: credentials.php vacío — verificar secrets"; exit 1; }
+          grep -q "HASH_PLACEHOLDER" build/prepagas/config/credentials.php \
+            && { echo "ERROR: sed no reemplazó los placeholders — verificar secrets"; exit 1; } || true
           # Escribir SA key desde GitHub Secret (nunca desde disco)
           echo '${{ secrets.GOOGLE_SHEETS_SA_JSON }}' > build/prepagas/api/config/sa.json
 
