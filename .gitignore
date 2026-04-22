@@ -38,6 +38,7 @@ ops/testing/environments/*.json
 # Brand assets & local tools — no necesarios en el repo
 marca/
 scripts/
+!.github/scripts/
 
 # OS
 .DS_Store
