@@ -38,13 +38,35 @@ jobs:
           ssh-keyscan -p $SSH_PORT ${{ secrets.FTP_HOST }} >> ~/.ssh/known_hosts 2>/dev/null
 
       - name: Preparar build de staging
+        env:
+          ADMIN_HASH: ${{ secrets.UMOH_ADMIN_HASH }}
+          PREPAGAS_HASH: ${{ secrets.UMOH_PREPAGAS_HASH }}
         run: |
           mkdir -p build/staging/api/config
           cp -r product/dashboard/. build/staging/
           cp -r product/api/.       build/staging/api/
           sed -i 's/const USE_MOCK = false.*/const USE_MOCK = true;/' \
             build/staging/assets/js/api.js || true
-          rm -f build/staging/config/credentials.php
+          # Generar credentials.php desde secrets (nunca desde disco)
+          cat > build/staging/config/credentials.php << 'PHPEOF'
+<?php
+const UMOH_USERS = [
+    'admin' => [
+        'password_hash' => 'ADMIN_HASH_PLACEHOLDER',
+        'role'          => 'admin',
+        'clients'       => ['prepagas'],
+        'name'          => 'Admin UMOH',
+    ],
+    'prepagas' => [
+        'password_hash' => 'PREPAGAS_HASH_PLACEHOLDER',
+        'role'          => 'client',
+        'clients'       => ['prepagas'],
+        'name'          => 'Prevención Salud',
+    ],
+];
+PHPEOF
+          sed -i "s|ADMIN_HASH_PLACEHOLDER|${ADMIN_HASH}|g"    build/staging/config/credentials.php
+          sed -i "s|PREPAGAS_HASH_PLACEHOLDER|${PREPAGAS_HASH}|g" build/staging/config/credentials.php
           # Escribir SA key desde GitHub Secret (nunca desde disco)
           echo '${{ secrets.GOOGLE_SHEETS_SA_JSON }}' > build/staging/api/config/sa.json
 
@@ -74,21 +96,39 @@ jobs:
           ssh-keyscan -p $SSH_PORT ${{ secrets.FTP_HOST }} >> ~/.ssh/known_hosts 2>/dev/null
 
       - name: Preparar build de producción
+        env:
+          ADMIN_HASH: ${{ secrets.UMOH_ADMIN_HASH }}
+          PREPAGAS_HASH: ${{ secrets.UMOH_PREPAGAS_HASH }}
         run: |
           mkdir -p build/prepagas/api/config
           cp -r product/dashboard/. build/prepagas/
           cp -r product/api/.       build/prepagas/api/
-          # Flags de seguridad: nunca llegan activos a producción
           sed -i 's/const USE_MOCK = true.*/const USE_MOCK = false;/' \
             build/prepagas/assets/js/api.js
-          sed -i "s/define('PHASE1_BYPASS', true)/define('PHASE1_BYPASS', false)/g" \
-            build/prepagas/auth_check.php build/prepagas/index.php 2>/dev/null || true
-          # Verificar que los flags críticos quedaron correctamente
           grep -q "USE_MOCK = false" build/prepagas/assets/js/api.js \
             || { echo "ERROR: USE_MOCK no quedó en false"; exit 1; }
-          grep -rq "PHASE1_BYPASS', false" build/prepagas/auth_check.php build/prepagas/index.php 2>/dev/null \
-            || { echo "WARN: PHASE1_BYPASS no encontrado — archivo no existe o ya era false"; }
-          rm -f build/prepagas/config/credentials.php
+          # Generar credentials.php desde secrets (nunca desde disco)
+          cat > build/prepagas/config/credentials.php << 'PHPEOF'
+<?php
+const UMOH_USERS = [
+    'admin' => [
+        'password_hash' => 'ADMIN_HASH_PLACEHOLDER',
+        'role'          => 'admin',
+        'clients'       => ['prepagas'],
+        'name'          => 'Admin UMOH',
+    ],
+    'prepagas' => [
+        'password_hash' => 'PREPAGAS_HASH_PLACEHOLDER',
+        'role'          => 'client',
+        'clients'       => ['prepagas'],
+        'name'          => 'Prevención Salud',
+    ],
+];
+PHPEOF
+          sed -i "s|ADMIN_HASH_PLACEHOLDER|${ADMIN_HASH}|g"    build/prepagas/config/credentials.php
+          sed -i "s|PREPAGAS_HASH_PLACEHOLDER|${PREPAGAS_HASH}|g" build/prepagas/config/credentials.php
+          [ -s build/prepagas/config/credentials.php ] \
+            || { echo "ERROR: credentials.php vacío — verificar secrets"; exit 1; }
           # Escribir SA key desde GitHub Secret (nunca desde disco)
           echo '${{ secrets.GOOGLE_SHEETS_SA_JSON }}' > build/prepagas/api/config/sa.json
 

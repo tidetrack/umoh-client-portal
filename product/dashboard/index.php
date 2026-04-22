@@ -1,28 +1,17 @@
 <?php
-/**
- * UMOH — Dashboard principal
- *
- * Gate de sesion PHP. Con PHASE1_BYPASS = true permite acceso libre (staging/Fase 1).
- * Para activar auth real en Fase 4: cambiar PHASE1_BYPASS a false en auth_check.php
- * y asegurarse de que credentials.php existe en /config/credentials.php.
- */
-define('PHASE1_BYPASS', true);
-
-if (!PHASE1_BYPASS) {
-    ini_set('session.cookie_domain', '.umohcrew.com');
-    session_set_cookie_params([
-        'lifetime' => 86400 * 30,
-        'path'     => '/',
-        'domain'   => '.umohcrew.com',
-        'secure'   => true,
-        'httponly' => true,
-        'samesite' => 'Lax',
-    ]);
-    session_start();
-    if (empty($_SESSION['umoh_user'])) {
-        header('Location: login.php');
-        exit;
-    }
+ini_set('session.cookie_domain', '.umohcrew.com');
+session_set_cookie_params([
+    'lifetime' => 86400 * 30,
+    'path'     => '/',
+    'domain'   => '.umohcrew.com',
+    'secure'   => true,
+    'httponly' => true,
+    'samesite' => 'Lax',
+]);
+session_start();
+if (empty($_SESSION['umoh_user'])) {
+    header('Location: login.php');
+    exit;
 }
 ?>
 <!DOCTYPE html>
