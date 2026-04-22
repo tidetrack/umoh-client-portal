@@ -37,9 +37,17 @@ function api_error(string $msg, int $code = 500): void {
 }
 
 function api_headers(): void {
+    $allowed = [
+        'https://prepagas.umohcrew.com',
+        'https://prepagas.umohcrew.com/staging',
+    ];
+    $origin = $_SERVER['HTTP_ORIGIN'] ?? '';
+    if (in_array($origin, $allowed, true)) {
+        header('Access-Control-Allow-Origin: ' . $origin);
+        header('Vary: Origin');
+    }
     header('Content-Type: application/json; charset=utf-8');
     header('Cache-Control: no-store');
-    header('Access-Control-Allow-Origin: *');
 }
 
 /**

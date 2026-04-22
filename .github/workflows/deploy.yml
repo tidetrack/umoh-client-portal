@@ -83,6 +83,11 @@ jobs:
             build/prepagas/assets/js/api.js
           sed -i "s/define('PHASE1_BYPASS', true)/define('PHASE1_BYPASS', false)/g" \
             build/prepagas/auth_check.php build/prepagas/index.php 2>/dev/null || true
+          # Verificar que los flags críticos quedaron correctamente
+          grep -q "USE_MOCK = false" build/prepagas/assets/js/api.js \
+            || { echo "ERROR: USE_MOCK no quedó en false"; exit 1; }
+          grep -rq "PHASE1_BYPASS', false" build/prepagas/auth_check.php build/prepagas/index.php 2>/dev/null \
+            || { echo "WARN: PHASE1_BYPASS no encontrado — archivo no existe o ya era false"; }
           rm -f build/prepagas/config/credentials.php
           # Escribir SA key desde GitHub Secret (nunca desde disco)
           echo '${{ secrets.GOOGLE_SHEETS_SA_JSON }}' > build/prepagas/api/config/sa.json
