@@ -100,8 +100,8 @@ open('build/staging/config/credentials.php', 'w').write(out)
           python3 -c "
 import os, sys
 tmpl = open('build/prepagas/config/credentials.template.php').read()
-out  = tmpl.replace('ADMIN_HASH_PLACEHOLDER',   os.environ['ADMIN_HASH'])
-out  = out.replace('PREPAGAS_HASH_PLACEHOLDER', os.environ['PREPAGAS_HASH'])
+out  = tmpl.replace('ADMIN_HASH_PLACEHOLDER',   os.environ['ADMIN_HASH'].strip())
+out  = out.replace('PREPAGAS_HASH_PLACEHOLDER', os.environ['PREPAGAS_HASH'].strip())
 if 'PLACEHOLDER' in out: sys.exit('ERROR: hashes no inyectados — verificar secrets')
 open('build/prepagas/config/credentials.php', 'w').write(out)
 "
@@ -115,4 +115,4 @@ open('build/prepagas/config/credentials.php', 'w').write(out)
             "${{ secrets.SSH_USER }}@${{ secrets.FTP_HOST }}:public_html/prepagas/"
           ssh -p $SSH_PORT -i ~/.ssh/deploy_key -o StrictHostKeyChecking=no \
             "${{ secrets.SSH_USER }}@${{ secrets.FTP_HOST }}" \
-            'find public_html/prepagas/ -maxdepth 3 -name "*.php" -exec touch {} \; 2>/dev/null && echo "OPcache invalidado"'
+            'rm -f public_html/prepagas/index.html && find public_html/prepagas/ -maxdepth 3 -name "*.php" -exec touch {} \; 2>/dev/null && echo "index.html eliminado + OPcache invalidado"'
