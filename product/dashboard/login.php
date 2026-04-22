@@ -1,15 +1,11 @@
 <?php
 $_is_local = in_array($_SERVER['HTTP_HOST'] ?? '', ['localhost', '127.0.0.1', 'localhost:8080']);
-$_domain   = $_is_local ? '' : '.umohcrew.com';
-ini_set('session.cookie_domain', $_domain);
-session_set_cookie_params([
-    'lifetime' => 86400 * 30,
-    'path'     => '/',
-    'domain'   => $_domain,
-    'secure'   => !$_is_local,
-    'httponly' => true,
-    'samesite' => 'Lax',
-]);
+if ($_is_local) {
+    session_set_cookie_params(['lifetime' => 86400 * 30, 'path' => '/', 'httponly' => true, 'samesite' => 'Lax']);
+} else {
+    ini_set('session.cookie_domain', '.umohcrew.com');
+    session_set_cookie_params(['lifetime' => 86400 * 30, 'path' => '/', 'domain' => '.umohcrew.com', 'secure' => true, 'httponly' => true, 'samesite' => 'Lax']);
+}
 session_start();
 
 if (!empty($_SESSION['umoh_user'])) {
@@ -463,6 +459,27 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
     .footer-meta a:hover { color: var(--footer-link-hover); }
 
+    /* ── Password toggle ─────────────────────────── */
+    .field-password { position: relative; }
+    .field-password input { padding-right: 44px; }
+    .btn-eye {
+      position: absolute;
+      right: 14px;
+      top: 50%;
+      transform: translateY(-50%);
+      background: none;
+      border: none;
+      cursor: pointer;
+      color: var(--muted);
+      padding: 4px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: color 0.2s;
+      line-height: 0;
+    }
+    .btn-eye:hover { color: var(--input-color); }
+
     /* ── Responsive ───────────────────────────────── */
     @media (max-width: 768px) {
       .planet-3  { width: 300px; }
@@ -530,7 +547,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             autofocus
           >
         </div>
-        <div class="field">
+        <div class="field field-password">
           <label for="password">Contraseña</label>
           <input
             type="password"
@@ -539,6 +556,17 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             placeholder="••••••••••••"
             required
           >
+          <button type="button" class="btn-eye" id="btn-toggle-password" aria-label="Mostrar contraseña" tabindex="-1">
+            <svg id="eye-open" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/>
+              <circle cx="12" cy="12" r="3"/>
+            </svg>
+            <svg id="eye-closed" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:none">
+              <path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94"/>
+              <path d="M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19"/>
+              <line x1="1" y1="1" x2="23" y2="23"/>
+            </svg>
+          </button>
         </div>
         <button type="submit" class="btn-submit">
           Ingresar
@@ -591,6 +619,21 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         localStorage.setItem(key, next);
         _applyLogo(next);
       });
+
+      var toggleBtn     = document.getElementById('btn-toggle-password');
+      var passwordInput = document.getElementById('password');
+      var eyeOpen       = document.getElementById('eye-open');
+      var eyeClosed     = document.getElementById('eye-closed');
+
+      if (toggleBtn && passwordInput) {
+        toggleBtn.addEventListener('click', function () {
+          var isPassword = passwordInput.type === 'password';
+          passwordInput.type      = isPassword ? 'text'    : 'password';
+          eyeOpen.style.display   = isPassword ? 'none'    : 'block';
+          eyeClosed.style.display = isPassword ? 'block'   : 'none';
+          toggleBtn.setAttribute('aria-label', isPassword ? 'Ocultar contraseña' : 'Mostrar contraseña');
+        });
+      }
     })();
   </script>
 </body>
