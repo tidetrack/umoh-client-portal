@@ -1,5 +1,5 @@
 <?php
-header('Content-Type: application/json');
+header('Content-Type: application/json; charset=utf-8');
 header('Cache-Control: no-store');
 
 ini_set('session.cookie_domain', '.umohcrew.com');
