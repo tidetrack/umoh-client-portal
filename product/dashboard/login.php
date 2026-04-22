@@ -550,14 +550,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
       <p class="help-text">
         ¿Necesitás acceso? Escribinos a<br>
-        <a href="mailto:hola@umohcrew.com">hola@umohcrew.com</a>
+        <a href="mailto:umohcrew@gmail.com">umohcrew@gmail.com</a>
       </p>
     </div>
 
     <div class="footer">
       <p class="footer-tagline">Digital Ecosystem <span style="color:#FF003B;">Creators</span></p>
       <p class="footer-meta">
-        UMOH &nbsp;·&nbsp; Acceso restringido &nbsp;·&nbsp; <a href="https://umohcrew.com" target="_blank">umohcrew.com</a>
+        Umoh &nbsp;·&nbsp; Marketing Agency &nbsp;·&nbsp; <a href="https://umohcrew.com" target="_blank">umohcrew.com</a>
       </p>
     </div>
 
@@ -573,7 +573,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
       function _applyLogo(theme) {
         if (!logoImg) return;
         logoImg.src = theme === 'light'
-          ? 'assets/img/logo-dark.png'
+          ? 'assets/img/logo-marca1.png'
           : 'assets/img/logo-white.png';
       }
 
