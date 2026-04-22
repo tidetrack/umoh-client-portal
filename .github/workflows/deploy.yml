@@ -38,14 +38,18 @@ jobs:
           ssh-keyscan -p $SSH_PORT ${{ secrets.FTP_HOST }} >> ~/.ssh/known_hosts 2>/dev/null
 
       - name: Preparar build de staging
+        env:
+          ADMIN_HASH: ${{ secrets.UMOH_ADMIN_HASH }}
+          PREPAGAS_HASH: ${{ secrets.UMOH_PREPAGAS_HASH }}
         run: |
           mkdir -p build/staging/api/config
           cp -r product/dashboard/. build/staging/
           cp -r product/api/.       build/staging/api/
           sed -i 's/const USE_MOCK = false.*/const USE_MOCK = true;/' \
             build/staging/assets/js/api.js || true
-          rm -f build/staging/config/credentials.php
-          # Escribir SA key desde GitHub Secret (nunca desde disco)
+          cp build/staging/config/credentials.template.php build/staging/config/credentials.php
+          sed -i "s|ADMIN_HASH_PLACEHOLDER|${ADMIN_HASH}|g"       build/staging/config/credentials.php
+          sed -i "s|PREPAGAS_HASH_PLACEHOLDER|${PREPAGAS_HASH}|g" build/staging/config/credentials.php
           echo '${{ secrets.GOOGLE_SHEETS_SA_JSON }}' > build/staging/api/config/sa.json
 
       - name: Deploy via rsync → /public_html/prepagas/staging/
@@ -74,16 +78,22 @@ jobs:
           ssh-keyscan -p $SSH_PORT ${{ secrets.FTP_HOST }} >> ~/.ssh/known_hosts 2>/dev/null
 
       - name: Preparar build de producción
+        env:
+          ADMIN_HASH: ${{ secrets.UMOH_ADMIN_HASH }}
+          PREPAGAS_HASH: ${{ secrets.UMOH_PREPAGAS_HASH }}
         run: |
           mkdir -p build/prepagas/api/config
           cp -r product/dashboard/. build/prepagas/
           cp -r product/api/.       build/prepagas/api/
-          # Flags de seguridad: nunca llegan activos a producción
           sed -i 's/const USE_MOCK = true.*/const USE_MOCK = false;/' \
             build/prepagas/assets/js/api.js
-          sed -i "s/define('PHASE1_BYPASS', true)/define('PHASE1_BYPASS', false)/g" \
-            build/prepagas/auth_check.php build/prepagas/index.php 2>/dev/null || true
-          rm -f build/prepagas/config/credentials.php
+          grep -q "USE_MOCK = false" build/prepagas/assets/js/api.js \
+            || { echo "ERROR: USE_MOCK no quedó en false"; exit 1; }
+          cp build/prepagas/config/credentials.template.php build/prepagas/config/credentials.php
+          sed -i "s|ADMIN_HASH_PLACEHOLDER|${ADMIN_HASH}|g"       build/prepagas/config/credentials.php
+          sed -i "s|PREPAGAS_HASH_PLACEHOLDER|${PREPAGAS_HASH}|g" build/prepagas/config/credentials.php
+          grep -q "HASH_PLACEHOLDER" build/prepagas/config/credentials.php \
+            && { echo "ERROR: sed no reemplazó los placeholders — verificar secrets"; exit 1; } || true
           # Escribir SA key desde GitHub Secret (nunca desde disco)
           echo '${{ secrets.GOOGLE_SHEETS_SA_JSON }}' > build/prepagas/api/config/sa.json
 

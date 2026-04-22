@@ -1,20 +1,6 @@
 <?php
-/**
- * UMOH — Verificación de sesión (endpoint AJAX)
- *
- * FASE 1: Auth bypass — siempre autenticado hasta Fase 4.
- * Para activar auth real, cambiar PHASE1_BYPASS a false.
- */
-
-define('PHASE1_BYPASS', true);
-
-header('Content-Type: application/json');
+header('Content-Type: application/json; charset=utf-8');
 header('Cache-Control: no-store');
-
-if (PHASE1_BYPASS) {
-    echo json_encode(['authenticated' => true, 'user' => 'admin', 'name' => 'Admin', 'role' => 'admin']);
-    exit;
-}
 
 ini_set('session.cookie_domain', '.umohcrew.com');
 session_set_cookie_params([
