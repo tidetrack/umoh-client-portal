@@ -2,7 +2,8 @@
 header('Content-Type: application/json; charset=utf-8');
 header('Cache-Control: no-store');
 
-$_is_local = in_array($_SERVER['HTTP_HOST'] ?? '', ['localhost', '127.0.0.1', 'localhost:8080']);
+$_host = $_SERVER['HTTP_HOST'] ?? '';
+$_is_local = ($_host === 'localhost' || $_host === '127.0.0.1' || str_starts_with($_host, 'localhost:') || str_starts_with($_host, '127.0.0.1:'));
 if ($_is_local) {
     session_set_cookie_params(['lifetime' => 86400 * 30, 'path' => '/', 'httponly' => true, 'samesite' => 'Lax']);
 } else {

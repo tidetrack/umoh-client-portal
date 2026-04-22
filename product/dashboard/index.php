@@ -1,5 +1,6 @@
 <?php
-$_is_local = in_array($_SERVER['HTTP_HOST'] ?? '', ['localhost', '127.0.0.1', 'localhost:8080']);
+$_host = $_SERVER['HTTP_HOST'] ?? '';
+$_is_local = ($_host === 'localhost' || $_host === '127.0.0.1' || str_starts_with($_host, 'localhost:') || str_starts_with($_host, '127.0.0.1:'));
 if ($_is_local) {
     session_set_cookie_params(['lifetime' => 86400 * 30, 'path' => '/', 'httponly' => true, 'samesite' => 'Lax']);
 } else {
@@ -25,8 +26,7 @@ if (empty($_SESSION['umoh_user'])) {
   <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&display=swap" rel="stylesheet">
 
   <!-- Leaflet CSS -->
-  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
-        integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.css" crossorigin="">
 
   <!-- Dashboard CSS -->
   <link rel="stylesheet" href="assets/css/umoh.css">
@@ -37,6 +37,12 @@ if (empty($_SESSION['umoh_user'])) {
       var t = localStorage.getItem('umoh-theme') || 'light';
       document.documentElement.setAttribute('data-theme', t);
     }());
+  </script>
+
+  <!-- Session data injected for JS -->
+  <script>
+    window.DASHBOARD_USERNAME = <?php echo json_encode($_SESSION['umoh_name'] ?? 'Usuario'); ?>;
+    window.DASHBOARD_ROLE     = <?php echo json_encode($_SESSION['umoh_role'] ?? 'client'); ?>;
   </script>
 </head>
 <body>
@@ -76,6 +82,15 @@ if (empty($_SESSION['umoh_user'])) {
           </div>
           <div id="date-picker-popover" class="date-picker-popover" hidden aria-hidden="true">
             <div class="date-picker-inner">
+              <div id="historic-section" class="historic-section">
+                <span class="historic-label">Histórico total</span>
+                <div class="historic-granularity" role="group" aria-label="Granularidad del histórico">
+                  <button class="historic-btn" data-granularity="dias">Días</button>
+                  <button class="historic-btn" data-granularity="semanas">Semanas</button>
+                  <button class="historic-btn active" data-granularity="meses">Meses</button>
+                </div>
+              </div>
+              <div class="date-picker-divider"></div>
               <div class="date-picker-row">
                 <label class="date-picker-label" for="date-start">Desde</label>
                 <input type="date" id="date-start" class="date-picker-input">
@@ -89,22 +104,10 @@ if (empty($_SESSION['umoh_user'])) {
           </div>
         </div>
 
-        <!-- Theme toggle -->
-        <button id="theme-toggle" class="theme-toggle-btn" title="Cambiar tema" aria-label="Cambiar modo claro/oscuro">
-          <!-- Sun icon (shown in dark mode) -->
-          <svg class="theme-icon theme-icon--sun" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-            <circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/>
-          </svg>
-          <!-- Moon icon (shown in light mode) -->
-          <svg class="theme-icon theme-icon--moon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-            <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/>
-          </svg>
-        </button>
-
         <!-- User menu -->
         <div class="user-menu" id="user-menu">
           <button class="user-menu-trigger" aria-haspopup="true" aria-expanded="false">
-            <div class="user-avatar" id="user-avatar">U</div>
+            <div class="user-avatar" id="user-avatar"><img src="assets/img/icon-asterisco-1.png" alt=""></div>
             <span class="user-greeting">Hola, <strong id="user-display-name">Usuario</strong></span>
             <svg class="user-chevron" width="12" height="12" viewBox="0 0 12 12" fill="none">
               <path d="M2 4l4 4 4-4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
@@ -112,7 +115,7 @@ if (empty($_SESSION['umoh_user'])) {
           </button>
           <div class="user-menu-dropdown" role="menu">
             <div class="user-menu-header">
-              <div class="user-menu-avatar-lg" id="user-avatar-lg">U</div>
+              <div class="user-menu-avatar-lg" id="user-avatar-lg"><img src="assets/img/icon-asterisco-1.png" alt=""></div>
               <div>
                 <div class="user-menu-fullname" id="user-menu-fullname">Usuario</div>
                 <div class="user-menu-role">Administrador</div>
@@ -161,7 +164,7 @@ if (empty($_SESSION['umoh_user'])) {
         <p class="section-subtitle">Resumen general de inversión y resultados del período seleccionado</p>
       </div>
 
-      <div class="kpi-grid kpi-grid--6">
+      <div class="kpi-grid kpi-grid--3">
         <div class="kpi-card" data-kpi="revenue">
           <span class="kpi-label">Ingreso por Ventas</span>
           <span class="kpi-value" id="kpi-revenue">—</span>
@@ -178,7 +181,6 @@ if (empty($_SESSION['umoh_user'])) {
           <span class="kpi-label">ROI</span>
           <span class="kpi-value" id="kpi-roi">—</span>
           <span class="kpi-delta" id="delta-roi"></span>
-          <span class="kpi-formula">(Ingresos − Inv.) ÷ Inv.</span>
           <canvas class="kpi-sparkline" id="sparkline-roi" aria-hidden="true"></canvas>
         </div>
         <div class="kpi-card" data-kpi="impressions">
@@ -193,7 +195,7 @@ if (empty($_SESSION['umoh_user'])) {
           <span class="kpi-delta" id="delta-leads"></span>
           <canvas class="kpi-sparkline" id="sparkline-leads" aria-hidden="true"></canvas>
         </div>
-        <div class="kpi-card kpi-card--accent" data-kpi="sales">
+        <div class="kpi-card" data-kpi="sales">
           <span class="kpi-label">Ventas Cerradas</span>
           <span class="kpi-value" id="kpi-sales">—</span>
           <span class="kpi-delta" id="delta-sales"></span>
@@ -201,14 +203,38 @@ if (empty($_SESSION['umoh_user'])) {
         </div>
       </div>
 
+      <!-- Resumen comercial del equipo -->
       <div class="charts-grid charts-grid--full">
         <div class="chart-card">
           <div class="chart-card-header">
-            <h3 class="chart-title">Inversión vs Ingresos</h3>
-            <span class="chart-badge">evolución por período</span>
+            <h3 class="chart-title">Resumen Comercial del Equipo</h3>
+            <span class="chart-badge">indicadores generales de vendedores</span>
+          </div>
+          <div class="chart-card-body" style="padding: var(--sp-5) var(--sp-6);">
+            <div class="commercial-summary" id="commercial-summary">
+              <!-- populated by charts.js -->
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="charts-grid charts-grid--2col">
+        <div class="chart-card">
+          <div class="chart-card-header">
+            <h3 class="chart-title">Evolución de Ingresos</h3>
+            <span class="chart-badge">tendencia del período</span>
           </div>
           <div class="chart-card-body chart-body--tall">
-            <canvas id="chart-trend"></canvas>
+            <canvas id="chart-perf-revenue"></canvas>
+          </div>
+        </div>
+        <div class="chart-card">
+          <div class="chart-card-header">
+            <h3 class="chart-title">Evolución de Inversión</h3>
+            <span class="chart-badge">tendencia del período</span>
+          </div>
+          <div class="chart-card-body chart-body--tall">
+            <canvas id="chart-perf-spend"></canvas>
           </div>
         </div>
       </div>
@@ -230,29 +256,40 @@ if (empty($_SESSION['umoh_user'])) {
           <span class="kpi-label">Impresiones</span>
           <span class="kpi-value" id="tofu-impressions">—</span>
           <span class="kpi-delta" id="delta-tofu-impressions"></span>
+          <canvas class="kpi-sparkline" id="sparkline-tofu-impressions" aria-hidden="true"></canvas>
         </div>
-        <div class="kpi-card">
+        <div class="kpi-card" data-kpi="tofu-clicks">
           <span class="kpi-label">Clicks</span>
           <span class="kpi-value" id="tofu-clicks">—</span>
           <span class="kpi-delta" id="delta-tofu-clicks"></span>
+          <canvas class="kpi-sparkline" id="sparkline-tofu-clicks" aria-hidden="true"></canvas>
         </div>
-        <div class="kpi-card kpi-card--accent" data-kpi="tofu-cpc">
+        <div class="kpi-card" data-kpi="tofu-cpc">
           <span class="kpi-label">CPC Promedio</span>
           <span class="kpi-value" id="tofu-cpc">—</span>
           <span class="kpi-delta" id="delta-tofu-cpc"></span>
-          <span class="kpi-formula">Inversión ÷ Clicks</span>
+          <canvas class="kpi-sparkline" id="sparkline-tofu-cpc" aria-hidden="true"></canvas>
         </div>
       </div>
 
-      <!-- Trend chart -->
-      <div class="charts-grid charts-grid--full">
+      <!-- Trend charts: split into 2 bar charts side by side -->
+      <div class="charts-grid charts-grid--2col">
         <div class="chart-card">
           <div class="chart-card-header">
-            <h3 class="chart-title">Evolución de Impresiones y Clicks</h3>
+            <h3 class="chart-title">Evolución de Impresiones</h3>
             <span class="chart-badge">tendencia del período</span>
           </div>
           <div class="chart-card-body chart-body--tall">
-            <canvas id="chart-tofu-trend"></canvas>
+            <canvas id="chart-tofu-impressions"></canvas>
+          </div>
+        </div>
+        <div class="chart-card">
+          <div class="chart-card-header">
+            <h3 class="chart-title">Evolución de Clicks</h3>
+            <span class="chart-badge">tendencia del período</span>
+          </div>
+          <div class="chart-card-body chart-body--tall">
+            <canvas id="chart-tofu-clicks"></canvas>
           </div>
         </div>
       </div>
@@ -263,7 +300,10 @@ if (empty($_SESSION['umoh_user'])) {
         <div class="chart-card chart-card--wide">
           <div class="chart-card-header">
             <h3 class="chart-title">Top Términos de Búsqueda</h3>
-            <span class="chart-badge">por clicks</span>
+            <select class="chart-filter-select" id="terms-filter" aria-label="Filtrar términos por métrica">
+              <option value="clicks">Por Clicks</option>
+              <option value="impressions">Por Impresiones</option>
+            </select>
           </div>
           <div class="chart-card-body">
             <table class="terms-table" aria-label="Top términos de búsqueda">
@@ -271,7 +311,7 @@ if (empty($_SESSION['umoh_user'])) {
                 <tr>
                   <th>Término</th>
                   <th class="th-bar"></th>
-                  <th class="th-num">Clicks</th>
+                  <th class="th-num" id="terms-col-header">Clicks</th>
                 </tr>
               </thead>
               <tbody id="search-terms-body">
@@ -284,42 +324,50 @@ if (empty($_SESSION['umoh_user'])) {
         <!-- Channels donut -->
         <div class="chart-card">
           <div class="chart-card-header">
-            <h3 class="chart-title">Canal por Clicks</h3>
+            <h3 class="chart-title">Canal</h3>
+            <select class="chart-filter-select" id="channels-filter" aria-label="Filtrar canales por métrica">
+              <option value="clicks">Por Clicks</option>
+              <option value="impressions">Por Impresiones</option>
+            </select>
           </div>
           <div class="chart-card-body chart-body--donut">
-            <canvas id="chart-channels" aria-label="Canal por clicks"></canvas>
+            <canvas id="chart-channels" aria-label="Canal por métrica"></canvas>
           </div>
         </div>
 
         <!-- Devices donut -->
         <div class="chart-card">
           <div class="chart-card-header">
-            <h3 class="chart-title">Dispositivos por Impresiones</h3>
+            <h3 class="chart-title">Dispositivos</h3>
+            <select class="chart-filter-select" id="devices-filter" aria-label="Filtrar dispositivos por métrica">
+              <option value="clicks">Por Clicks</option>
+              <option value="impressions">Por Impresiones</option>
+            </select>
           </div>
           <div class="chart-card-body chart-body--donut">
-            <canvas id="chart-devices" aria-label="Dispositivos por impresiones"></canvas>
+            <canvas id="chart-devices" aria-label="Dispositivos por métrica"></canvas>
           </div>
         </div>
 
-        <!-- Geo map — spans 2 cols -->
+        <!-- Geo choropleth map — spans 2 cols -->
         <div class="chart-card chart-card--wide">
           <div class="chart-card-header">
             <h3 class="chart-title">Clicks por Departamento</h3>
             <span class="chart-badge">Gran Mendoza</span>
           </div>
-          <div class="chart-card-body">
-            <div id="geo-map" class="geo-map" aria-label="Mapa de clicks por departamento"></div>
-            <div class="geo-legend" aria-hidden="true">
-              <span class="geo-legend-label">Menor</span>
-              <div class="geo-legend-scale">
-                <span style="background:#F0F5F5" title="Muy bajo"></span>
-                <span style="background:#C8D8DC" title="Bajo"></span>
-                <span style="background:#FF80A0" title="Medio"></span>
-                <span style="background:#FF4068" title="Alto"></span>
-                <span style="background:#FF0040" title="Muy alto"></span>
-              </div>
-              <span class="geo-legend-label">Mayor</span>
+          <div class="chart-card-body" style="height: 280px; padding: 0; overflow: hidden; border-radius: 0 0 var(--r-xl) var(--r-xl);">
+            <div id="geo-map" class="geo-map" style="width:100%; height:100%;"></div>
+          </div>
+          <div class="geo-legend" style="padding: 8px 16px 10px;">
+            <span class="geo-legend-label">Menor</span>
+            <div class="geo-legend-scale">
+              <span style="background:#E8F0F5" title="Muy bajo"></span>
+              <span style="background:#C8D8DC" title="Bajo"></span>
+              <span style="background:#FF80A0" title="Medio"></span>
+              <span style="background:#FF4068" title="Alto"></span>
+              <span style="background:#FF0040" title="Muy alto"></span>
             </div>
+            <span class="geo-legend-label">Mayor</span>
           </div>
         </div>
 
@@ -337,52 +385,65 @@ if (empty($_SESSION['umoh_user'])) {
       </div>
 
       <div class="kpi-grid kpi-grid--4">
-        <div class="kpi-card" data-kpi="leads">
+        <div class="kpi-card" data-kpi="mofu-leads">
           <span class="kpi-label">Leads Totales</span>
           <span class="kpi-value" id="mofu-leads">—</span>
           <span class="kpi-delta" id="delta-mofu-leads"></span>
+          <canvas class="kpi-sparkline" id="sparkline-mofu-leads" aria-hidden="true"></canvas>
         </div>
         <div class="kpi-card" data-kpi="mofu-cpl">
           <span class="kpi-label">CPL — Costo por Lead</span>
           <span class="kpi-value" id="mofu-cpl">—</span>
           <span class="kpi-delta" id="delta-mofu-cpl"></span>
-          <span class="kpi-formula">Inversión ÷ Leads</span>
+          <canvas class="kpi-sparkline" id="sparkline-mofu-cpl" aria-hidden="true"></canvas>
         </div>
         <div class="kpi-card" data-kpi="mofu-tipif">
           <span class="kpi-label">Tasa de Tipificación</span>
           <span class="kpi-value" id="mofu-tipif">—</span>
           <span class="kpi-delta" id="delta-mofu-tipif"></span>
+          <canvas class="kpi-sparkline" id="sparkline-mofu-tipif" aria-hidden="true"></canvas>
         </div>
-        <div class="kpi-card kpi-card--accent" data-kpi="mofu-highintent">
-          <span class="kpi-label">Leads Alta Intención</span>
+        <div class="kpi-card" data-kpi="mofu-highintent">
+          <span class="kpi-label">Leads — Formulario</span>
           <span class="kpi-value" id="mofu-highintent">—</span>
           <span class="kpi-delta" id="delta-mofu-highintent"></span>
+          <canvas class="kpi-sparkline" id="sparkline-mofu-highintent" aria-hidden="true"></canvas>
         </div>
       </div>
 
-      <!-- Trend chart -->
-      <div class="charts-grid charts-grid--full">
+      <!-- Trend charts: split into 2 bar charts side by side -->
+      <div class="charts-grid charts-grid--2col">
         <div class="chart-card">
           <div class="chart-card-header">
-            <h3 class="chart-title">Evolución de Leads y CPL</h3>
+            <h3 class="chart-title">Evolución de Leads</h3>
             <span class="chart-badge">tendencia del período</span>
           </div>
           <div class="chart-card-body chart-body--tall">
-            <canvas id="chart-mofu-trend"></canvas>
+            <canvas id="chart-mofu-leads"></canvas>
+          </div>
+        </div>
+        <div class="chart-card">
+          <div class="chart-card-header">
+            <h3 class="chart-title">Evolución del CPL</h3>
+            <span class="chart-badge">tendencia del período</span>
+          </div>
+          <div class="chart-card-body chart-body--tall">
+            <canvas id="chart-mofu-cpl"></canvas>
           </div>
         </div>
       </div>
 
+      <!-- Status stacked bar + Segments donut: side by side -->
       <div class="charts-grid charts-grid--2col">
 
-        <!-- Status horizontal bars — spans 2 cols -->
-        <div class="chart-card chart-card--wide">
+        <!-- Status vertical funnel bar chart -->
+        <div class="chart-card">
           <div class="chart-card-header">
             <h3 class="chart-title">Distribución por Estado</h3>
             <span class="chart-note">Fuente: MeisterTask · datos manuales</span>
           </div>
-          <div class="chart-card-body chart-body--bars">
-            <canvas id="chart-status" aria-label="Distribución por estado de lead"></canvas>
+          <div class="chart-card-body chart-body--tall">
+            <canvas id="chart-status" aria-label="Distribución por estado de lead" style="height: 340px;"></canvas>
           </div>
         </div>
 
@@ -414,21 +475,25 @@ if (empty($_SESSION['umoh_user'])) {
           <span class="kpi-label">Ingresos Totales</span>
           <span class="kpi-value" id="bofu-revenue">—</span>
           <span class="kpi-delta" id="delta-bofu-revenue"></span>
+          <canvas class="kpi-sparkline" id="sparkline-bofu-revenue" aria-hidden="true"></canvas>
         </div>
         <div class="kpi-card" data-kpi="sales">
           <span class="kpi-label">Ventas Cerradas</span>
           <span class="kpi-value" id="bofu-sales">—</span>
           <span class="kpi-delta" id="delta-bofu-sales"></span>
+          <canvas class="kpi-sparkline" id="sparkline-bofu-sales" aria-hidden="true"></canvas>
         </div>
         <div class="kpi-card" data-kpi="bofu-ticket">
           <span class="kpi-label">Ticket Promedio</span>
           <span class="kpi-value" id="bofu-ticket">—</span>
           <span class="kpi-delta" id="delta-bofu-ticket"></span>
+          <canvas class="kpi-sparkline" id="sparkline-bofu-ticket" aria-hidden="true"></canvas>
         </div>
-        <div class="kpi-card kpi-card--accent" data-kpi="bofu-conversion">
+        <div class="kpi-card" data-kpi="bofu-conversion">
           <span class="kpi-label">Tasa de Conversión</span>
           <span class="kpi-value" id="bofu-conversion">—</span>
           <span class="kpi-delta" id="delta-bofu-conversion"></span>
+          <canvas class="kpi-sparkline" id="sparkline-bofu-conversion" aria-hidden="true"></canvas>
         </div>
       </div>
 
@@ -437,23 +502,34 @@ if (empty($_SESSION['umoh_user'])) {
           <span class="kpi-label">Cápitas Cerradas</span>
           <span class="kpi-value" id="bofu-capitas">—</span>
           <span class="kpi-delta" id="delta-bofu-capitas"></span>
+          <canvas class="kpi-sparkline" id="sparkline-bofu-capitas" aria-hidden="true"></canvas>
         </div>
         <div class="kpi-card">
           <span class="kpi-label">Ticket Promedio por Cápita</span>
           <span class="kpi-value" id="bofu-ticket-capita">—</span>
           <span class="kpi-delta" id="delta-bofu-ticket-capita"></span>
+          <canvas class="kpi-sparkline" id="sparkline-bofu-ticket-capita" aria-hidden="true"></canvas>
         </div>
       </div>
 
-      <!-- Trend chart -->
-      <div class="charts-grid charts-grid--full">
+      <!-- Trend charts — split into 2 independent charts -->
+      <div class="charts-grid charts-grid--2col">
         <div class="chart-card">
           <div class="chart-card-header">
-            <h3 class="chart-title">Evolución de Ingresos y Ventas</h3>
+            <h3 class="chart-title">Evolución de Ingresos</h3>
             <span class="chart-badge">tendencia del período</span>
           </div>
           <div class="chart-card-body chart-body--tall">
-            <canvas id="chart-bofu-trend"></canvas>
+            <canvas id="chart-bofu-revenue"></canvas>
+          </div>
+        </div>
+        <div class="chart-card">
+          <div class="chart-card-header">
+            <h3 class="chart-title">Evolución de Ventas</h3>
+            <span class="chart-badge">tendencia del período</span>
+          </div>
+          <div class="chart-card-body chart-body--tall">
+            <canvas id="chart-bofu-sales-trend"></canvas>
           </div>
         </div>
       </div>
@@ -489,6 +565,35 @@ if (empty($_SESSION['umoh_user'])) {
         </div>
       </div>
 
+      <!-- Ranking de vendedores -->
+      <div class="charts-grid charts-grid--full">
+        <div class="chart-card">
+          <div class="chart-card-header">
+            <h3 class="chart-title">Ranking de Vendedores</h3>
+            <span class="chart-badge">indicadores comerciales · período seleccionado</span>
+          </div>
+          <div class="chart-card-body" style="padding: var(--sp-4);">
+            <table class="sellers-table" id="sellers-table" aria-label="Ranking de vendedores">
+              <thead>
+                <tr>
+                  <th class="th-rank">#</th>
+                  <th>Vendedor</th>
+                  <th class="th-num">Ventas</th>
+                  <th class="th-num">Efectividad</th>
+                  <th class="th-num">Ticket Prom</th>
+                  <th class="th-num">Cápitas</th>
+                  <th class="th-num">Ciclo Prom</th>
+                </tr>
+              </thead>
+              <tbody id="sellers-body">
+                <!-- populated by charts.js -->
+              </tbody>
+              <tfoot id="sellers-foot"></tfoot>
+            </table>
+          </div>
+        </div>
+      </div>
+
     </section>
 
   </main>
@@ -516,8 +621,7 @@ if (empty($_SESSION['umoh_user'])) {
   <!-- Chart.js -->
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.3/dist/chart.umd.min.js"></script>
   <!-- Leaflet JS -->
-  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
-          integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV/XN/WLEg=" crossorigin=""></script>
+  <script src="https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.js" crossorigin=""></script>
 
   <!-- KPI Info Modal -->
   <div id="kpi-modal" class="kpi-modal-overlay" role="dialog" aria-modal="true" aria-labelledby="kpi-modal-title" hidden>
@@ -526,12 +630,29 @@ if (empty($_SESSION['umoh_user'])) {
       <h2 class="kpi-modal-title" id="kpi-modal-title">—</h2>
       <p class="kpi-modal-formula" id="kpi-modal-formula"></p>
       <p class="kpi-modal-desc" id="kpi-modal-desc"></p>
+      <div class="kpi-modal-chart-area">
+        <canvas id="kpi-modal-chart" aria-hidden="true"></canvas>
+      </div>
       <div class="kpi-modal-example">
         <span class="kpi-modal-example-label">Ejemplo aplicado</span>
         <p id="kpi-modal-example"></p>
       </div>
     </div>
   </div>
+
+  <!-- Theme toggle pill switch (position: fixed top-right) -->
+  <button id="theme-toggle" class="theme-toggle-switch" title="Cambiar tema" aria-label="Cambiar modo claro/oscuro">
+    <span class="theme-switch-track">
+      <span class="theme-switch-thumb">
+        <svg class="theme-icon theme-icon--sun" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+          <circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/>
+        </svg>
+        <svg class="theme-icon theme-icon--moon" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/>
+        </svg>
+      </span>
+    </span>
+  </button>
 
   <!-- Dashboard scripts -->
   <script src="assets/js/mockdata.js"></script>

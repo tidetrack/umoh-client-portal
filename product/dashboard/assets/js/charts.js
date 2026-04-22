@@ -2,9 +2,67 @@
  * charts.js — Toda la lógica de render: Chart.js + Leaflet.
  * Consumir siempre a través de renderSection(section, data).
  *
- * Paleta: navy/slate/silver/mist como colores principales.
- * Rojo #FF0040 solo para el acento puntual (máx. 1 dataset por chart).
+ * Paleta compartida CHART_PALETTE — funciona en modo claro y oscuro.
  */
+
+/* ── Paleta de colores compartida ──────────────────────── */
+const CHART_PALETTE = {
+  blue:   { solid: 'rgba(99,179,237,0.85)',  fill: 'rgba(99,179,237,0.15)'  },
+  green:  { solid: 'rgba(72,199,142,0.85)',  fill: 'rgba(72,199,142,0.15)'  },
+  amber:  { solid: 'rgba(251,191,36,0.85)',  fill: 'rgba(251,191,36,0.15)'  },
+  purple: { solid: 'rgba(167,139,250,0.85)', fill: 'rgba(167,139,250,0.15)' },
+  coral:  { solid: 'rgba(252,129,74,0.85)',  fill: 'rgba(252,129,74,0.15)'  },
+  teal:   { solid: 'rgba(45,212,191,0.85)',  fill: 'rgba(45,212,191,0.15)'  },
+};
+
+/* ── Gran Mendoza inline GeoJSON (no fetch — works offline) ── */
+const GRAN_MENDOZA_GEOJSON = {
+  type: 'FeatureCollection',
+  features: [
+    {
+      type: 'Feature',
+      properties: { nombre: 'Capital' },
+      geometry: { type: 'Polygon', coordinates: [[
+        [-68.880, -32.870], [-68.820, -32.870], [-68.820, -32.840], [-68.860, -32.830], [-68.880, -32.850], [-68.880, -32.870]
+      ]]}
+    },
+    {
+      type: 'Feature',
+      properties: { nombre: 'Godoy Cruz' },
+      geometry: { type: 'Polygon', coordinates: [[
+        [-68.880, -32.940], [-68.820, -32.940], [-68.820, -32.870], [-68.880, -32.870], [-68.880, -32.940]
+      ]]}
+    },
+    {
+      type: 'Feature',
+      properties: { nombre: 'Guaymallén' },
+      geometry: { type: 'Polygon', coordinates: [[
+        [-68.820, -32.900], [-68.730, -32.900], [-68.730, -32.820], [-68.820, -32.820], [-68.820, -32.900]
+      ]]}
+    },
+    {
+      type: 'Feature',
+      properties: { nombre: 'Las Heras' },
+      geometry: { type: 'Polygon', coordinates: [[
+        [-68.900, -32.830], [-68.820, -32.830], [-68.820, -32.750], [-68.900, -32.750], [-68.900, -32.830]
+      ]]}
+    },
+    {
+      type: 'Feature',
+      properties: { nombre: 'Luján de Cuyo' },
+      geometry: { type: 'Polygon', coordinates: [[
+        [-68.980, -33.050], [-68.820, -33.050], [-68.820, -32.940], [-68.980, -32.940], [-68.980, -33.050]
+      ]]}
+    },
+    {
+      type: 'Feature',
+      properties: { nombre: 'Maipú' },
+      geometry: { type: 'Polygon', coordinates: [[
+        [-68.820, -33.000], [-68.680, -33.000], [-68.680, -32.900], [-68.820, -32.900], [-68.820, -33.000]
+      ]]}
+    }
+  ]
+};
 
 /* ── Chart registry ─────────────────────────────────────── */
 const _charts = {};
@@ -67,7 +125,7 @@ function _donutOpts() {
         }
       }
     },
-    cutout: '65%',
+    cutout: '62%',
     responsive: true,
     maintainAspectRatio: true
   };
@@ -85,6 +143,64 @@ function _axisDefaults() {
 
 /* ── Chart.js global defaults ───────────────────────────── */
 Chart.defaults.font.family = 'Outfit';
+
+/* ══════════════════════════════════════════════════════════
+   COMMERCIAL SUMMARY — helper para Performance
+══════════════════════════════════════════════════════════ */
+
+/**
+ * Renders the commercial summary strip in the Performance section.
+ * @param {object} s - sellers_summary object from performance data
+ */
+function _renderCommercialSummary(s) {
+  const el = document.getElementById('commercial-summary');
+  if (!el || !s) return;
+  const p = s.prev || {};
+
+  function mini(curr, prev, lowerBetter, fmt) {
+    if (prev == null || prev === 0) return '';
+    const pct  = ((curr - prev) / Math.abs(prev)) * 100;
+    const good = lowerBetter ? pct <= 0 : pct >= 0;
+    const cls  = Math.abs(pct) < 0.5 ? 'cs-flat' : (good ? 'cs-up' : 'cs-down');
+    return '<span class="cs-delta ' + cls + '">' + (pct >= 0 ? '↑' : '↓') + ' ' + Math.abs(pct).toFixed(1) + '%</span>';
+  }
+
+  el.innerHTML =
+    '<div class="cs-grid">' +
+      '<div class="cs-item">' +
+        '<span class="cs-label">Mejor Vendedor</span>' +
+        '<span class="cs-value cs-value--name">' + s.top_seller + '</span>' +
+        (p.top_seller && p.top_seller !== s.top_seller
+          ? '<span class="cs-delta cs-flat">ant. ' + p.top_seller + '</span>'
+          : '<span class="cs-delta cs-flat">—</span>') +
+      '</div>' +
+      '<div class="cs-item">' +
+        '<span class="cs-label">Efectividad Promedio</span>' +
+        '<span class="cs-value">' + fmtPercent(s.avg_effectiveness) + '</span>' +
+        mini(s.avg_effectiveness, p.avg_effectiveness, false) +
+      '</div>' +
+      '<div class="cs-item">' +
+        '<span class="cs-label">Ventas del Equipo</span>' +
+        '<span class="cs-value">' + fmtNumber(s.total_sales) + '</span>' +
+        mini(s.total_sales, p.total_sales, false) +
+      '</div>' +
+      '<div class="cs-item">' +
+        '<span class="cs-label">Ciclo Promedio</span>' +
+        '<span class="cs-value">' + s.avg_cycle_days.toFixed(1) + ' días</span>' +
+        mini(s.avg_cycle_days, p.avg_cycle_days, true) +
+      '</div>' +
+      '<div class="cs-item">' +
+        '<span class="cs-label">Ticket Promedio</span>' +
+        '<span class="cs-value">' + fmtCurrency(s.avg_ticket) + '</span>' +
+        mini(s.avg_ticket, p.avg_ticket, false) +
+      '</div>' +
+      '<div class="cs-item">' +
+        '<span class="cs-label">Cápitas / Venta</span>' +
+        '<span class="cs-value">' + (s.avg_capitas_per_sale ? s.avg_capitas_per_sale.toFixed(2) : '—') + '</span>' +
+        (s.avg_capitas_per_sale ? mini(s.avg_capitas_per_sale, p.avg_capitas_per_sale, false) : '') +
+      '</div>' +
+    '</div>';
+}
 
 /* ══════════════════════════════════════════════════════════
    PERFORMANCE
@@ -111,64 +227,162 @@ function renderPerformance(data) {
 
   renderSparklines(data);
 
-  /* ── Stacked bar: Inversión (bottom) + Resultado Neto (top) ── */
+  if (data.sellers_summary) _renderCommercialSummary(data.sellers_summary);
+
+  /* ── Two independent bar charts: Ingresos / Inversión ── */
   _destroyChart('chart-trend');
-  const ctx = document.getElementById('chart-trend');
-  if (!ctx) return;
+  _destroyChart('chart-perf-revenue');
+  _destroyChart('chart-perf-spend');
 
-  const netRevenue = data.trend.revenue.map((r, i) => r - data.trend.spend[i]);
-  const axis = _axisDefaults();
-
-  _charts['chart-trend'] = new Chart(ctx, {
-    type: 'bar',
-    data: {
-      labels: data.trend.labels,
-      datasets: [
-        {
-          label:           'Inversión',
-          data:            data.trend.spend,
-          backgroundColor: 'rgba(143,165,168,0.7)',  /* silver */
-          borderRadius:    { topLeft: 0, topRight: 0, bottomLeft: 4, bottomRight: 4 },
-          borderSkipped:   false,
-          stack:           'stack'
-        },
-        {
-          label:           'Resultado Neto',
-          data:            netRevenue,
-          backgroundColor: 'rgba(37,48,64,0.85)',   /* navy */
-          borderRadius:    { topLeft: 4, topRight: 4, bottomLeft: 0, bottomRight: 0 },
-          borderSkipped:   false,
-          stack:           'stack'
-        }
-      ]
-    },
-    options: {
-      responsive: true,
-      maintainAspectRatio: false,
-      interaction: { mode: 'index', intersect: false },
-      plugins: {
-        legend: { labels: { font: { family: 'Outfit', size: 12 }, color: _cssVar('--text-secondary'), usePointStyle: true } },
-        tooltip: {
-          callbacks: {
-            label: ctx => {
-              if (ctx.datasetIndex === 0) return ` Inversión: ${fmtCurrency(ctx.parsed.y)}`;
-              return ` Ingresos: ${fmtCurrency(data.trend.revenue[ctx.dataIndex])} (neto: ${fmtCurrency(ctx.parsed.y)})`;
-            }
-          }
-        }
+  const ctxPR = document.getElementById('chart-perf-revenue');
+  if (ctxPR && data.trend) {
+    const axis = _axisDefaults();
+    _charts['chart-perf-revenue'] = new Chart(ctxPR, {
+      type: 'bar',
+      data: {
+        labels: data.trend.labels,
+        datasets: [{
+          label: 'Ingresos', data: data.trend.revenue,
+          backgroundColor: CHART_PALETTE.green.solid,
+          borderRadius: 4, borderSkipped: false,
+          barPercentage: 0.6, categoryPercentage: 0.7
+        }]
       },
-      scales: {
-        y: { stacked: true, ...axis, ticks: { ...axis.ticks, callback: v => '$' + (v / 1000).toFixed(0) + 'k' } },
-        x: { stacked: true, ...axis, grid: { display: false } }
+      options: {
+        responsive: true, maintainAspectRatio: false,
+        interaction: { mode: 'index', intersect: false },
+        plugins: { legend: { display: false },
+          tooltip: { callbacks: { label: ctx => ` Ingresos: ${fmtCurrency(ctx.parsed.y)}` } } },
+        scales: {
+          y: { ...axis, ticks: { ...axis.ticks, callback: v => '$' + (v / 1000).toFixed(0) + 'k' } },
+          x: { ...axis, grid: { display: false } }
+        }
       }
-    }
-  });
+    });
+  }
+
+  const ctxPS = document.getElementById('chart-perf-spend');
+  if (ctxPS && data.trend) {
+    const axis = _axisDefaults();
+    _charts['chart-perf-spend'] = new Chart(ctxPS, {
+      type: 'bar',
+      data: {
+        labels: data.trend.labels,
+        datasets: [{
+          label: 'Inversión', data: data.trend.spend,
+          backgroundColor: CHART_PALETTE.coral.solid,
+          borderRadius: 4, borderSkipped: false,
+          barPercentage: 0.6, categoryPercentage: 0.7
+        }]
+      },
+      options: {
+        responsive: true, maintainAspectRatio: false,
+        interaction: { mode: 'index', intersect: false },
+        plugins: { legend: { display: false },
+          tooltip: { callbacks: { label: ctx => ` Inversión: ${fmtCurrency(ctx.parsed.y)}` } } },
+        scales: {
+          y: { ...axis, ticks: { ...axis.ticks, callback: v => '$' + (v / 1000).toFixed(0) + 'k' } },
+          x: { ...axis, grid: { display: false } }
+        }
+      }
+    });
+  }
+
+  window._kpiModalData = data;
 }
 
 /* ══════════════════════════════════════════════════════════
    TOFU
 ══════════════════════════════════════════════════════════ */
+
+/**
+ * Renders the search terms table.
+ * @param {object[]} terms - array of search term objects
+ * @param {'clicks'|'impressions'} mode - which metric to display
+ */
+function _renderSearchTerms(terms, mode) {
+  const tbody = document.getElementById('search-terms-body');
+  const colHeader = document.getElementById('terms-col-header');
+  if (!tbody || !terms) return;
+
+  const colors = [
+    CHART_PALETTE.blue.solid, CHART_PALETTE.teal.solid, CHART_PALETTE.purple.solid,
+    CHART_PALETTE.amber.solid, CHART_PALETTE.coral.solid, CHART_PALETTE.green.solid,
+    CHART_PALETTE.blue.solid, CHART_PALETTE.teal.solid
+  ];
+
+  if (colHeader) colHeader.textContent = mode === 'impressions' ? 'Impresiones' : 'Clicks';
+
+  tbody.innerHTML = terms.map((row, i) => {
+    const pct   = mode === 'impressions' ? (row.pct_imp || row.pct) : row.pct;
+    const value = mode === 'impressions' ? (row.impressions || 0) : row.clicks;
+    return `
+      <tr>
+        <td class="term-name">${row.term}</td>
+        <td class="term-bar">
+          <div class="bar-wrap">
+            <div class="bar-fill" style="width:${pct}%; background:${colors[i % colors.length]}; opacity:0.85;"></div>
+          </div>
+        </td>
+        <td class="term-clicks">${fmtNumber(value)}</td>
+      </tr>
+    `;
+  }).join('');
+}
+
+/**
+ * Renders the channels doughnut chart.
+ * @param {object} data - full TOFU data object
+ * @param {'clicks'|'impressions'} mode - which dataset to display
+ */
+function _renderChannels(data, mode) {
+  _destroyChart('chart-channels');
+  const ctxCh = document.getElementById('chart-channels');
+  if (!ctxCh) return;
+
+  const chColors = ['blue', 'teal', 'amber', 'purple', 'coral'].map(k => CHART_PALETTE[k].solid);
+  const dataset  = mode === 'impressions' && data.channels_imp
+    ? data.channels_imp
+    : data.channels;
+
+  _charts['chart-channels'] = new Chart(ctxCh, {
+    type: 'doughnut',
+    data: {
+      labels:   dataset.labels,
+      datasets: [{ data: dataset.data, backgroundColor: chColors, borderWidth: 0, hoverOffset: 8 }]
+    },
+    options: _donutOpts()
+  });
+}
+
+/**
+ * Renders the devices doughnut chart.
+ * @param {object} data - full TOFU data object
+ * @param {'clicks'|'impressions'} mode - which dataset to display
+ */
+function _renderDevices(data, mode) {
+  _destroyChart('chart-devices');
+  const ctxDev = document.getElementById('chart-devices');
+  if (!ctxDev) return;
+
+  const devColors = ['purple', 'amber', 'coral'].map(k => CHART_PALETTE[k].solid);
+  const dataset   = mode === 'impressions' && data.devices_imp
+    ? data.devices_imp
+    : data.devices;
+
+  _charts['chart-devices'] = new Chart(ctxDev, {
+    type: 'doughnut',
+    data: {
+      labels:   dataset.labels,
+      datasets: [{ data: dataset.data, backgroundColor: devColors, borderWidth: 0, hoverOffset: 8 }]
+    },
+    options: _donutOpts()
+  });
+}
+
 function renderTofu(data) {
+  window._tofuData = data;
+
   const prev = data.prev || {};
 
   setKPI('tofu-impressions', fmtNumber(data.impressions));
@@ -179,182 +393,197 @@ function renderTofu(data) {
   _setDelta('delta-tofu-clicks',      data.clicks,      prev.clicks);
   _setDelta('delta-tofu-cpc',         data.cpc,         prev.cpc, true);
 
-  /* ── Trend: Impresiones + Clicks (ejes duales) ── */
-  _destroyChart('chart-tofu-trend');
-  const ctxTrend = document.getElementById('chart-tofu-trend');
-  if (ctxTrend && data.trend) {
-    const axis = _axisDefaults();
-    const muted = _cssVar('--text-muted');
+  /* ── Sparklines for TOFU KPI cards ── */
+  if (data.trend) {
+    const t   = data.trend;
+    const isUp = arr => arr[arr.length - 1] >= arr[0];
+    _renderSparkline('sparkline-tofu-impressions', t.impressions, isUp(t.impressions), t.labels || []);
+    _renderSparkline('sparkline-tofu-clicks',      t.clicks,      isUp(t.clicks),      t.labels || []);
+    /* CPC: more clicks = lower CPC = good — invert direction */
+    _renderSparkline('sparkline-tofu-cpc',         t.clicks,      isUp(t.clicks),      t.labels || []);
+  }
 
-    _charts['chart-tofu-trend'] = new Chart(ctxTrend, {
-      type: 'line',
+  /* ── Trend: split into 2 separate bar charts ── */
+  _destroyChart('chart-tofu-trend');
+  _destroyChart('chart-tofu-impressions');
+  _destroyChart('chart-tofu-clicks');
+
+  const ctxImp = document.getElementById('chart-tofu-impressions');
+  if (ctxImp && data.trend) {
+    const axis = _axisDefaults();
+    _charts['chart-tofu-impressions'] = new Chart(ctxImp, {
+      type: 'bar',
       data: {
         labels: data.trend.labels,
-        datasets: [
-          {
-            label:           'Impresiones',
-            data:            data.trend.impressions,
-            borderColor:     '#2563EB',
-            backgroundColor: 'rgba(37,99,235,0.08)',
-            borderWidth:     2,
-            pointRadius:     4,
-            pointBackgroundColor: '#2563EB',
-            tension:         0.35,
-            fill:            true,
-            yAxisID:         'yImp'
-          },
-          {
-            label:           'Clicks',
-            data:            data.trend.clicks,
-            borderColor:     '#F59E0B',
-            backgroundColor: 'rgba(245,158,11,0.07)',
-            borderWidth:     2,
-            pointRadius:     4,
-            pointBackgroundColor: '#F59E0B',
-            tension:         0.35,
-            fill:            true,
-            yAxisID:         'yClk'
-          }
-        ]
+        datasets: [{
+          label:              'Impresiones',
+          data:               data.trend.impressions,
+          backgroundColor:    CHART_PALETTE.blue.solid,
+          borderRadius:       4,
+          borderSkipped:      false,
+          barPercentage:      0.6,
+          categoryPercentage: 0.7
+        }]
       },
       options: {
         responsive: true,
         maintainAspectRatio: false,
         interaction: { mode: 'index', intersect: false },
         plugins: {
-          legend: { labels: { font: { family: 'Outfit', size: 12 }, color: _cssVar('--text-secondary'), usePointStyle: true } },
-          tooltip: {
-            callbacks: {
-              label: ctx => {
-                const v = ctx.dataset.yAxisID === 'yImp'
-                  ? fmtNumber(ctx.parsed.y)
-                  : fmtNumber(ctx.parsed.y);
-                return ` ${ctx.dataset.label}: ${v}`;
-              }
-            }
-          }
+          legend: { display: false },
+          tooltip: { callbacks: { label: ctx => ` Impresiones: ${fmtNumber(ctx.parsed.y)}` } }
         },
         scales: {
-          yImp: { ...axis, position: 'left',  ticks: { ...axis.ticks, callback: v => (v / 1000).toFixed(0) + 'k' }, title: { display: true, text: 'Impresiones', color: muted, font: { size: 11 } } },
-          yClk: { ...axis, position: 'right', grid: { display: false }, ticks: { ...axis.ticks }, title: { display: true, text: 'Clicks', color: muted, font: { size: 11 } } },
-          x:    { ...axis, grid: { display: false } }
+          y: { ...axis, ticks: { ...axis.ticks, callback: v => (v / 1000).toFixed(0) + 'k' } },
+          x: { ...axis, grid: { display: false } }
         }
       }
     });
   }
 
-  /* Search terms table */
-  const tbody = document.getElementById('search-terms-body');
-  if (tbody) {
-    tbody.innerHTML = data.search_terms.map(row => `
-      <tr>
-        <td class="term-name">${row.term}</td>
-        <td class="term-bar"><div class="bar-wrap"><div class="bar-fill" style="width:${row.pct}%"></div></div></td>
-        <td class="term-clicks">${fmtNumber(row.clicks)}</td>
-      </tr>
-    `).join('');
-  }
-
-  /* Channels donut */
-  _destroyChart('chart-channels');
-  const ctxCh = document.getElementById('chart-channels');
-  if (ctxCh) {
-    _charts['chart-channels'] = new Chart(ctxCh, {
-      type: 'doughnut',
+  const ctxClk = document.getElementById('chart-tofu-clicks');
+  if (ctxClk && data.trend) {
+    const axis = _axisDefaults();
+    _charts['chart-tofu-clicks'] = new Chart(ctxClk, {
+      type: 'bar',
       data: {
-        labels:   data.channels.labels,
-        datasets: [{ data: data.channels.data, backgroundColor: data.channels.colors, borderWidth: 0, hoverOffset: 8 }]
+        labels: data.trend.labels,
+        datasets: [{
+          label:              'Clicks',
+          data:               data.trend.clicks,
+          backgroundColor:    CHART_PALETTE.teal.solid,
+          borderRadius:       4,
+          borderSkipped:      false,
+          barPercentage:      0.6,
+          categoryPercentage: 0.7
+        }]
       },
-      options: _donutOpts()
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        interaction: { mode: 'index', intersect: false },
+        plugins: {
+          legend: { display: false },
+          tooltip: { callbacks: { label: ctx => ` Clicks: ${fmtNumber(ctx.parsed.y)}` } }
+        },
+        scales: {
+          y: { ...axis, ticks: { ...axis.ticks, callback: v => fmtNumber(v) } },
+          x: { ...axis, grid: { display: false } }
+        }
+      }
     });
   }
 
-  /* Devices donut */
-  _destroyChart('chart-devices');
-  const ctxDev = document.getElementById('chart-devices');
-  if (ctxDev) {
-    _charts['chart-devices'] = new Chart(ctxDev, {
-      type: 'doughnut',
-      data: {
-        labels:   data.devices.labels,
-        datasets: [{ data: data.devices.data, backgroundColor: data.devices.colors, borderWidth: 0, hoverOffset: 8 }]
-      },
-      options: _donutOpts()
-    });
+  /* ── Search terms table (default: clicks) ── */
+  const termsFilter = document.getElementById('terms-filter');
+  _renderSearchTerms(data.search_terms, termsFilter ? termsFilter.value : 'clicks');
+
+  /* ── Channels donut ── */
+  const chFilter = document.getElementById('channels-filter');
+  _renderChannels(data, chFilter ? chFilter.value : 'clicks');
+
+  /* ── Devices donut ── */
+  const devFilter = document.getElementById('devices-filter');
+  _renderDevices(data, devFilter ? devFilter.value : 'clicks');
+
+  /* ── Geo: choropleth map by department ── */
+  if (data.geo) renderGeoMap(data.geo);
+
+  /* ── Wire up filter dropdowns (idempotent: replaces listener on each render) ── */
+  const termsEl = document.getElementById('terms-filter');
+  if (termsEl) {
+    termsEl.onchange = () => _renderSearchTerms(window._tofuData.search_terms, termsEl.value);
   }
 
-  renderGeoMap(data.geo);
+  const chEl = document.getElementById('channels-filter');
+  if (chEl) {
+    chEl.onchange = () => _renderChannels(window._tofuData, chEl.value);
+  }
+
+  const devEl = document.getElementById('devices-filter');
+  if (devEl) {
+    devEl.onchange = () => _renderDevices(window._tofuData, devEl.value);
+  }
 }
 
-/* ── Leaflet choropleth ────────────────────────────────── */
+/* ── Geo choropleth map ─────────────────────────────────── */
 let _leafletMap = null;
 let _geoLayer   = null;
 
-const GRAN_MENDOZA_DEPTS = ['Capital', 'Godoy Cruz', 'Guaymallén', 'Las Heras', 'Luján de Cuyo', 'Maipú'];
-const GEOJSON_URL = 'https://raw.githubusercontent.com/mgaitan/departamentos-argentina/master/departamentos.geojson';
-
 function _choroplethColor(value, max) {
-  const t = value / max;
+  const t = max > 0 ? value / max : 0;
   if (t > 0.8) return '#FF0040';
   if (t > 0.6) return '#FF4068';
   if (t > 0.4) return '#FF80A0';
   if (t > 0.2) return '#C8D8DC';
-  return '#F0F5F5';
+  return '#E8F0F5';
 }
 
-async function renderGeoMap(geoData) {
+function renderGeoMap(geoData) {
   const container = document.getElementById('geo-map');
-  if (!container) return;
+  if (!container || typeof L === 'undefined') return;
 
   if (!_leafletMap) {
-    _leafletMap = L.map('geo-map', { zoomControl: true, scrollWheelZoom: false, attributionControl: true });
-    L.tileLayer('https://{s}.basemaps.cartocdn.com/light_nolabels/{z}/{x}/{y}{r}.png', {
-      attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OSM</a> &copy; <a href="https://carto.com/">CARTO</a>',
-      maxZoom: 14
-    }).addTo(_leafletMap);
+    const isDark = document.documentElement.getAttribute('data-theme') === 'dark';
+    _leafletMap = L.map('geo-map', {
+      center:             [-32.9, -68.8],
+      zoom:               10,
+      zoomControl:        false,
+      scrollWheelZoom:    false,
+      attributionControl: false,
+      dragging:           false,
+      doubleClickZoom:    false,
+      boxZoom:            false,
+      keyboard:           false
+    });
+    const tileUrl = isDark
+      ? 'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png'
+      : 'https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png';
+    L.tileLayer(tileUrl, { maxZoom: 19 }).addTo(_leafletMap);
   }
 
   if (_geoLayer) { _leafletMap.removeLayer(_geoLayer); _geoLayer = null; }
 
-  const maxVal = Math.max(...Object.values(geoData));
+  const maxVal = Math.max(...Object.values(geoData), 1);
 
-  try {
-    const resp = await fetch(GEOJSON_URL);
-    if (!resp.ok) throw new Error(`GeoJSON HTTP ${resp.status}`);
-    const json = await resp.json();
+  _geoLayer = L.geoJSON(GRAN_MENDOZA_GEOJSON, {
+    style: feature => {
+      const nombre = feature.properties.nombre;
+      const val    = geoData[nombre] || 0;
+      return {
+        fillColor:   _choroplethColor(val, maxVal),
+        fillOpacity: 0.82,
+        weight:      1.5,
+        color:       '#253040',
+        opacity:     0.5
+      };
+    },
+    onEachFeature: (feature, layer) => {
+      const nombre = feature.properties.nombre;
+      const val    = geoData[nombre] || 0;
+      layer.bindTooltip(
+        `<div style="font-family:Outfit,sans-serif;font-size:13px;font-weight:600">${nombre}</div><div style="font-size:12px">${fmtNumber(val)} clicks</div>`,
+        { className: 'geo-tooltip', sticky: true, direction: 'top' }
+      );
+      layer.on({
+        mouseover: e => e.target.setStyle({ fillOpacity: 1.0, weight: 2.5 }),
+        mouseout:  e => _geoLayer.resetStyle(e.target)
+      });
+    }
+  }).addTo(_leafletMap);
 
-    const filtered = {
-      type: 'FeatureCollection',
-      features: json.features.filter(f => {
-        const prov = (f.properties.provincia || '').trim();
-        const dept = (f.properties.departamento || f.properties.nombre || '').trim();
-        return prov === 'Mendoza' && GRAN_MENDOZA_DEPTS.includes(dept);
-      })
-    };
+  setTimeout(() => {
+    if (_leafletMap) {
+      _leafletMap.invalidateSize();
+      if (_geoLayer) _leafletMap.fitBounds(_geoLayer.getBounds(), { padding: [20, 20] });
+    }
+  }, 200);
+}
 
-    if (filtered.features.length === 0) throw new Error('No se encontraron departamentos de Gran Mendoza');
-
-    _geoLayer = L.geoJSON(filtered, {
-      style: feature => {
-        const dept = (feature.properties.departamento || feature.properties.nombre || '').trim();
-        const val  = geoData[dept] || 0;
-        return { fillColor: _choroplethColor(val, maxVal), fillOpacity: 0.78, weight: 1.5, color: '#253040', opacity: 0.6 };
-      },
-      onEachFeature: (feature, layer) => {
-        const dept = (feature.properties.departamento || feature.properties.nombre || '').trim();
-        const val  = geoData[dept] || 0;
-        layer.bindTooltip(`<b>${dept}</b><br>${fmtNumber(val)} clicks`, { className: 'geo-tooltip', sticky: true });
-        layer.on({
-          mouseover: e => { e.target.setStyle({ fillOpacity: 0.95 }); },
-          mouseout:  e => { _geoLayer.resetStyle(e.target); }
-        });
-      }
-    }).addTo(_leafletMap);
-
-    _leafletMap.fitBounds(_geoLayer.getBounds(), { padding: [30, 30] });
-  } catch (err) {
-    console.error('[GeoMap]', err);
-    container.innerHTML = `<p class="map-error">No se pudo cargar el mapa: ${err.message}</p>`;
+function invalidateGeoMap() {
+  if (_leafletMap) {
+    _leafletMap.invalidateSize();
+    if (_geoLayer) _leafletMap.fitBounds(_geoLayer.getBounds(), { padding: [20, 20] });
   }
 }
 
@@ -362,6 +591,8 @@ async function renderGeoMap(geoData) {
    MOFU
 ══════════════════════════════════════════════════════════ */
 function renderMofu(data) {
+  window._mofuData = data;
+
   const prev = data.prev || {};
 
   setKPI('mofu-leads',      fmtNumber(data.total_leads));
@@ -374,103 +605,289 @@ function renderMofu(data) {
   _setDelta('delta-mofu-tipif',      data.tipification_rate, prev.tipification_rate);
   _setDelta('delta-mofu-highintent', data.high_intent_leads, prev.high_intent_leads);
 
-  /* ── Trend: Leads (barras) + CPL (línea eje derecho) ── */
-  _destroyChart('chart-mofu-trend');
-  const ctxMT = document.getElementById('chart-mofu-trend');
-  if (ctxMT && data.trend) {
-    const axis = _axisDefaults();
-    const muted = _cssVar('--text-muted');
+  /* ── MOFU sparklines ── */
+  if (data.trend) {
+    const src = data.trend.sparkline || data.trend;
+    const isUp = arr => arr[arr.length - 1] >= arr[0];
+    _renderSparkline('sparkline-mofu-leads',     src.leads, isUp(src.leads),     src.labels || []);
+    _renderSparkline('sparkline-mofu-cpl',       src.cpl,   !isUp(src.cpl),      src.labels || []);
+    _renderSparkline('sparkline-mofu-tipif',     src.leads, isUp(src.leads),     src.labels || []);
+    _renderSparkline('sparkline-mofu-highintent',src.leads, isUp(src.leads),     src.labels || []);
+  }
 
-    _charts['chart-mofu-trend'] = new Chart(ctxMT, {
+  /* ── Trend: separate bar charts for Leads and CPL ── */
+  _destroyChart('chart-mofu-trend');
+  _destroyChart('chart-mofu-leads');
+  _destroyChart('chart-mofu-cpl');
+
+  const ctxML = document.getElementById('chart-mofu-leads');
+  if (ctxML && data.trend) {
+    _charts['chart-mofu-leads'] = new Chart(ctxML, {
       type: 'bar',
       data: {
         labels: data.trend.labels,
-        datasets: [
-          {
-            type:            'bar',
-            label:           'Leads',
-            data:            data.trend.leads,
-            backgroundColor: 'rgba(37,48,64,0.75)',
-            borderRadius:    4,
-            borderSkipped:   false,
-            yAxisID:         'yLeads'
-          },
-          {
-            type:            'line',
-            label:           'CPL',
-            data:            data.trend.cpl,
-            borderColor:     '#FF0040',
-            backgroundColor: 'transparent',
-            borderWidth:     2,
-            pointRadius:     4,
-            pointBackgroundColor: '#FF0040',
-            tension:         0.35,
-            yAxisID:         'yCpl'
-          }
-        ]
+        datasets: [{
+          label:              'Leads',
+          data:               data.trend.leads,
+          backgroundColor:    CHART_PALETTE.blue.solid,
+          borderRadius:       4,
+          borderSkipped:      false,
+          barPercentage:      0.6,
+          categoryPercentage: 0.7
+        }]
       },
       options: {
         responsive: true,
         maintainAspectRatio: false,
         interaction: { mode: 'index', intersect: false },
         plugins: {
-          legend: { labels: { font: { family: 'Outfit', size: 12 }, color: _cssVar('--text-secondary'), usePointStyle: true } },
-          tooltip: {
-            callbacks: {
-              label: ctx => {
-                if (ctx.dataset.label === 'CPL') return ` CPL: ${fmtCurrency(ctx.parsed.y)}`;
-                return ` Leads: ${fmtNumber(ctx.parsed.y)}`;
-              }
-            }
-          }
+          legend: { display: false },
+          tooltip: { callbacks: { label: ctx => ` Leads: ${fmtNumber(ctx.parsed.y)}` } }
         },
         scales: {
-          yLeads: { ...axis, position: 'left',  grid: { color: axis.grid.color }, title: { display: true, text: 'Leads', color: muted, font: { size: 11 } } },
-          yCpl:   { ...axis, position: 'right', grid: { display: false }, ticks: { ...axis.ticks, callback: v => '$' + (v / 1000).toFixed(1) + 'k' }, title: { display: true, text: 'CPL', color: muted, font: { size: 11 } } },
-          x:      { ...axis, grid: { display: false } }
+          y: { ..._axisDefaults(), ticks: { ..._axisDefaults().ticks, callback: v => fmtNumber(v) } },
+          x: { ..._axisDefaults(), grid: { display: false } }
         }
       }
     });
   }
 
-  /* Status horizontal bars */
-  _destroyChart('chart-status');
-  const ctxSt = document.getElementById('chart-status');
-  if (ctxSt) {
-    _charts['chart-status'] = new Chart(ctxSt, {
+  const ctxMC = document.getElementById('chart-mofu-cpl');
+  if (ctxMC && data.trend) {
+    _charts['chart-mofu-cpl'] = new Chart(ctxMC, {
       type: 'bar',
       data: {
-        labels:   data.status.labels,
-        datasets: [{ data: data.status.data, backgroundColor: data.status.colors, borderRadius: 4, borderSkipped: false, barThickness: 20 }]
+        labels: data.trend.labels,
+        datasets: [{
+          label:              'CPL',
+          data:               data.trend.cpl,
+          backgroundColor:    'rgba(239,68,68,0.75)',
+          borderRadius:       4,
+          borderSkipped:      false,
+          barPercentage:      0.6,
+          categoryPercentage: 0.7
+        }]
       },
       options: {
-        indexAxis: 'y',
         responsive: true,
         maintainAspectRatio: false,
+        interaction: { mode: 'index', intersect: false },
         plugins: {
           legend: { display: false },
-          tooltip: { callbacks: { label: ctx => ` ${fmtNumber(ctx.parsed.x)} leads` } }
+          tooltip: { callbacks: { label: ctx => ` CPL: ${fmtCurrency(ctx.parsed.y)}` } }
         },
         scales: {
-          x: { ..._axisDefaults(), ticks: { ..._axisDefaults().ticks } },
-          y: { grid: { display: false }, ticks: { font: { size: 12 }, color: _cssVar('--text-secondary') } }
+          y: { ..._axisDefaults(), ticks: { ..._axisDefaults().ticks, callback: v => '$' + (v / 1000).toFixed(1) + 'k' } },
+          x: { ..._axisDefaults(), grid: { display: false } }
         }
       }
     });
   }
 
-  /* Segments donut */
+  /* ── Status: SVG funnel chart — interactive, no static labels ── */
+  _destroyChart('chart-status');
+  const ctxSt = document.getElementById('chart-status');
+  if (ctxSt && data.status) {
+    const prevSvg = ctxSt.parentElement.querySelector('.umoh-funnel');
+    if (prevSvg) prevSvg.remove();
+    const prevTip = document.getElementById('umoh-funnel-tip');
+    if (prevTip) prevTip.remove();
+    ctxSt.style.display = 'none';
+
+    const statusColors = [
+      CHART_PALETTE.blue.solid,
+      CHART_PALETTE.coral.solid,
+      CHART_PALETTE.amber.solid,
+      CHART_PALETTE.purple.solid,
+      CHART_PALETTE.teal.solid,
+      'rgba(72,199,142,0.65)',
+      CHART_PALETTE.green.solid
+    ];
+
+    const labels = data.status.labels;
+    const vals   = data.status.data;
+    const total  = vals.reduce((a, b) => a + b, 0);
+    const maxVal = Math.max(...vals);
+    const n      = vals.length;
+
+    const parent  = ctxSt.parentElement;
+    const W       = Math.max(parent.clientWidth || 480, 320);
+    const stageH  = 46;
+    const gap     = 3;
+    const totalH  = n * stageH + (n - 1) * gap;
+    const cx      = W / 2;
+    const maxBarW = W * 0.90;
+    const minBarW = maxBarW * 0.20;
+
+    const widths = vals.map(v => minBarW + (v / maxVal) * (maxBarW - minBarW));
+
+    /* Tooltip — fixed position, follows cursor, matches Chart.js style */
+    const tip = document.createElement('div');
+    tip.id = 'umoh-funnel-tip';
+    tip.style.cssText = 'position:fixed;background:rgba(15,23,42,0.92);color:#fff;font-family:Outfit,sans-serif;font-size:13px;font-weight:500;line-height:1.6;padding:8px 12px;border-radius:8px;pointer-events:none;display:none;white-space:nowrap;z-index:9999;box-shadow:0 4px 16px rgba(0,0,0,0.35)';
+    document.body.appendChild(tip);
+
+    const NS  = 'http://www.w3.org/2000/svg';
+    const svg = document.createElementNS(NS, 'svg');
+    svg.setAttribute('viewBox', `0 0 ${W} ${totalH}`);
+    svg.style.cssText = `display:block;width:100%;height:${totalH}px;overflow:visible;`;
+    svg.classList.add('umoh-funnel');
+
+    vals.forEach((val, i) => {
+      const topW  = widths[i];
+      const botW  = i < n - 1 ? widths[i + 1] : widths[i] * 0.82;
+      const y     = i * (stageH + gap);
+      const pct   = total > 0 ? ((val / total) * 100).toFixed(1) : '0';
+      const color = statusColors[i % statusColors.length];
+
+      const x1 = cx - topW / 2;
+      const x2 = cx + topW / 2;
+      const x3 = cx + botW / 2;
+      const x4 = cx - botW / 2;
+      const r  = 5;
+
+      const isFirst = i === 0;
+      const isLast  = i === n - 1;
+      let d;
+      if (isFirst) {
+        d = `M ${x1+r} ${y} L ${x2-r} ${y} Q ${x2} ${y} ${x2} ${y+r} L ${x3} ${y+stageH} L ${x4} ${y+stageH} L ${x1} ${y+r} Q ${x1} ${y} ${x1+r} ${y} Z`;
+      } else if (isLast) {
+        d = `M ${x1} ${y} L ${x2} ${y} L ${x3-r} ${y+stageH} Q ${x3} ${y+stageH} ${x3} ${y+stageH-r} L ${x4} ${y+stageH-r} Q ${x4} ${y+stageH} ${x4+r} ${y+stageH} Z`;
+      } else {
+        d = `M ${x1} ${y} L ${x2} ${y} L ${x3} ${y+stageH} L ${x4} ${y+stageH} Z`;
+      }
+
+      const path = document.createElementNS(NS, 'path');
+      path.setAttribute('d', d);
+      path.setAttribute('fill', color);
+      path.style.cursor     = 'pointer';
+      path.style.transition = 'opacity 0.15s';
+
+      path.addEventListener('mousemove', e => {
+        tip.style.display = 'block';
+        tip.style.left    = (e.clientX + 14) + 'px';
+        tip.style.top     = (e.clientY - 10) + 'px';
+        tip.innerHTML     = `<span style="font-weight:700">${labels[i]}</span><br>${fmtNumber(val)} leads &nbsp;&middot;&nbsp; ${pct}%`;
+        path.style.opacity = '0.72';
+      });
+      path.addEventListener('mouseleave', () => {
+        tip.style.display  = 'none';
+        path.style.opacity = '1';
+      });
+
+      svg.appendChild(path);
+    });
+
+    parent.appendChild(svg);
+  }
+
+  /* ── Segments donut ── */
   _destroyChart('chart-segments');
   const ctxSeg = document.getElementById('chart-segments');
   if (ctxSeg) {
+    const segColors = ['blue', 'green', 'purple'].map(k => CHART_PALETTE[k].solid);
     _charts['chart-segments'] = new Chart(ctxSeg, {
       type: 'doughnut',
       data: {
         labels:   data.segments.labels,
-        datasets: [{ data: data.segments.data, backgroundColor: data.segments.colors, borderWidth: 0, hoverOffset: 8 }]
+        datasets: [{ data: data.segments.data, backgroundColor: segColors, borderWidth: 0, hoverOffset: 8 }]
       },
       options: _donutOpts()
     });
+  }
+}
+
+/* ══════════════════════════════════════════════════════════
+   BOFU — SELLERS TABLE
+══════════════════════════════════════════════════════════ */
+
+/**
+ * Renders the sellers ranking table in BOFU.
+ * Sorted by sales descending. Delta arrows for each metric.
+ * cycle_days uses lowerBetter = true (fewer days = green).
+ * @param {object[]} sellers - array of seller objects from data.sellers
+ */
+function _renderSellersTable(sellers) {
+  const tbody = document.getElementById('sellers-body');
+  if (!tbody || !sellers || !sellers.length) return;
+
+  /* Sort by sales descending — rank is dynamic per period */
+  const sorted = [...sellers].sort((a, b) => b.sales - a.sales);
+
+  /**
+   * Computes a percentage-delta arrow badge.
+   * @param {number}  curr
+   * @param {number}  prev
+   * @param {boolean} lowerBetter - true for cycle_days
+   */
+  function delta(curr, prev, lowerBetter) {
+    if (prev == null || prev === 0) return '';
+    const pct  = ((curr - prev) / Math.abs(prev)) * 100;
+    const good = lowerBetter ? pct <= 0 : pct >= 0;
+    const cls  = Math.abs(pct) < 0.5 ? 'delta-flat' : (good ? 'delta-up' : 'delta-down');
+    const arrow = pct >= 0 ? '↑' : '↓';
+    return `<span class="seller-delta ${cls}">${arrow} ${Math.abs(pct).toFixed(1)}%</span>`;
+  }
+
+  tbody.innerHTML = sorted.map((s, i) => {
+    const rank    = i + 1;
+    const eff     = s.leads > 0 ? (s.sales / s.leads) * 100 : 0;
+    const prevEff = (s.prev && s.prev.leads > 0) ? (s.prev.sales / s.prev.leads) * 100 : null;
+    const rankClass = rank <= 3 ? `rank-${rank}` : '';
+
+    return `
+      <tr>
+        <td class="td-rank ${rankClass}">${rank}</td>
+        <td class="td-name">${s.name}</td>
+        <td class="td-num">
+          ${fmtNumber(s.sales)}
+          ${s.prev ? delta(s.sales, s.prev.sales, false) : ''}
+        </td>
+        <td class="td-num">
+          ${fmtPercent(eff)}
+          ${prevEff !== null ? delta(eff, prevEff, false) : ''}
+        </td>
+        <td class="td-num">
+          ${fmtCurrency(s.avg_ticket)}
+          ${s.prev ? delta(s.avg_ticket, s.prev.avg_ticket, false) : ''}
+        </td>
+        <td class="td-num">
+          ${fmtNumber(s.capitas)}
+          ${s.prev ? delta(s.capitas, s.prev.capitas, false) : ''}
+        </td>
+        <td class="td-num">
+          ${s.cycle_days.toFixed(1)} días
+          ${s.prev ? delta(s.cycle_days, s.prev.cycle_days, true) : ''}
+        </td>
+      </tr>
+    `;
+  }).join('');
+
+  /* ── Totals footer row ── */
+  const tfoot = document.getElementById('sellers-foot');
+  if (tfoot) {
+    const totalSales   = sorted.reduce((a, s) => a + s.sales,   0);
+    const totalLeads   = sorted.reduce((a, s) => a + s.leads,   0);
+    const totalCapitas = sorted.reduce((a, s) => a + s.capitas, 0);
+    const avgEff    = totalLeads   > 0 ? (totalSales / totalLeads) * 100 : 0;
+    const avgTicket = totalSales   > 0
+      ? sorted.reduce((a, s) => a + s.sales * s.avg_ticket, 0) / totalSales
+      : 0;
+    const avgCycle  = sorted.length > 0
+      ? sorted.reduce((a, s) => a + s.cycle_days, 0) / sorted.length
+      : 0;
+
+    tfoot.innerHTML = `
+      <tr>
+        <td></td>
+        <td class="td-total-label">Totales / Promedios</td>
+        <td class="td-num">${fmtNumber(totalSales)}</td>
+        <td class="td-num">${fmtPercent(avgEff)}</td>
+        <td class="td-num">${fmtCurrency(avgTicket)}</td>
+        <td class="td-num">${fmtNumber(totalCapitas)}</td>
+        <td class="td-num">${avgCycle.toFixed(1)} días</td>
+      </tr>
+    `;
   }
 }
 
@@ -494,60 +911,92 @@ function renderBofu(data) {
   _setDelta('delta-bofu-capitas',       data.capitas_closed,        prev.capitas_closed);
   _setDelta('delta-bofu-ticket-capita', data.avg_ticket_per_capita, prev.avg_ticket_per_capita);
 
-  /* ── Trend: Ingresos (barras) + Ventas (línea eje derecho) ── */
-  _destroyChart('chart-bofu-trend');
-  const ctxBT = document.getElementById('chart-bofu-trend');
-  if (ctxBT && data.trend) {
-    const axis = _axisDefaults();
-    const muted = _cssVar('--text-muted');
+  /* ── Sparklines for BOFU KPI cards ── */
+  if (data.trend) {
+    const src   = data.trend.sparkline || data.trend;
+    const isUp  = arr => arr[arr.length - 1] >= arr[0];
+    const rev   = src.revenue || [];
+    const sales = src.sales   || [];
 
-    _charts['chart-bofu-trend'] = new Chart(ctxBT, {
+    const capitas = sales.map(s =>
+      Math.round(s * (data.capitas_closed / Math.max(data.closed_sales, 1)))
+    );
+
+    _renderSparkline('sparkline-bofu-revenue',      rev,     isUp(rev),     src.labels || []);
+    _renderSparkline('sparkline-bofu-sales',         sales,   isUp(sales),   src.labels || []);
+    _renderSparkline('sparkline-bofu-ticket',        rev,     isUp(rev),     src.labels || []);
+    _renderSparkline('sparkline-bofu-conversion',    sales,   isUp(sales),   src.labels || []);
+    _renderSparkline('sparkline-bofu-capitas',       capitas, isUp(capitas), src.labels || []);
+    _renderSparkline('sparkline-bofu-ticket-capita', rev,     isUp(rev),     src.labels || []);
+  }
+
+  /* ── Trend: 2 independent bar charts (Ingresos / Ventas) ── */
+  _destroyChart('chart-bofu-trend');
+  _destroyChart('chart-bofu-revenue');
+  _destroyChart('chart-bofu-sales-trend');
+
+  const ctxBR = document.getElementById('chart-bofu-revenue');
+  if (ctxBR && data.trend) {
+    const axis = _axisDefaults();
+    _charts['chart-bofu-revenue'] = new Chart(ctxBR, {
       type: 'bar',
       data: {
         labels: data.trend.labels,
-        datasets: [
-          {
-            type:            'bar',
-            label:           'Ingresos',
-            data:            data.trend.revenue,
-            backgroundColor: 'rgba(37,48,64,0.75)',
-            borderRadius:    4,
-            borderSkipped:   false,
-            yAxisID:         'yRev'
-          },
-          {
-            type:            'line',
-            label:           'Ventas',
-            data:            data.trend.sales,
-            borderColor:     '#FF0040',
-            backgroundColor: 'transparent',
-            borderWidth:     2,
-            pointRadius:     5,
-            pointBackgroundColor: '#FF0040',
-            tension:         0.35,
-            yAxisID:         'ySales'
-          }
-        ]
+        datasets: [{
+          label:              'Ingresos',
+          data:               data.trend.revenue,
+          backgroundColor:    CHART_PALETTE.green.solid,
+          borderRadius:       4,
+          borderSkipped:      false,
+          barPercentage:      0.6,
+          categoryPercentage: 0.7
+        }]
       },
       options: {
         responsive: true,
         maintainAspectRatio: false,
         interaction: { mode: 'index', intersect: false },
         plugins: {
-          legend: { labels: { font: { family: 'Outfit', size: 12 }, color: _cssVar('--text-secondary'), usePointStyle: true } },
-          tooltip: {
-            callbacks: {
-              label: ctx => {
-                if (ctx.dataset.label === 'Ventas') return ` Ventas: ${fmtNumber(ctx.parsed.y)}`;
-                return ` Ingresos: ${fmtCurrency(ctx.parsed.y)}`;
-              }
-            }
-          }
+          legend: { display: false },
+          tooltip: { callbacks: { label: ctx => ` Ingresos: ${fmtCurrency(ctx.parsed.y)}` } }
         },
         scales: {
-          yRev:   { ...axis, position: 'left',  ticks: { ...axis.ticks, callback: v => '$' + (v / 1000).toFixed(0) + 'k' }, title: { display: true, text: 'Ingresos', color: muted, font: { size: 11 } } },
-          ySales: { ...axis, position: 'right', grid: { display: false }, ticks: { ...axis.ticks }, title: { display: true, text: 'Ventas', color: muted, font: { size: 11 } } },
-          x:      { ...axis, grid: { display: false } }
+          y: { ...axis, ticks: { ...axis.ticks, callback: v => '$' + (v / 1000).toFixed(0) + 'k' } },
+          x: { ...axis, grid: { display: false } }
+        }
+      }
+    });
+  }
+
+  const ctxBS = document.getElementById('chart-bofu-sales-trend');
+  if (ctxBS && data.trend) {
+    const axis = _axisDefaults();
+    _charts['chart-bofu-sales-trend'] = new Chart(ctxBS, {
+      type: 'bar',
+      data: {
+        labels: data.trend.labels,
+        datasets: [{
+          label:              'Ventas',
+          data:               data.trend.sales,
+          backgroundColor:    CHART_PALETTE.teal.solid,
+          borderRadius:       4,
+          borderSkipped:      false,
+          barPercentage:      0.6,
+          categoryPercentage: 0.7
+        }]
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        interaction: { mode: 'index', intersect: false },
+        plugins: {
+          legend: { display: false },
+          tooltip: { callbacks: { label: ctx => ` Ventas: ${fmtNumber(ctx.parsed.y)}` } }
+        },
+        scales: {
+          y: { ...axis, beginAtZero: true,
+               ticks: { ...axis.ticks, callback: v => fmtNumber(v), precision: 0 } },
+          x: { ...axis, grid: { display: false } }
         }
       }
     });
@@ -556,12 +1005,13 @@ function renderBofu(data) {
   /* Typification donut */
   _destroyChart('chart-typification');
   const ctxTyp = document.getElementById('chart-typification');
+  const bofuColors = ['green', 'blue', 'amber'].map(k => CHART_PALETTE[k].solid);
   if (ctxTyp) {
     _charts['chart-typification'] = new Chart(ctxTyp, {
       type: 'doughnut',
       data: {
         labels:   data.typification.labels,
-        datasets: [{ data: data.typification.data, backgroundColor: data.typification.colors, borderWidth: 0, hoverOffset: 8 }]
+        datasets: [{ data: data.typification.data, backgroundColor: bofuColors, borderWidth: 0, hoverOffset: 8 }]
       },
       options: _donutOpts()
     });
@@ -572,9 +1022,9 @@ function renderBofu(data) {
   if (segBody && data.typification) {
     const total = data.typification.data.reduce((a, b) => a + b, 0);
     segBody.innerHTML = data.typification.labels.map((label, i) => {
-      const val = data.typification.data[i];
-      const pct = total > 0 ? ((val / total) * 100).toFixed(1) : '0.0';
-      const color = data.typification.colors[i];
+      const val   = data.typification.data[i];
+      const pct   = total > 0 ? ((val / total) * 100).toFixed(1) : '0.0';
+      const color = bofuColors[i] || bofuColors[0];
       return `
         <tr>
           <td class="segment-name">
@@ -586,6 +1036,9 @@ function renderBofu(data) {
       `;
     }).join('');
   }
+
+  /* Sellers ranking table */
+  if (data.sellers) _renderSellersTable(data.sellers);
 }
 
 /* ══════════════════════════════════════════════════════════
@@ -594,39 +1047,63 @@ function renderBofu(data) {
 
 /**
  * Renders a single sparkline chart.
- * @param {string} id      - canvas element ID (e.g. 'sparkline-revenue')
- * @param {number[]} values - array of data points
- * @param {boolean} positive - true = accent color, false = red
+ * @param {string}   id       - canvas element ID (e.g. 'sparkline-revenue')
+ * @param {number[]} values   - array of data points
+ * @param {boolean}  positive - true = green (trending up), false = red (trending down)
+ * @param {string[]} labels   - optional x-axis labels shown in tooltip
  */
-function _renderSparkline(id, values, positive) {
+function _renderSparkline(id, values, positive, labels) {
   _destroyChart(id);
   const ctx = document.getElementById(id);
   if (!ctx || !values || values.length < 2) return;
 
-  const color = positive ? _cssVar('--umoh-accent') : '#FF0040';
-  const colorAlpha = positive ? 'rgba(255,0,64,0.12)' : 'rgba(255,0,64,0.12)';
+  // Pin dimensions before Chart.js takes over — prevents infinite resize loop
+  // when responsive:true + maintainAspectRatio:false inside a flex parent.
+  const SPARK_H = 56;
+  const parentW = ctx.parentElement ? ctx.parentElement.clientWidth : 200;
+  ctx.width  = parentW > 0 ? parentW : 200;
+  ctx.height = SPARK_H;
+  ctx.style.height = SPARK_H + 'px';
+
+  const borderColor     = positive ? '#22C55E' : '#FF0040';
+  const backgroundColor = positive ? 'rgba(34,197,94,0.10)' : 'rgba(255,0,64,0.10)';
+
+  /* Use provided labels if they match the data length, otherwise fall back */
+  const resolvedLabels = (labels && labels.length === values.length)
+    ? labels
+    : values.map((_, i) => `P${i + 1}`);
 
   _charts[id] = new Chart(ctx, {
     type: 'line',
     data: {
-      labels: values.map(() => ''),
+      labels: resolvedLabels,
       datasets: [{
         data:            values,
-        borderColor:     color,
-        backgroundColor: colorAlpha,
+        borderColor:     borderColor,
+        backgroundColor: backgroundColor,
         borderWidth:     1.5,
         pointRadius:     0,
-        tension:         0.4,
+        pointHoverRadius: 4,
+        tension:         0,
         fill:            true
       }]
     },
     options: {
-      responsive:          true,
+      responsive:          false,
       maintainAspectRatio: false,
       animation:           { duration: 400 },
+      interaction:         { mode: 'index', intersect: false },
       plugins: {
         legend:  { display: false },
-        tooltip: { enabled: false }
+        tooltip: {
+          enabled:   true,
+          mode:      'index',
+          intersect: false,
+          callbacks: {
+            title: items => items[0]?.label || '',
+            label: c     => fmtNumber(c.parsed.y)
+          }
+        }
       },
       scales: {
         x: { display: false },
@@ -639,15 +1116,18 @@ function _renderSparkline(id, values, positive) {
 
 /**
  * Renders sparklines for all 6 Performance KPI cards.
+ * Prefers doubled sparkline data (current + previous period) when available.
  * Revenue and spend come directly from trend data.
  * ROI, impressions, leads, sales are derived point-by-point.
  */
 function renderSparklines(data) {
   if (!data.trend) return;
 
-  const trend   = data.trend;
-  const revenue = trend.revenue;
-  const spend   = trend.spend;
+  /* Prefer sparkline sub-object (doubled data) over raw trend */
+  const src = data.trend.sparkline || data.trend;
+  const labels  = src.labels || [];
+  const revenue = src.revenue;
+  const spend   = src.spend;
 
   /* ROI per data point */
   const roi = revenue.map((r, i) =>
@@ -671,12 +1151,12 @@ function renderSparklines(data) {
   /* Determine trend direction for each metric (last vs first point) */
   const isUp = arr => arr[arr.length - 1] >= arr[0];
 
-  _renderSparkline('sparkline-revenue',     revenue,     isUp(revenue));
-  _renderSparkline('sparkline-spend',       spend,       !isUp(spend));   /* lower spend = better */
-  _renderSparkline('sparkline-roi',         roi,         isUp(roi));
-  _renderSparkline('sparkline-impressions', impressions, isUp(impressions));
-  _renderSparkline('sparkline-leads',       leads,       isUp(leads));
-  _renderSparkline('sparkline-sales',       sales,       isUp(sales));
+  _renderSparkline('sparkline-revenue',     revenue,     isUp(revenue),     labels);
+  _renderSparkline('sparkline-spend',       spend,       !isUp(spend),      labels); /* lower spend = better */
+  _renderSparkline('sparkline-roi',         roi,         isUp(roi),         labels);
+  _renderSparkline('sparkline-impressions', impressions, isUp(impressions), labels);
+  _renderSparkline('sparkline-leads',       leads,       isUp(leads),       labels);
+  _renderSparkline('sparkline-sales',       sales,       isUp(sales),       labels);
 }
 
 /* ── Entry point ────────────────────────────────────────── */
