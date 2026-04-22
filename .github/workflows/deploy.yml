@@ -47,9 +47,14 @@ jobs:
           cp -r product/api/.       build/staging/api/
           sed -i 's/const USE_MOCK = false.*/const USE_MOCK = true;/' \
             build/staging/assets/js/api.js || true
-          cp build/staging/config/credentials.template.php build/staging/config/credentials.php
-          sed -i "s|ADMIN_HASH_PLACEHOLDER|${ADMIN_HASH}|g"       build/staging/config/credentials.php
-          sed -i "s|PREPAGAS_HASH_PLACEHOLDER|${PREPAGAS_HASH}|g" build/staging/config/credentials.php
+          python3 -c "
+import os, sys
+tmpl = open('build/staging/config/credentials.template.php').read()
+out  = tmpl.replace('ADMIN_HASH_PLACEHOLDER',    os.environ['ADMIN_HASH'])
+out  = out.replace('PREPAGAS_HASH_PLACEHOLDER',  os.environ['PREPAGAS_HASH'])
+if 'PLACEHOLDER' in out: sys.exit('ERROR: hashes no inyectados — verificar secrets')
+open('build/staging/config/credentials.php', 'w').write(out)
+"
           echo '${{ secrets.GOOGLE_SHEETS_SA_JSON }}' > build/staging/api/config/sa.json
 
       - name: Deploy via rsync → /public_html/prepagas/staging/
@@ -58,6 +63,9 @@ jobs:
             -e "ssh -p $SSH_PORT -i ~/.ssh/deploy_key -o StrictHostKeyChecking=no" \
             build/staging/ \
             "${{ secrets.SSH_USER }}@${{ secrets.FTP_HOST }}:public_html/prepagas/staging/"
+          ssh -p $SSH_PORT -i ~/.ssh/deploy_key -o StrictHostKeyChecking=no \
+            "${{ secrets.SSH_USER }}@${{ secrets.FTP_HOST }}" \
+            'find public_html/prepagas/staging/ -name "*.php" -exec touch {} \; 2>/dev/null && echo "OPcache invalidado"'
 
   # ── PRODUCCIÓN — solo main ─────────────────────────────────────────────────
   deploy-production:
@@ -89,12 +97,14 @@ jobs:
             build/prepagas/assets/js/api.js
           grep -q "USE_MOCK = false" build/prepagas/assets/js/api.js \
             || { echo "ERROR: USE_MOCK no quedó en false"; exit 1; }
-          cp build/prepagas/config/credentials.template.php build/prepagas/config/credentials.php
-          sed -i "s|ADMIN_HASH_PLACEHOLDER|${ADMIN_HASH}|g"       build/prepagas/config/credentials.php
-          sed -i "s|PREPAGAS_HASH_PLACEHOLDER|${PREPAGAS_HASH}|g" build/prepagas/config/credentials.php
-          grep -q "HASH_PLACEHOLDER" build/prepagas/config/credentials.php \
-            && { echo "ERROR: sed no reemplazó los placeholders — verificar secrets"; exit 1; } || true
-          # Escribir SA key desde GitHub Secret (nunca desde disco)
+          python3 -c "
+import os, sys
+tmpl = open('build/prepagas/config/credentials.template.php').read()
+out  = tmpl.replace('ADMIN_HASH_PLACEHOLDER',   os.environ['ADMIN_HASH'])
+out  = out.replace('PREPAGAS_HASH_PLACEHOLDER', os.environ['PREPAGAS_HASH'])
+if 'PLACEHOLDER' in out: sys.exit('ERROR: hashes no inyectados — verificar secrets')
+open('build/prepagas/config/credentials.php', 'w').write(out)
+"
           echo '${{ secrets.GOOGLE_SHEETS_SA_JSON }}' > build/prepagas/api/config/sa.json
 
       - name: Deploy via rsync → /public_html/prepagas/
@@ -103,3 +113,6 @@ jobs:
             -e "ssh -p $SSH_PORT -i ~/.ssh/deploy_key -o StrictHostKeyChecking=no" \
             build/prepagas/ \
             "${{ secrets.SSH_USER }}@${{ secrets.FTP_HOST }}:public_html/prepagas/"
+          ssh -p $SSH_PORT -i ~/.ssh/deploy_key -o StrictHostKeyChecking=no \
+            "${{ secrets.SSH_USER }}@${{ secrets.FTP_HOST }}" \
+            'find public_html/prepagas/ -maxdepth 3 -name "*.php" -exec touch {} \; 2>/dev/null && echo "OPcache invalidado"'
