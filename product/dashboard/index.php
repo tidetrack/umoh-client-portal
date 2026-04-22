@@ -1,15 +1,11 @@
 <?php
 $_is_local = in_array($_SERVER['HTTP_HOST'] ?? '', ['localhost', '127.0.0.1', 'localhost:8080']);
-$_domain   = $_is_local ? '' : '.umohcrew.com';
-ini_set('session.cookie_domain', $_domain);
-session_set_cookie_params([
-    'lifetime' => 86400 * 30,
-    'path'     => '/',
-    'domain'   => $_domain,
-    'secure'   => !$_is_local,
-    'httponly' => true,
-    'samesite' => 'Lax',
-]);
+if ($_is_local) {
+    session_set_cookie_params(['lifetime' => 86400 * 30, 'path' => '/', 'httponly' => true, 'samesite' => 'Lax']);
+} else {
+    ini_set('session.cookie_domain', '.umohcrew.com');
+    session_set_cookie_params(['lifetime' => 86400 * 30, 'path' => '/', 'domain' => '.umohcrew.com', 'secure' => true, 'httponly' => true, 'samesite' => 'Lax']);
+}
 session_start();
 if (empty($_SESSION['umoh_user'])) {
     header('Location: login.php');
