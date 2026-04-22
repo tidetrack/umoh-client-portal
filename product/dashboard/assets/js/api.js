@@ -8,7 +8,7 @@
  * Para pasar a producción solo cambiar USE_MOCK a false.
  */
 
-const USE_MOCK = true; // Cambiar a false en producción (el servidor ya tiene USE_MOCK=false)
+const USE_MOCK = true; // staging: mock data activo — producción usa USE_MOCK=false via workflow
 const API_BASE = 'api/endpoints';
 
 /**

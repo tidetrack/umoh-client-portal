@@ -4,6 +4,7 @@
 
 # Auth credentials — subir manualmente via FTP, nunca al repo
 dashboard/config/credentials.php
+product/dashboard/config/credentials.php
 
 # Python
 __pycache__/
@@ -29,6 +30,10 @@ service_account.json
 eco-league-*.json
 *-sa-key.json
 *.key.json
+
+# SA keys y OAuth secrets en ops/ — nunca al repo
+ops/production/environments/*.json
+ops/testing/environments/*.json
 
 # Brand assets & local tools — no necesarios en el repo
 marca/

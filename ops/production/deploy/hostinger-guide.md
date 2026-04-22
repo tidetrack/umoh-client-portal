@@ -73,7 +73,7 @@ Crear `/public_html/prepagas/.htaccess`:
 Options -Indexes
 
 # Redirigir raíz al dashboard
-DirectoryIndex dashboard/index.html
+DirectoryIndex dashboard/index.php dashboard/index.html
 
 # PHP 8.3 en Hostinger (si no está por defecto)
 # AddHandler application/x-httpd-php83 .php
