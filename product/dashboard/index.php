@@ -1,10 +1,12 @@
 <?php
-ini_set('session.cookie_domain', '.umohcrew.com');
+$_is_local = in_array($_SERVER['HTTP_HOST'] ?? '', ['localhost', '127.0.0.1', 'localhost:8080']);
+$_domain   = $_is_local ? '' : '.umohcrew.com';
+ini_set('session.cookie_domain', $_domain);
 session_set_cookie_params([
     'lifetime' => 86400 * 30,
     'path'     => '/',
-    'domain'   => '.umohcrew.com',
-    'secure'   => true,
+    'domain'   => $_domain,
+    'secure'   => !$_is_local,
     'httponly' => true,
     'samesite' => 'Lax',
 ]);
