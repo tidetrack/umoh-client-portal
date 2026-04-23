@@ -1,1 +1,15 @@
 DirectoryIndex index.php index.html
+
+# ── Cache headers ─────────────────────────────────────────────────────────────
+# PHP y HTML: nunca cachear (entry points dinámicos + session-gated)
+<FilesMatch "\.(php|html)$">
+    Header set Cache-Control "no-store, no-cache, must-revalidate"
+    Header set Pragma "no-cache"
+    Header unset ETag
+</FilesMatch>
+
+# JS y CSS: cache de 1 año — los assets se sirven con ?v=<sha> desde index.php
+# El query string diferente en cada deploy hace que el browser descargue la versión nueva
+<FilesMatch "\.(js|css)$">
+    Header set Cache-Control "public, max-age=31536000, immutable"
+</FilesMatch>
