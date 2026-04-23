@@ -1,0 +1,117 @@
+name: Limpieza manual — directorio huérfano
+
+# Disparo 100% manual. Requiere escribir "CONFIRMAR-BORRADO" en el input.
+# Borra: /home/u*/public_html/prepagas/ (path incorrecto pre-fix rsync).
+# NO borra: domains/umohcrew.com/public_html/prepagas/ (path correcto, en producción).
+
+on:
+  workflow_dispatch:
+    inputs:
+      confirmacion:
+        description: 'Escribí exactamente "CONFIRMAR-BORRADO" para proceder'
+        required: true
+        type: string
+      dry_run:
+        description: 'Listar archivos sin borrar (dry run = true para revisar antes)'
+        required: true
+        default: 'true'
+        type: choice
+        options: [true, false]
+
+env:
+  SSH_PORT: 65002
+
+jobs:
+  cleanup-huerfano:
+    name: Limpiar directorio huérfano
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - name: Validar confirmación
+        run: |
+          if [ "${{ github.event.inputs.confirmacion }}" != "CONFIRMAR-BORRADO" ]; then
+            echo "ERROR: El input de confirmación no coincide exactamente con 'CONFIRMAR-BORRADO'."
+            echo "El workflow se cancela sin tocar nada."
+            exit 1
+          fi
+          echo "Confirmación válida. Continuando..."
+
+      - name: Configurar SSH
+        run: |
+          mkdir -p ~/.ssh
+          printf '%s\n' "${{ secrets.SSH_PRIVATE_KEY }}" > ~/.ssh/deploy_key
+          chmod 600 ~/.ssh/deploy_key
+          ssh-keyscan -p $SSH_PORT ${{ secrets.FTP_HOST }} >> ~/.ssh/known_hosts 2>/dev/null
+
+      - name: Verificar existencia del directorio huérfano
+        run: |
+          ssh -p $SSH_PORT -i ~/.ssh/deploy_key -o StrictHostKeyChecking=no \
+            "${{ secrets.SSH_USER }}@${{ secrets.FTP_HOST }}" '
+            ORPHAN_GLOB=$(ls -d /home/*/public_html/prepagas 2>/dev/null | head -1)
+            if [ -z "$ORPHAN_GLOB" ]; then
+              echo "INFO: El directorio huérfano /home/u*/public_html/prepagas/ no existe o ya fue limpiado."
+              echo "ORPHAN_EXISTS=false" >> /tmp/cleanup_state
+            else
+              echo "ENCONTRADO: $ORPHAN_GLOB"
+              echo "ORPHAN_EXISTS=true" >> /tmp/cleanup_state
+              echo "ORPHAN_PATH=$ORPHAN_GLOB" >> /tmp/cleanup_state
+            fi
+          '
+
+      - name: Listar contenido antes de cualquier acción
+        run: |
+          ssh -p $SSH_PORT -i ~/.ssh/deploy_key -o StrictHostKeyChecking=no \
+            "${{ secrets.SSH_USER }}@${{ secrets.FTP_HOST }}" '
+            ORPHAN=$(ls -d /home/*/public_html/prepagas 2>/dev/null | head -1)
+            if [ -z "$ORPHAN" ]; then
+              echo "Directorio no encontrado — nada que listar."
+            else
+              echo "════ Contenido de $ORPHAN ════"
+              find "$ORPHAN" -maxdepth 3 | head -80
+              echo ""
+              echo "════ Tamaño total ════"
+              du -sh "$ORPHAN" 2>/dev/null || echo "n/d"
+              echo ""
+              echo "════ Path correcto de producción (NO se toca) ════"
+              ls -la domains/umohcrew.com/public_html/prepagas/ 2>/dev/null | head -5 || echo "n/d"
+            fi
+          '
+
+      - name: Ejecutar limpieza (si dry_run=false)
+        if: github.event.inputs.dry_run == 'false'
+        run: |
+          ssh -p $SSH_PORT -i ~/.ssh/deploy_key -o StrictHostKeyChecking=no \
+            "${{ secrets.SSH_USER }}@${{ secrets.FTP_HOST }}" '
+            ORPHAN=$(ls -d /home/*/public_html/prepagas 2>/dev/null | head -1)
+            if [ -z "$ORPHAN" ]; then
+              echo "Directorio huérfano no encontrado. Nada que borrar."
+              exit 0
+            fi
+
+            # Guard: el path correcto de producción NO debe estar bajo /home/*/public_html/prepagas
+            # sino bajo domains/umohcrew.com/public_html/prepagas/ — son paths distintos.
+            # Verificación extra: el path a borrar NO debe contener "domains/".
+            if echo "$ORPHAN" | grep -q "domains/"; then
+              echo "ERROR: El path detectado contiene domains/ — cancelando para evitar borrar producción."
+              exit 1
+            fi
+
+            echo "Borrando: $ORPHAN"
+            rm -rf "$ORPHAN"
+            echo "Limpieza completada."
+
+            # Confirmar que no existe más
+            if [ -d "$ORPHAN" ]; then
+              echo "ADVERTENCIA: El directorio todavía existe tras el rm -rf."
+            else
+              echo "OK: $ORPHAN ya no existe."
+            fi
+          '
+
+      - name: Resultado dry run
+        if: github.event.inputs.dry_run == 'true'
+        run: |
+          echo "DRY RUN completado — no se borró nada."
+          echo "Revisá el listado del step anterior."
+          echo "Para ejecutar la limpieza real, corré el workflow nuevamente con dry_run=false."
