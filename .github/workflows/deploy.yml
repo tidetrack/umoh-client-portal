@@ -56,13 +56,13 @@ jobs:
           rsync -avz --delete --mkpath \
             -e "ssh -p $SSH_PORT -i ~/.ssh/deploy_key -o StrictHostKeyChecking=no" \
             build/staging/ \
-            "${{ secrets.SSH_USER }}@${{ secrets.FTP_HOST }}:public_html/prepagas/staging/"
+            "${{ secrets.SSH_USER }}@${{ secrets.FTP_HOST }}:domains/umohcrew.com/public_html/prepagas/staging/"
 
       - name: Invalidar OPcache staging
         run: |
           ssh -p $SSH_PORT -i ~/.ssh/deploy_key -o StrictHostKeyChecking=no \
             "${{ secrets.SSH_USER }}@${{ secrets.FTP_HOST }}" \
-            'find public_html/prepagas/staging/ -name "*.php" -exec touch {} \; 2>/dev/null; echo "OK"'
+            'find domains/umohcrew.com/public_html/prepagas/staging/ -name "*.php" -exec touch {} \; 2>/dev/null; echo "OK"'
 
   # ── PRODUCCIÓN — solo main ─────────────────────────────────────────────────
   deploy-production:
@@ -104,30 +104,18 @@ jobs:
           rsync -avz --delete --mkpath \
             -e "ssh -p $SSH_PORT -i ~/.ssh/deploy_key -o StrictHostKeyChecking=no" \
             build/prepagas/ \
-            "${{ secrets.SSH_USER }}@${{ secrets.FTP_HOST }}:public_html/prepagas/"
+            "${{ secrets.SSH_USER }}@${{ secrets.FTP_HOST }}:domains/umohcrew.com/public_html/prepagas/"
 
-      - name: Diagnóstico post-deploy (dónde vive el index.php real del subdomain)
+      - name: Verificación post-deploy (canario + timestamp del index)
         run: |
           ssh -p $SSH_PORT -i ~/.ssh/deploy_key -o StrictHostKeyChecking=no \
             "${{ secrets.SSH_USER }}@${{ secrets.FTP_HOST }}" \
-            'echo "════ PWD / ~ del usuario SSH ════"; pwd; echo "HOME=$HOME"; ls -la ~/ 2>/dev/null | head -20; \
+            'echo "════ Canary en path del subdomain ════"; cat domains/umohcrew.com/public_html/prepagas/deploy-canary.txt 2>/dev/null || echo "NO EXISTE — path incorrecto"; \
              echo ""; \
-             echo "════ Todos los index.php del home (hasta depth 6) ════"; find ~ -maxdepth 6 -iname "index.php" 2>/dev/null; \
-             echo ""; \
-             echo "════ Todos los deploy-canary.txt del home ════"; find ~ -maxdepth 6 -iname "deploy-canary.txt" 2>/dev/null; \
-             echo ""; \
-             echo "════ Buscar cualquier directorio con prepagas en el nombre ════"; find ~ -maxdepth 5 -type d -iname "*prepagas*" 2>/dev/null; \
-             echo ""; \
-             echo "════ Contenido de public_html/ del home (top level) ════"; ls -la public_html/ 2>/dev/null | head -30; \
-             echo ""; \
-             echo "════ .htaccess del home (puede tener RewriteRule del subdomain) ════"; cat ~/.htaccess 2>/dev/null | head -40 || echo "no hay"; \
-             echo ""; \
-             echo "════ .htaccess de public_html/ ════"; cat public_html/.htaccess 2>/dev/null | head -40 || echo "no hay"; \
-             echo ""; \
-             echo "════ Canary DESPUÉS del rsync en public_html/prepagas/ ════"; cat public_html/prepagas/deploy-canary.txt 2>/dev/null || echo "no existe"'
+             echo "════ Timestamp del index.php ════"; stat domains/umohcrew.com/public_html/prepagas/index.php 2>/dev/null | grep Modify || echo "no existe"'
 
       - name: Limpiar servidor + invalidar OPcache
         run: |
           ssh -p $SSH_PORT -i ~/.ssh/deploy_key -o StrictHostKeyChecking=no \
             "${{ secrets.SSH_USER }}@${{ secrets.FTP_HOST }}" \
-            'rm -f public_html/prepagas/index.html; find public_html/prepagas/ -maxdepth 6 -name "*.php" -exec touch {} \; 2>/dev/null; echo "OK"'
+            'rm -f domains/umohcrew.com/public_html/prepagas/index.html; find domains/umohcrew.com/public_html/prepagas/ -maxdepth 6 -name "*.php" -exec touch {} \; 2>/dev/null; echo "OK"'
