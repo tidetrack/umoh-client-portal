@@ -12,6 +12,9 @@ if (empty($_SESSION['umoh_user'])) {
     header('Location: login.php');
     exit;
 }
+// Cache-busting: inyectado por GitHub Actions en cada deploy via inject_credentials.py
+// Fallback: timestamp del archivo CSS para entornos locales sin inyección
+$_asset_v = defined('ASSET_VERSION') ? ASSET_VERSION : filemtime(__DIR__ . '/assets/css/umoh.css');
 ?>
 <!DOCTYPE html>
 <html lang="es" data-theme="light">
@@ -29,7 +32,7 @@ if (empty($_SESSION['umoh_user'])) {
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.css" crossorigin="">
 
   <!-- Dashboard CSS -->
-  <link rel="stylesheet" href="assets/css/umoh.css">
+  <link rel="stylesheet" href="assets/css/umoh.css?v=<?php echo $_asset_v; ?>">
 
   <!-- Theme: apply saved preference synchronously to avoid flash -->
   <script>
@@ -655,10 +658,10 @@ if (empty($_SESSION['umoh_user'])) {
   </button>
 
   <!-- Dashboard scripts -->
-  <script src="assets/js/mockdata.js"></script>
-  <script src="assets/js/api.js"></script>
-  <script src="assets/js/charts.js"></script>
-  <script src="assets/js/filters.js"></script>
+  <script src="assets/js/mockdata.js?v=<?php echo $_asset_v; ?>"></script>
+  <script src="assets/js/api.js?v=<?php echo $_asset_v; ?>"></script>
+  <script src="assets/js/charts.js?v=<?php echo $_asset_v; ?>"></script>
+  <script src="assets/js/filters.js?v=<?php echo $_asset_v; ?>"></script>
 
 </body>
 </html>
