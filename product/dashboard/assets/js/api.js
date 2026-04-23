@@ -44,12 +44,18 @@ async function fetchData(endpoint, params = {}) {
  * @returns {Promise<Object>}
  */
 function getMockData(endpoint, params) {
-  const period = params.period || '30d';
+  let period = params.period || '30d';
 
   /* Rango personalizado: generar datos con granularidad correcta de fechas */
   if (period === 'custom' && params.start && params.end) {
     const data = generateCustomMockData(endpoint, params.start, params.end);
     return new Promise(resolve => setTimeout(() => resolve(data), 80));
+  }
+
+  /* Histórico total: usar granularidad seleccionada */
+  if (period === 'all') {
+    const g = (params.granularity) || 'meses';
+    period = `all_${g}`;
   }
 
   const map = {

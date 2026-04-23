@@ -1,14 +1,12 @@
 <?php
-// auth setup — cross-subdomain session
-ini_set('session.cookie_domain', '.umohcrew.com');
-session_set_cookie_params([
-    'lifetime' => 86400 * 30,
-    'path'     => '/',
-    'domain'   => '.umohcrew.com',
-    'secure'   => true,
-    'httponly' => true,
-    'samesite' => 'Lax',
-]);
+$_host = $_SERVER['HTTP_HOST'] ?? '';
+$_is_local = ($_host === 'localhost' || $_host === '127.0.0.1' || str_starts_with($_host, 'localhost:') || str_starts_with($_host, '127.0.0.1:'));
+if ($_is_local) {
+    session_set_cookie_params(['lifetime' => 86400 * 30, 'path' => '/', 'httponly' => true, 'samesite' => 'Lax']);
+} else {
+    ini_set('session.cookie_domain', '.umohcrew.com');
+    session_set_cookie_params(['lifetime' => 86400 * 30, 'path' => '/', 'domain' => '.umohcrew.com', 'secure' => true, 'httponly' => true, 'samesite' => 'Lax']);
+}
 session_start();
 
 if (!empty($_SESSION['umoh_user'])) {
@@ -125,42 +123,82 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
       overflow: hidden;
     }
 
-    /* ── Theme toggle ─────────────────────────────────── */
+    /* ── Theme toggle — pill switch ───────────────────── */
     .theme-toggle {
       position: fixed;
       top: 20px;
       right: 20px;
       z-index: 10;
-      width: 38px;
-      height: 38px;
-      border-radius: 50%;
-      border: 1px solid var(--toggle-border);
-      background: var(--toggle-bg);
-      color: var(--toggle-color);
+      border: none;
+      background: transparent;
       cursor: pointer;
+      padding: 0;
+      outline: none;
+      line-height: 0;
+    }
+
+    .theme-switch-track {
+      display: block;
+      width: 56px;
+      height: 28px;
+      border-radius: 14px;
+      background: rgba(255, 255, 255, 0.14);
+      border: 1.5px solid rgba(255, 255, 255, 0.26);
+      position: relative;
+      transition: background 0.3s, border-color 0.3s;
+    }
+
+    .theme-toggle:hover .theme-switch-track {
+      background: rgba(255, 255, 255, 0.22);
+      border-color: rgba(255, 255, 255, 0.38);
+    }
+
+    .theme-switch-thumb {
       display: flex;
       align-items: center;
       justify-content: center;
-      transition: background 0.2s, border-color 0.2s, color 0.2s;
-      backdrop-filter: blur(8px);
-      -webkit-backdrop-filter: blur(8px);
+      width: 22px;
+      height: 22px;
+      border-radius: 50%;
+      background: #E8EDF2;
+      color: #161F2C;
+      position: absolute;
+      top: 2px;
+      left: 2px;
+      transform: translateX(28px);
+      transition: transform 0.35s cubic-bezier(0.34, 1.56, 0.64, 1), background 0.3s, color 0.3s;
+      box-shadow: 0 1px 4px rgba(0,0,0,0.3);
     }
 
-    .theme-toggle:hover {
-      background: var(--toggle-hover-bg);
-    }
-
-    .theme-toggle svg {
-      width: 16px;
-      height: 16px;
+    .theme-switch-thumb svg {
+      width: 13px;
+      height: 13px;
       fill: none;
       stroke: currentColor;
-      stroke-width: 1.75;
+      stroke-width: 2.5;
       stroke-linecap: round;
       stroke-linejoin: round;
       flex-shrink: 0;
     }
 
+    /* Light mode: toggle sits on light background — dark track + white thumb on left */
+    [data-theme="light"] .theme-switch-track {
+      background: rgba(14, 21, 32, 0.12);
+      border-color: rgba(14, 21, 32, 0.22);
+    }
+
+    [data-theme="light"] .theme-toggle:hover .theme-switch-track {
+      background: rgba(14, 21, 32, 0.18);
+      border-color: rgba(14, 21, 32, 0.32);
+    }
+
+    [data-theme="light"] .theme-switch-thumb {
+      transform: translateX(0);
+      background: #253040;
+      color: #F0F5F5;
+    }
+
+    /* Icon visibility: sun shown in light mode, moon in dark mode */
     .icon-sun  { display: none; }
     .icon-moon { display: block; }
 
@@ -462,6 +500,27 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
     .footer-meta a:hover { color: var(--footer-link-hover); }
 
+    /* ── Password toggle ─────────────────────────── */
+    .input-wrap { position: relative; }
+    .input-wrap input { padding-right: 44px; }
+    .btn-eye {
+      position: absolute;
+      right: 14px;
+      top: 50%;
+      transform: translateY(-50%);
+      background: none;
+      border: none;
+      cursor: pointer;
+      color: var(--muted);
+      padding: 4px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: color 0.2s;
+      line-height: 0;
+    }
+    .btn-eye:hover { color: var(--input-color); }
+
     /* ── Responsive ───────────────────────────────── */
     @media (max-width: 768px) {
       .planet-3  { width: 300px; }
@@ -474,24 +533,28 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 </head>
 <body>
 
-  <!-- Theme toggle -->
+  <!-- Theme toggle — pill switch -->
   <button class="theme-toggle" id="themeToggle" aria-label="Cambiar tema" title="Cambiar tema">
-    <!-- Sun (shown in light mode) -->
-    <svg class="icon-sun" viewBox="0 0 24 24">
-      <circle cx="12" cy="12" r="5"/>
-      <line x1="12" y1="2"  x2="12" y2="4"/>
-      <line x1="12" y1="20" x2="12" y2="22"/>
-      <line x1="4.22" y1="4.22"  x2="5.64" y2="5.64"/>
-      <line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/>
-      <line x1="2"  y1="12" x2="4"  y2="12"/>
-      <line x1="20" y1="12" x2="22" y2="12"/>
-      <line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/>
-      <line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/>
-    </svg>
-    <!-- Moon (shown in dark mode) -->
-    <svg class="icon-moon" viewBox="0 0 24 24">
-      <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/>
-    </svg>
+    <span class="theme-switch-track">
+      <span class="theme-switch-thumb">
+        <!-- Sun (shown in light mode) -->
+        <svg class="icon-sun" viewBox="0 0 24 24">
+          <circle cx="12" cy="12" r="5"/>
+          <line x1="12" y1="2"  x2="12" y2="4"/>
+          <line x1="12" y1="20" x2="12" y2="22"/>
+          <line x1="4.22" y1="4.22"  x2="5.64" y2="5.64"/>
+          <line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/>
+          <line x1="2"  y1="12" x2="4"  y2="12"/>
+          <line x1="20" y1="12" x2="22" y2="12"/>
+          <line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/>
+          <line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/>
+        </svg>
+        <!-- Moon (shown in dark mode) -->
+        <svg class="icon-moon" viewBox="0 0 24 24">
+          <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/>
+        </svg>
+      </span>
+    </span>
   </button>
 
   <!-- PLANETAS DECORATIVOS — definitivos: 3, 7, 9, 12, 13 -->
@@ -531,6 +594,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         </div>
         <div class="field">
           <label for="password">Contraseña</label>
+          <div class="input-wrap">
           <input
             type="password"
             id="password"
@@ -538,6 +602,18 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             placeholder="••••••••••••"
             required
           >
+          <button type="button" class="btn-eye" id="btn-toggle-password" aria-label="Mostrar contraseña" tabindex="-1">
+            <svg id="eye-open" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/>
+              <circle cx="12" cy="12" r="3"/>
+            </svg>
+            <svg id="eye-closed" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:none">
+              <path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94"/>
+              <path d="M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19"/>
+              <line x1="1" y1="1" x2="23" y2="23"/>
+            </svg>
+          </button>
+          </div>
         </div>
         <button type="submit" class="btn-submit">
           Ingresar
@@ -549,14 +625,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
       <p class="help-text">
         ¿Necesitás acceso? Escribinos a<br>
-        <a href="mailto:hola@umohcrew.com">hola@umohcrew.com</a>
+        <a href="mailto:umohcrew@gmail.com">umohcrew@gmail.com</a>
       </p>
     </div>
 
     <div class="footer">
       <p class="footer-tagline">Digital Ecosystem <span style="color:#FF003B;">Creators</span></p>
       <p class="footer-meta">
-        UMOH &nbsp;·&nbsp; Acceso restringido &nbsp;·&nbsp; <a href="https://umohcrew.com" target="_blank">umohcrew.com</a>
+        Umoh &nbsp;·&nbsp; Marketing Agency &nbsp;·&nbsp; <a href="https://umohcrew.com" target="_blank">umohcrew.com</a>
       </p>
     </div>
 
@@ -572,7 +648,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
       function _applyLogo(theme) {
         if (!logoImg) return;
         logoImg.src = theme === 'light'
-          ? 'assets/img/logo-dark.png'
+          ? 'assets/img/logo-marca1.png'
           : 'assets/img/logo-white.png';
       }
 
@@ -590,6 +666,21 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         localStorage.setItem(key, next);
         _applyLogo(next);
       });
+
+      var toggleBtn     = document.getElementById('btn-toggle-password');
+      var passwordInput = document.getElementById('password');
+      var eyeOpen       = document.getElementById('eye-open');
+      var eyeClosed     = document.getElementById('eye-closed');
+
+      if (toggleBtn && passwordInput) {
+        toggleBtn.addEventListener('click', function () {
+          var isPassword = passwordInput.type === 'password';
+          passwordInput.type      = isPassword ? 'text'    : 'password';
+          eyeOpen.style.display   = isPassword ? 'none'    : 'block';
+          eyeClosed.style.display = isPassword ? 'block'   : 'none';
+          toggleBtn.setAttribute('aria-label', isPassword ? 'Ocultar contraseña' : 'Mostrar contraseña');
+        });
+      }
     })();
   </script>
 </body>
