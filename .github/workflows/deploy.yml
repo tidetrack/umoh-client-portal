@@ -90,8 +90,10 @@ jobs:
           mkdir -p build/prepagas/api/config
           cp -r product/dashboard/. build/prepagas/
           cp -r product/api/.       build/prepagas/api/
-          sed -i 's/const USE_MOCK = true.*/const USE_MOCK = false;/' build/prepagas/assets/js/api.js
-          grep -q "USE_MOCK = false" build/prepagas/assets/js/api.js || { echo "ERROR: USE_MOCK no quedó en false"; exit 1; }
+          # TEMP (Fase 1): producción usa mock data hasta que los endpoints reales estén listos (Fase 2+).
+          # Cuando Google Ads/Meta/MeisterTask estén conectados, volver este sed a: USE_MOCK = false
+          sed -i 's/const USE_MOCK = false.*/const USE_MOCK = true;/' build/prepagas/assets/js/api.js || true
+          grep -q "USE_MOCK = true" build/prepagas/assets/js/api.js || { echo "ERROR: USE_MOCK no quedó en true"; exit 1; }
           python3 .github/scripts/inject_credentials.py build/prepagas
           echo '${{ secrets.GOOGLE_SHEETS_SA_JSON }}' > build/prepagas/api/config/sa.json
 
