@@ -106,21 +106,25 @@ jobs:
             build/prepagas/ \
             "${{ secrets.SSH_USER }}@${{ secrets.FTP_HOST }}:public_html/prepagas/"
 
-      - name: Diagnóstico post-deploy (qué path existe y qué sirve el subdomain)
+      - name: Diagnóstico post-deploy (dónde vive el index.php real del subdomain)
         run: |
           ssh -p $SSH_PORT -i ~/.ssh/deploy_key -o StrictHostKeyChecking=no \
             "${{ secrets.SSH_USER }}@${{ secrets.FTP_HOST }}" \
-            'echo "════ public_html/prepagas/ ════"; ls -la public_html/prepagas/ 2>/dev/null | head -25 || echo "NO EXISTE"; \
+            'echo "════ PWD / ~ del usuario SSH ════"; pwd; echo "HOME=$HOME"; ls -la ~/ 2>/dev/null | head -20; \
              echo ""; \
-             echo "════ domains/prepagas.umohcrew.com/public_html/ ════"; ls -la domains/prepagas.umohcrew.com/public_html/ 2>/dev/null | head -25 || echo "NO EXISTE"; \
+             echo "════ Todos los index.php del home (hasta depth 6) ════"; find ~ -maxdepth 6 -iname "index.php" 2>/dev/null; \
              echo ""; \
-             echo "════ stat index.php en public_html/prepagas/ ════"; stat public_html/prepagas/index.php 2>/dev/null || echo "no existe"; \
+             echo "════ Todos los deploy-canary.txt del home ════"; find ~ -maxdepth 6 -iname "deploy-canary.txt" 2>/dev/null; \
              echo ""; \
-             echo "════ stat index.php en domains/prepagas.umohcrew.com/public_html/ ════"; stat domains/prepagas.umohcrew.com/public_html/index.php 2>/dev/null || echo "no existe"; \
+             echo "════ Buscar cualquier directorio con prepagas en el nombre ════"; find ~ -maxdepth 5 -type d -iname "*prepagas*" 2>/dev/null; \
              echo ""; \
-             echo "════ canary en public_html/prepagas/ ════"; cat public_html/prepagas/deploy-canary.txt 2>/dev/null || echo "no existe"; \
+             echo "════ Contenido de public_html/ del home (top level) ════"; ls -la public_html/ 2>/dev/null | head -30; \
              echo ""; \
-             echo "════ buscar index.* que podrían competir ════"; find public_html/prepagas/ -maxdepth 2 -iname "index.*" 2>/dev/null'
+             echo "════ .htaccess del home (puede tener RewriteRule del subdomain) ════"; cat ~/.htaccess 2>/dev/null | head -40 || echo "no hay"; \
+             echo ""; \
+             echo "════ .htaccess de public_html/ ════"; cat public_html/.htaccess 2>/dev/null | head -40 || echo "no hay"; \
+             echo ""; \
+             echo "════ Canary DESPUÉS del rsync en public_html/prepagas/ ════"; cat public_html/prepagas/deploy-canary.txt 2>/dev/null || echo "no existe"'
 
       - name: Limpiar servidor + invalidar OPcache
         run: |
