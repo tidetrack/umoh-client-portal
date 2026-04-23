@@ -96,6 +96,8 @@ jobs:
           grep -q "USE_MOCK = true" build/prepagas/assets/js/api.js || { echo "ERROR: USE_MOCK no quedó en true"; exit 1; }
           python3 .github/scripts/inject_credentials.py build/prepagas
           echo '${{ secrets.GOOGLE_SHEETS_SA_JSON }}' > build/prepagas/api/config/sa.json
+          # Canario de deploy — Franco accede a prepagas.umohcrew.com/deploy-canary.txt para confirmar path servido
+          echo "Deploy SHA: ${GITHUB_SHA:0:7} — $(date -u +%Y-%m-%dT%H:%M:%SZ)" > build/prepagas/deploy-canary.txt
 
       - name: Deploy via rsync
         run: |
@@ -104,8 +106,24 @@ jobs:
             build/prepagas/ \
             "${{ secrets.SSH_USER }}@${{ secrets.FTP_HOST }}:public_html/prepagas/"
 
+      - name: Diagnóstico post-deploy (qué path existe y qué sirve el subdomain)
+        run: |
+          ssh -p $SSH_PORT -i ~/.ssh/deploy_key -o StrictHostKeyChecking=no \
+            "${{ secrets.SSH_USER }}@${{ secrets.FTP_HOST }}" \
+            'echo "════ public_html/prepagas/ ════"; ls -la public_html/prepagas/ 2>/dev/null | head -25 || echo "NO EXISTE"; \
+             echo ""; \
+             echo "════ domains/prepagas.umohcrew.com/public_html/ ════"; ls -la domains/prepagas.umohcrew.com/public_html/ 2>/dev/null | head -25 || echo "NO EXISTE"; \
+             echo ""; \
+             echo "════ stat index.php en public_html/prepagas/ ════"; stat public_html/prepagas/index.php 2>/dev/null || echo "no existe"; \
+             echo ""; \
+             echo "════ stat index.php en domains/prepagas.umohcrew.com/public_html/ ════"; stat domains/prepagas.umohcrew.com/public_html/index.php 2>/dev/null || echo "no existe"; \
+             echo ""; \
+             echo "════ canary en public_html/prepagas/ ════"; cat public_html/prepagas/deploy-canary.txt 2>/dev/null || echo "no existe"; \
+             echo ""; \
+             echo "════ buscar index.* que podrían competir ════"; find public_html/prepagas/ -maxdepth 2 -iname "index.*" 2>/dev/null'
+
       - name: Limpiar servidor + invalidar OPcache
         run: |
           ssh -p $SSH_PORT -i ~/.ssh/deploy_key -o StrictHostKeyChecking=no \
             "${{ secrets.SSH_USER }}@${{ secrets.FTP_HOST }}" \
-            'rm -f public_html/prepagas/index.html; find public_html/prepagas/ -maxdepth 3 -name "*.php" -exec touch {} \; 2>/dev/null; echo "OK"'
+            'rm -f public_html/prepagas/index.html; find public_html/prepagas/ -maxdepth 6 -name "*.php" -exec touch {} \; 2>/dev/null; echo "OK"'
