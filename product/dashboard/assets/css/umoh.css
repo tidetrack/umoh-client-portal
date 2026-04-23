@@ -1791,4 +1791,41 @@ body {
 
 .cs-up   { color: #22C55E; }
 .cs-down { color: var(--umoh-accent); }
+
+/* ── Funnel phase legend (MOFU status chart) ─────────────── */
+.funnel-phase-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--sp-3) var(--sp-5);
+  padding: var(--sp-3) var(--sp-4) var(--sp-2);
+  border-top: 1px solid var(--border-subtle);
+  margin-top: var(--sp-3);
+}
+
+.funnel-phase-item {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+}
+
+.funnel-phase-chip {
+  display: inline-block;
+  width: 10px;
+  height: 10px;
+  border-radius: 3px;
+  flex-shrink: 0;
+}
+
+.funnel-phase-label {
+  font-family: var(--font);
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--text-secondary);
+  white-space: nowrap;
+}
+
+[data-theme="dark"] .funnel-phase-legend {
+  border-top-color: rgba(255, 255, 255, 0.08);
+}
+
 .cs-flat { color: var(--text-muted); }

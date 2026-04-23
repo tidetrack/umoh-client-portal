@@ -694,14 +694,34 @@ function renderMofu(data) {
     if (prevTip) prevTip.remove();
     ctxSt.style.display = 'none';
 
+    /*
+     * Fase A — Contacto inicial / filtrado (etapas 1–4):
+     *   Contactado, Erróneo, No prospera, A futuro
+     *   Escala azul slate: del más saturado al más tenue → refleja leads no calificados aún.
+     *
+     * Fase B — Intención real / proceso de cierre (etapas 5–6):
+     *   Cotizado, En emisión
+     *   Escala ámbar: dos tonos progresivos → calor creciente hacia el cierre.
+     *
+     * Fase C — Ganado (etapa 7):
+     *   Cargado 100%
+     *   Verde UMOH (CHART_PALETTE.green) — conversión lograda, inconfundible.
+     */
     const statusColors = [
-      CHART_PALETTE.blue.solid,
-      CHART_PALETTE.coral.solid,
-      CHART_PALETTE.amber.solid,
-      CHART_PALETTE.purple.solid,
-      CHART_PALETTE.teal.solid,
-      'rgba(72,199,142,0.65)',
-      CHART_PALETTE.green.solid
+      'rgba(99,179,237,0.90)',   /* Fase A-1: Contactado    — azul pleno         */
+      'rgba(99,179,237,0.68)',   /* Fase A-2: Erróneo       — azul medio-alto     */
+      'rgba(99,179,237,0.46)',   /* Fase A-3: No prospera   — azul medio-bajo     */
+      'rgba(99,179,237,0.28)',   /* Fase A-4: A futuro      — azul tenue          */
+      'rgba(251,191,36,0.75)',   /* Fase B-1: Cotizado      — ámbar base          */
+      'rgba(251,191,36,0.95)',   /* Fase B-2: En emisión    — ámbar intenso       */
+      CHART_PALETTE.green.solid  /* Fase C:   Cargado 100%  — verde UMOH cerrado  */
+    ];
+
+    /* Grupos de fases para la leyenda */
+    const statusPhases = [
+      { label: 'Contacto inicial', color: 'rgba(99,179,237,0.85)'  },
+      { label: 'Intención real',   color: 'rgba(251,191,36,0.85)'  },
+      { label: 'Ganado',           color: CHART_PALETTE.green.solid }
     ];
 
     const labels = data.status.labels;
@@ -779,6 +799,20 @@ function renderMofu(data) {
     });
 
     parent.appendChild(svg);
+
+    /* Leyenda de fases — se limpia antes de redibujar para no duplicar en cambio de período */
+    const prevLegend = parent.querySelector('.funnel-phase-legend');
+    if (prevLegend) prevLegend.remove();
+
+    const legend = document.createElement('div');
+    legend.className = 'funnel-phase-legend';
+    statusPhases.forEach(phase => {
+      const item = document.createElement('div');
+      item.className = 'funnel-phase-item';
+      item.innerHTML = `<span class="funnel-phase-chip" style="background:${phase.color}"></span><span class="funnel-phase-label">${phase.label}</span>`;
+      legend.appendChild(item);
+    });
+    parent.appendChild(legend);
   }
 
   /* ── Segments donut ── */

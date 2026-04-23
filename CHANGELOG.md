@@ -14,6 +14,15 @@ Formato basado en [Keep a Changelog](https://keepachangelog.com/es/1.0.0/).
 
 ---
 
+## [1.4.0] — 2026-04-23
+
+### Changed
+- MOFU: funnel de estado de leads ahora usa escala cromática agrupada por fase del ciclo de vida — Contacto inicial (azul), Intención real (ámbar), Ganado (verde) — antes eran 7 colores sin relación semántica entre sí
+- MOFU: leyenda de referencia con 3 chips (uno por fase cromática) debajo del funnel chart, con limpieza previa para evitar duplicación al cambiar período
+- CSS: 5 reglas nuevas para `.funnel-phase-legend` + override dark mode en `umoh.css`
+
+---
+
 ## [1.3.0] — 2025-04-21
 
 ### Added
@@ -88,6 +97,7 @@ Formato basado en [Keep a Changelog](https://keepachangelog.com/es/1.0.0/).
 ---
 
 [Unreleased]: https://github.com/tidetrack/umoh-client-portal/compare/HEAD...main
+[1.4.0]: https://github.com/tidetrack/umoh-client-portal/compare/ece14a8...HEAD
 [1.3.0]: https://github.com/tidetrack/umoh-client-portal/compare/1b36f49...ece14a8
 [1.2.0]: https://github.com/tidetrack/umoh-client-portal/compare/617b521...1b36f49
 [1.1.0]: https://github.com/tidetrack/umoh-client-portal/compare/e8ae7ca...617b521
