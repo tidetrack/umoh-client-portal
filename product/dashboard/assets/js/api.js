@@ -33,11 +33,14 @@ async function fetchData(endpoint, params = {}) {
     return getMockData(endpoint, params);
   }
 
-  const base = window.location.origin + '/' + API_BASE;
-  const url  = new URL(`${base}/${endpoint}.php`);
+  // URL relativa al documento actual: si el dashboard se sirve desde
+  // prepagas.umohcrew.com/staging/, el fetch va a /staging/api/endpoints/...
+  // Si se sirve desde la raíz (producción), va a /api/endpoints/...
+  const url = new URL(`${API_BASE}/${endpoint}.php`, window.location.href);
   Object.entries(params).forEach(([k, v]) => url.searchParams.set(k, v));
 
   const res = await fetch(url.toString(), {
+    credentials: 'same-origin',
     headers: { 'Accept': 'application/json' }
   });
 
