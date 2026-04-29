@@ -12,6 +12,23 @@ require_once __DIR__ . '/../lib/config.php';
 
 api_headers();
 
+// Auth gate: la session se setea en /dashboard/login.php y vive en cookie
+// .umohcrew.com (configurada con domain compartido). Si no hay session,
+// 401 — el frontend hace logout y redirige a /login.php.
+$_host = $_SERVER['HTTP_HOST'] ?? '';
+$_is_local = ($_host === 'localhost' || $_host === '127.0.0.1'
+    || str_starts_with($_host, 'localhost:') || str_starts_with($_host, '127.0.0.1:'));
+if ($_is_local) {
+    session_set_cookie_params(['lifetime' => 86400 * 30, 'path' => '/', 'httponly' => true, 'samesite' => 'Lax']);
+} else {
+    ini_set('session.cookie_domain', '.umohcrew.com');
+    session_set_cookie_params(['lifetime' => 86400 * 30, 'path' => '/', 'domain' => '.umohcrew.com', 'secure' => true, 'httponly' => true, 'samesite' => 'Lax']);
+}
+session_start();
+if (empty($_SESSION['umoh_user'])) {
+    api_error('No autenticado', 401);
+}
+
 // Por ahora hardcodeamos el cliente: el MVP sirve solo a prepagas.
 // Cuando se active el login (Fase 4), el slug se va a derivar del usuario.
 const CLIENT_SLUG = 'prepagas';
