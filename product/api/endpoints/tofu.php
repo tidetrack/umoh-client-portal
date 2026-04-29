@@ -91,7 +91,7 @@ try {
     $last   = end($dates);
     $prev_d = count($dates) >= 2 ? $dates[count($dates) - 2] : null;
 
-    [$start, $end] = period_dates($period, $last);
+    [$start, $end] = period_dates($period, $last, $dates[0] ?? null);
     $selected = filter_range($by_date, $start, $end);
 
     // Agregar el período. Para channels/devices guardamos clicks Y impressions

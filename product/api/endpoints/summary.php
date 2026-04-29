@@ -83,7 +83,7 @@ try {
     $last   = end($all_dates);
     $prev_d = count($all_dates) >= 2 ? $all_dates[count($all_dates) - 2] : null;
 
-    [$start, $end] = period_dates($period, $last);
+    [$start, $end] = period_dates($period, $last, $all_dates[0] ?? null);
 
     // 5. Filtrar y agregar el período
     $impressions = 0; $spend = 0.0; $leads_count = 0; $revenue = 0.0; $sales = 0;

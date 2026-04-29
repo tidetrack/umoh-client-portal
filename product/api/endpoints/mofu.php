@@ -38,10 +38,11 @@ try {
     }
 
     // 2. Leads del cliente (todos — el filtrado por período se hace en PHP).
-    //    Limit alto porque pueden ser cientos; si crece a miles habría que paginar.
+    //    tipification = segmento real (Voluntario/Monotributista/Obligatorio)
+    //    canal       = origen del lead (Form/Wsp = campaña; Referido = vendedor)
     $leads = supabase_query('leads', [
         'client_slug' => 'eq.' . CLIENT_SLUG,
-        'select'      => 'meistertask_id,section,operatoria,lead_created_at',
+        'select'      => 'meistertask_id,section,tipification,canal,lead_created_at',
         'limit'       => '5000',
     ]);
 
@@ -82,7 +83,7 @@ try {
     $last   = end($dates);
     $prev_d = count($dates) >= 2 ? $dates[count($dates) - 2] : null;
 
-    [$start, $end] = period_dates($period, $last);
+    [$start, $end] = period_dates($period, $last, $dates[0] ?? null);
     $selected = filter_range($by_date, $start, $end);
 
     // 6. Helper para clasificar un lead en sus buckets
@@ -118,9 +119,9 @@ try {
             if ($c['excluded'])    $leads_erroneo++;
             if ($c['lost'])        $leads_no_prospera++;
 
-            $op = trim($l['operatoria'] ?? '');
-            if ($op === '') $op = 'Sin clasificar';
-            $segs[$op] = ($segs[$op] ?? 0) + 1;
+            $tip = trim($l['tipification'] ?? '');
+            if ($tip === '') $tip = 'Sin clasificar';
+            $segs[$tip] = ($segs[$tip] ?? 0) + 1;
         }
     }
 

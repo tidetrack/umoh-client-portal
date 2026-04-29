@@ -35,10 +35,10 @@ try {
         'limit'       => '5000',
     ]);
 
-    // 2. Leads — para enriquecer con operatoria (segmento de venta)
+    // 2. Leads — para enriquecer con tipification (segmento real: Voluntario/Mono/Obligatorio)
     $leads = supabase_query('leads', [
         'client_slug' => 'eq.' . CLIENT_SLUG,
-        'select'      => 'meistertask_id,operatoria,lead_created_at',
+        'select'      => 'meistertask_id,tipification,canal,lead_created_at',
         'limit'       => '5000',
     ]);
     $lead_by_id = [];
@@ -46,13 +46,27 @@ try {
         $lead_by_id[$l['meistertask_id']] = $l;
     }
 
-    // 3. Total leads del período (para conversion_rate)
+    // 3. Impresiones del período desde tofu_ads_daily (para conversion_rate
+    //    según definición: closed_sales / impressions). También recolectamos
+    //    leads_by_date por si se necesita para otras métricas.
     $leads_by_date = [];
     foreach ($leads as $l) {
         $created = $l['lead_created_at'] ?? null;
         if (!$created) continue;
         $d = substr($created, 0, 10);
         $leads_by_date[$d] = ($leads_by_date[$d] ?? 0) + 1;
+    }
+
+    $tofu_rows = supabase_query('tofu_ads_daily', [
+        'client_slug' => 'eq.' . CLIENT_SLUG,
+        'select'      => 'date,impressions',
+        'order'       => 'date.asc',
+        'limit'       => '500',
+    ]);
+    $impr_by_date = [];
+    foreach ($tofu_rows as $r) {
+        $d = $r['date'];
+        $impr_by_date[$d] = ($impr_by_date[$d] ?? 0) + (int)$r['impressions'];
     }
 
     // 4. Agrupar ventas cerradas por fecha (updated_at = momento de cierre)
@@ -75,9 +89,9 @@ try {
         $by_date[$d]['capitas']       += (int)($c['capitas'] ?? 0);
 
         $lead = $lead_by_id[$c['meistertask_id']] ?? null;
-        $op = trim($lead['operatoria'] ?? '');
-        if ($op === '') $op = 'Sin clasificar';
-        $by_date[$d]['sales_by_op'][$op] = ($by_date[$d]['sales_by_op'][$op] ?? 0) + $price;
+        $tip = trim($lead['tipification'] ?? '');
+        if ($tip === '') $tip = 'Sin clasificar';
+        $by_date[$d]['sales_by_op'][$tip] = ($by_date[$d]['sales_by_op'][$tip] ?? 0) + $price;
     }
     ksort($by_date);
 
@@ -89,7 +103,7 @@ try {
     $last   = end($dates);
     $prev_d = count($dates) >= 2 ? $dates[count($dates) - 2] : null;
 
-    [$start, $end] = period_dates($period, $last);
+    [$start, $end] = period_dates($period, $last, $dates[0] ?? null);
     $selected = filter_range($by_date, $start, $end);
 
     // 6. Agregar
@@ -108,12 +122,13 @@ try {
     $avg_ticket     = $closed_sales > 0 ? round($total_revenue / $closed_sales, 2) : 0;
     $avg_ticket_cap = $capitas > 0      ? round($total_revenue / $capitas, 2)      : 0;
 
-    // Conversion rate = closed_sales en período / leads_creados en período
-    $period_leads = 0;
-    foreach ($leads_by_date as $d => $n) {
-        if ($d >= $start && $d <= $end) $period_leads += $n;
+    // Conversion rate definido como closed_sales / impressions en el período.
+    // Es el ratio de cuánta gente que vio el ad terminó comprando.
+    $period_impr = 0;
+    foreach ($impr_by_date as $d => $n) {
+        if ($d >= $start && $d <= $end) $period_impr += $n;
     }
-    $conversion_rate = $period_leads > 0 ? round($closed_sales / $period_leads * 100, 2) : 0;
+    $conversion_rate = $period_impr > 0 ? round($closed_sales / $period_impr * 100, 4) : 0;
 
     // 7. Trend: revenue y sales por día
     $trend = build_trend($selected, $period, [
@@ -127,12 +142,12 @@ try {
         $pr = $by_date[$prev_d];
         $pr_rev = $pr['total_revenue']; $pr_sales = $pr['closed_sales'];
         $pr_cap = $pr['capitas'];
-        $pr_leads = $leads_by_date[$prev_d] ?? 0;
+        $pr_impr = $impr_by_date[$prev_d] ?? 0;
         $prev = [
             'total_revenue'         => round($pr_rev, 2),
             'closed_sales'          => $pr_sales,
             'avg_ticket'            => $pr_sales > 0 ? round($pr_rev / $pr_sales, 2) : 0,
-            'conversion_rate'       => $pr_leads > 0 ? round($pr_sales / $pr_leads * 100, 2) : 0,
+            'conversion_rate'       => $pr_impr > 0 ? round($pr_sales / $pr_impr * 100, 4) : 0,
             'capitas_closed'        => $pr_cap,
             'avg_ticket_per_capita' => $pr_cap > 0 ? round($pr_rev / $pr_cap, 2) : 0,
         ];

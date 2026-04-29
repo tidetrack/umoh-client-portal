@@ -53,9 +53,35 @@ function api_headers(): void {
 /**
  * Calcula las fechas de inicio y fin para un período dado.
  * $last_date = última fecha disponible en los datos.
+ *
+ * Soporta:
+ *   '7d', '30d', '90d' → últimos N días desde $last_date
+ *   'custom'           → lee $_GET['start'] y $_GET['end'] (YYYY-MM-DD)
+ *   'historical'       → desde la primera fecha con datos hasta $last_date
+ *
  * Devuelve [start, end] como strings YYYY-MM-DD.
  */
-function period_dates(string $period, string $last_date): array {
+function period_dates(string $period, string $last_date, ?string $first_date = null): array {
+    if ($period === 'custom') {
+        $start = $_GET['start'] ?? null;
+        $end   = $_GET['end']   ?? null;
+        // Validación mínima: formato YYYY-MM-DD
+        $valid = fn($d) => is_string($d) && preg_match('/^\d{4}-\d{2}-\d{2}$/', $d);
+        if (!$valid($start) || !$valid($end)) {
+            // Fallback a 30d si los params son inválidos
+            $start = date('Y-m-d', strtotime($last_date . ' -29 days'));
+            $end   = $last_date;
+        } elseif ($start > $end) {
+            // Swap si vienen invertidos
+            [$start, $end] = [$end, $start];
+        }
+        return [$start, $end];
+    }
+
+    if ($period === 'historical') {
+        return [$first_date ?? '2020-01-01', $last_date];
+    }
+
     $days_back = ['7d' => 6, '30d' => 29, '90d' => 89];
     $days      = $days_back[$period] ?? 29;
     $end       = $last_date;
