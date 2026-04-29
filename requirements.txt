@@ -1,8 +1,12 @@
 # Pipeline UMOH — dependencias Python
 # Instalar con: pip install -r requirements.txt
 
-# Google Ads API — libreria oficial de Python
-google-ads==24.1.0
+# Google Ads API — libreria oficial de Python.
+# Bump 2026-04-29: 24.1.0 → 30.1.0. La 24.x usaba Google Ads API v17, que Google
+# retiró y devuelve 501 UNIMPLEMENTED ("GRPC target method can't be resolved").
+# 30.x soporta v21+. Imports y GAQL queries del extractor son genéricos, no
+# requieren ajustes.
+google-ads==30.1.0
 
 # Google Sheets API + autenticacion Service Account
 google-api-python-client==2.127.0
