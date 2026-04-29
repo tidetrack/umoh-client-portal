@@ -16,7 +16,8 @@
 #   GOOGLE_ADS_CLIENT_SECRET
 #   GOOGLE_ADS_REFRESH_TOKEN
 #   GOOGLE_ADS_LOGIN_CUSTOMER_ID
-#   GOOGLE_SHEETS_SA_JSON
+#   SUPABASE_URL
+#   SUPABASE_SERVICE_KEY
 # ---------------------------------------------------------------------------
 
 name: Extract & Load — All Platforms
@@ -58,7 +59,8 @@ jobs:
       GOOGLE_ADS_CLIENT_SECRET: ${{ secrets.GOOGLE_ADS_CLIENT_SECRET }}
       GOOGLE_ADS_REFRESH_TOKEN: ${{ secrets.GOOGLE_ADS_REFRESH_TOKEN }}
       GOOGLE_ADS_LOGIN_CUSTOMER_ID: ${{ secrets.GOOGLE_ADS_LOGIN_CUSTOMER_ID }}
-      GOOGLE_SHEETS_SA_JSON: ${{ secrets.GOOGLE_SHEETS_SA_JSON }}
+      SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+      SUPABASE_SERVICE_KEY: ${{ secrets.SUPABASE_SERVICE_KEY }}
 
     steps:
       - name: Checkout repositorio
@@ -73,57 +75,11 @@ jobs:
       - name: Instalar dependencias
         run: pip install -r requirements.txt
 
-      - name: Extraer, normalizar y cargar datos de Google Ads
+      - name: Ejecutar pipeline TOFU (Google Ads → Supabase)
         run: |
-          python - <<'EOF'
-          import logging
-          import sys
-
-          logging.basicConfig(
-              level=logging.INFO,
-              format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
-              stream=sys.stdout,
-          )
-
-          sys.path.insert(0, 'data')
-          from extractors.google_ads import run as extract
-          from normalizers.canonical import normalize
-          from loaders.sheets_writer import write_normalized_data
-          import pandas as pd
-
-          # Parametros del workflow_dispatch (con fallback al default)
-          days_back = int("${{ github.event.inputs.days_back || '7' }}")
-          client_filter = "${{ github.event.inputs.client_filter || '' }}".strip()
-
-          print(f"Iniciando extraccion — days_back={days_back}, client_filter='{client_filter or 'todos'}'")
-
-          raw_results = extract(config_dir="clients", days_back=days_back)
-
-          if client_filter:
-              raw_results = [r for r in raw_results if r.get("client_id") == client_filter]
-              print(f"Filtrado: {len(raw_results)} cliente(s) con client_id='{client_filter}'")
-
-          if not raw_results:
-              print("No hay datos para procesar. Finalizando.")
-              sys.exit(0)
-
-          dfs = []
-          for raw in raw_results:
-              try:
-                  df = normalize(raw)
-                  dfs.append(df)
-                  print(f"  Normalizado: {raw['client_id']} — {len(df)} filas")
-              except Exception as e:
-                  print(f"  ERROR normalizando {raw.get('client_id')}: {e}", file=sys.stderr)
-
-          if not dfs:
-              print("No hay DataFrames para cargar. Finalizando.", file=sys.stderr)
-              sys.exit(1)
-
-          combined = pd.concat(dfs, ignore_index=True)
-          write_normalized_data(combined)
-          print(f"Pipeline completado: {len(combined)} filas escritas en Sheets.")
-          EOF
+          python scripts/run_tofu_pipeline.py \
+            --days "${{ github.event.inputs.days_back || '7' }}" \
+            --no-sheets
 
       - name: Notificar fallo por email
         if: failure()

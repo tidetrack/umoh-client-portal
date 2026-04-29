@@ -14,3 +14,9 @@ pandas==2.2.2
 
 # Lectura de archivos de configuracion YAML
 pyyaml==6.0.1
+
+# Supabase Python client — pipeline MeisterTask -> Supabase (Fase 1+)
+supabase>=2.0.0
+
+# Carga de .env en desarrollo local (no-op en GitHub Actions)
+python-dotenv>=1.0.0

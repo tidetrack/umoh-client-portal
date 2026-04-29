@@ -37,8 +37,13 @@ ops/testing/environments/*.json
 
 # Brand assets & local tools — no necesarios en el repo
 marca/
-scripts/
+# scripts/ excluido salvo pipelines productivos que llama Actions.
+# Truco: excluir contenido (scripts/*), no el directorio entero (scripts/),
+# para que las excepciones siguientes funcionen en Git.
+scripts/*
 !.github/scripts/
+!scripts/run_*.py
+!scripts/sync_*.py
 
 # OS
 .DS_Store
