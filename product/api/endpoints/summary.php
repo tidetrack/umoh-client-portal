@@ -44,10 +44,10 @@ try {
         $tofu[$d]['spend']       += (float) $r['spend'];
     }
 
-    // 2. MOFU: leads de campaña por fecha de creación
+    // 2. MOFU: leads de campaña por fecha de creación + assignee para ranking
     $leads = supabase_query('leads', [
         'client_slug' => 'eq.' . CLIENT_SLUG,
-        'select'      => 'meistertask_id,is_campaign_lead,lead_created_at',
+        'select'      => 'meistertask_id,is_campaign_lead,assignee,lead_created_at,status_updated_at,section',
         'limit'       => '5000',
     ]);
     $mofu = []; $nc_leads = 0;
@@ -140,6 +140,65 @@ try {
         ];
     }
 
+    // 8. Ranking de vendedores (por assignee). Solo leads de campaña.
+    //    Métricas por vendedor:
+    //      leads          — leads totales asignados (en período)
+    //      sales          — ventas cerradas (lead_monetary.is_closed=true) en período
+    //      revenue        — sumatoria precio_final
+    //      effectiveness  — sales / leads * 100
+    //      avg_cycle_days — promedio (status_updated_at - lead_created_at) de los cerrados
+    //      avg_ticket     — revenue / sales
+    $sales_by_lead = [];
+    foreach ($closed as $c) {
+        $sales_by_lead[$c['meistertask_id']] = [
+            'price' => (float)($c['precio_final'] ?? 0),
+            'date'  => substr($c['updated_at'] ?? '', 0, 10),
+        ];
+    }
+
+    $sellers_agg = [];
+    foreach ($leads as $l) {
+        if (empty($l['is_campaign_lead'])) continue;
+        $name    = trim($l['assignee'] ?? '');
+        if ($name === '' || strtolower($name) === 'umoh crew') continue;
+        $created = substr($l['lead_created_at'] ?? '', 0, 10);
+        if ($created === '' || $created < $start || $created > $end) continue;
+
+        if (!isset($sellers_agg[$name])) {
+            $sellers_agg[$name] = ['leads' => 0, 'sales' => 0, 'revenue' => 0.0, 'cycle_sum' => 0, 'cycle_count' => 0];
+        }
+        $sellers_agg[$name]['leads']++;
+
+        $sale = $sales_by_lead[$l['meistertask_id']] ?? null;
+        if ($sale && $sale['date'] >= $start && $sale['date'] <= $end) {
+            $sellers_agg[$name]['sales']++;
+            $sellers_agg[$name]['revenue'] += $sale['price'];
+
+            $st_upd = $l['status_updated_at'] ?? null;
+            if ($st_upd && $created) {
+                $diff = (strtotime(substr($st_upd, 0, 10)) - strtotime($created)) / 86400;
+                if ($diff >= 0) {
+                    $sellers_agg[$name]['cycle_sum']   += $diff;
+                    $sellers_agg[$name]['cycle_count']++;
+                }
+            }
+        }
+    }
+
+    $sellers = [];
+    foreach ($sellers_agg as $name => $s) {
+        $sellers[] = [
+            'name'           => $name,
+            'leads'          => $s['leads'],
+            'sales'          => $s['sales'],
+            'revenue'        => round($s['revenue'], 2),
+            'effectiveness'  => $s['leads'] > 0 ? round($s['sales'] / $s['leads'] * 100, 1) : 0,
+            'avg_cycle_days' => $s['cycle_count'] > 0 ? round($s['cycle_sum'] / $s['cycle_count'], 1) : 0,
+            'avg_ticket'     => $s['sales'] > 0 ? round($s['revenue'] / $s['sales'], 2) : 0,
+        ];
+    }
+    usort($sellers, fn($a, $b) => $b['sales'] <=> $a['sales'] ?: $b['revenue'] <=> $a['revenue']);
+
     echo json_encode([
         'revenue'      => round($revenue, 2),
         'ad_spend'     => round($spend, 2),
@@ -152,6 +211,7 @@ try {
             'closed_sales'  => $nc_sales,
             'total_revenue' => round($nc_revenue, 2),
         ],
+        'sellers'      => $sellers,
         'prev'         => $prev,
     ], JSON_UNESCAPED_UNICODE);
 

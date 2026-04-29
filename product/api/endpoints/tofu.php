@@ -175,9 +175,14 @@ try {
         'colors' => array_slice($dev_colors, 0, count($dev_labels)),
     ];
 
+    // CPC diario para el popup KPI: spend / clicks del mismo día (0 si no hay clicks).
     $trend = build_trend($selected, $period, [
         'impressions' => fn($r) => (int)$r['impressions'],
         'clicks'      => fn($r) => (int)$r['clicks'],
+        'spend'       => fn($r) => (float)$r['spend'],
+        'cpc'         => fn($r) => ((int)$r['clicks']) > 0
+                                    ? round((float)$r['spend'] / (int)$r['clicks'], 2)
+                                    : 0,
     ]);
 
     // Prev: el día inmediatamente anterior al último, para mostrar delta puntual.

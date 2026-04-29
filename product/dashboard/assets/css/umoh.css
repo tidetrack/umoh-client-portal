@@ -1121,7 +1121,62 @@ body {
   white-space: nowrap;
 }
 
-/* ── 9. Geo Map ────────────────────────────────────────────── */
+/* ── 9. Geo: tabla ranking (reemplaza al mapa Leaflet) ────────── */
+.geo-table {
+  width: 100%;
+  border-collapse: separate;
+  border-spacing: 0 6px;
+  font-family: 'Outfit', sans-serif;
+}
+.geo-table thead th {
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+  padding: 4px 12px;
+  text-align: left;
+}
+.geo-table tbody td {
+  padding: 10px 12px;
+  vertical-align: middle;
+  font-size: 13px;
+}
+.geo-table .geo-rank {
+  width: 36px;
+  font-weight: 600;
+  color: var(--text-muted);
+  font-variant-numeric: tabular-nums;
+}
+.geo-table .geo-city {
+  font-weight: 500;
+  color: var(--text-primary);
+  width: 30%;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.geo-table .geo-bar { width: 100%; padding-right: var(--sp-4); }
+.geo-table .geo-clicks {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+  color: var(--text-secondary);
+  font-weight: 600;
+  white-space: nowrap;
+  width: 80px;
+}
+.geo-empty {
+  text-align: center;
+  color: var(--text-muted);
+  padding: 24px;
+  font-style: italic;
+}
+[data-theme="dark"] .geo-table tbody tr {
+  background: rgba(255, 255, 255, 0.02);
+  border-radius: 6px;
+}
+
+/* legacy — el mapa Leaflet ya no se usa pero algunas clases pueden estar en uso */
 .geo-map {
   width: 100%;
   height: 380px;
@@ -1829,3 +1884,275 @@ body {
 }
 
 .cs-flat { color: var(--text-muted); }
+/* ── Pending Price Table — Ventas sin monto cargado ─────────── */
+.pending-table {
+  width: 100%;
+  border-collapse: separate;
+  border-spacing: 0 4px;
+  font-family: var(--font);
+  font-size: 13px;
+}
+.pending-table thead th {
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+  padding: 8px 10px;
+  text-align: left;
+}
+.pending-table tbody td {
+  padding: 10px;
+  vertical-align: middle;
+  background: var(--card-bg, transparent);
+}
+.pending-table .pending-name { font-weight: 500; color: var(--text-primary); }
+.pending-table .pending-asesor { color: var(--text-secondary); }
+.pending-table .pending-tip { color: var(--text-secondary); }
+.pending-table .pending-tip .muted { color: var(--text-muted); font-style: italic; }
+.pending-table .pending-date { color: var(--text-muted); font-variant-numeric: tabular-nums; text-align: right; }
+.pending-empty {
+  text-align: center;
+  color: var(--text-muted);
+  padding: 24px;
+  font-style: italic;
+}
+.origin-badge {
+  display: inline-block;
+  padding: 2px 8px;
+  border-radius: 10px;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+}
+.origin-badge.origin-campaign { background: rgba(72, 199, 142, 0.12); color: #2da76b; }
+.origin-badge.origin-vendor   { background: rgba(255, 191, 36, 0.14); color: #b78104; }
+[data-theme="dark"] .origin-badge.origin-campaign { color: #6dd9a4; }
+[data-theme="dark"] .origin-badge.origin-vendor   { color: #f5c150; }
+
+/* ─────────────────────────────────────────────────────────────
+   MOBILE RESPONSIVE — iPhone 14 Pro Max (430px) y menores
+   ───────────────────────────────────────────────────────────── */
+@media (max-width: 480px) {
+  /* Layout general */
+  :root {
+    --content-pad: var(--sp-3);
+    --header-h: 56px;
+  }
+
+  body { font-size: 14px; }
+
+  /* Header — colapso a stack vertical */
+  .header-inner {
+    flex-wrap: wrap;
+    gap: var(--sp-2);
+    padding: var(--sp-2) var(--sp-3);
+  }
+  .header-brand   { flex-shrink: 1; min-width: 0; }
+  .brand-agency   { font-size: 14px; }
+  .header-controls { gap: var(--sp-2); flex-wrap: wrap; justify-content: flex-end; }
+
+  /* Period selector — overflow horizontal en lugar de wrap */
+  .period-selector {
+    overflow-x: auto;
+    max-width: 100%;
+    scrollbar-width: none;
+  }
+  .period-selector::-webkit-scrollbar { display: none; }
+  .period-btn { padding: 6px 10px; font-size: 12px; }
+
+  /* Date picker popover — full width */
+  .date-picker-popover {
+    position: fixed;
+    top: calc(var(--header-h) + 8px);
+    left: var(--sp-3);
+    right: var(--sp-3);
+    min-width: 0;
+  }
+
+  /* Nav tabs — scroll horizontal */
+  .nav-tabs-wrap, .nav-tabs {
+    overflow-x: auto;
+    scrollbar-width: none;
+    -webkit-overflow-scrolling: touch;
+  }
+  .nav-tabs-wrap::-webkit-scrollbar, .nav-tabs::-webkit-scrollbar { display: none; }
+  .nav-tab { white-space: nowrap; flex-shrink: 0; padding: 10px 14px; font-size: 13px; }
+
+  /* KPI cards — siempre 1 columna en mobile */
+  .kpi-grid,
+  .kpi-grid--6,
+  .kpi-grid--5,
+  .kpi-grid--4,
+  .kpi-grid--3,
+  .kpi-grid--2 {
+    grid-template-columns: 1fr;
+    gap: var(--sp-3);
+  }
+  .kpi-card { padding: var(--sp-3) var(--sp-4); }
+  .kpi-value { font-size: 22px; }
+  .kpi-label { font-size: 11px; }
+
+  /* Charts grids — siempre 1 columna */
+  .charts-grid,
+  .charts-grid--full,
+  .charts-grid--2 {
+    grid-template-columns: 1fr !important;
+    gap: var(--sp-3);
+  }
+
+  /* Chart cards — padding y altura ajustadas */
+  .chart-card { border-radius: var(--r-md); }
+  .chart-card-header { padding: var(--sp-3) var(--sp-4); }
+  .chart-title { font-size: 14px; }
+  .chart-card-body { padding: var(--sp-3); }
+  .chart-body--tall { height: 240px; }
+  .chart-body--donut { height: 220px; }
+
+  /* Tables — scroll horizontal cuando son muy anchas */
+  .terms-table,
+  .geo-table,
+  .pending-table,
+  .sellers-table,
+  .segments-table,
+  table.bofu-segment-table {
+    font-size: 12px;
+  }
+  .chart-card-body { overflow-x: auto; }
+
+  .geo-table .geo-city,
+  .pending-table .pending-name { max-width: 140px; }
+
+  .term-name { width: 140px; max-width: 140px; }
+
+  /* Funnel MOFU — etapas se apilan en mobile */
+  .funnel-phases-row {
+    flex-direction: column;
+    gap: var(--sp-2);
+  }
+
+  /* Footer */
+  .footer-inner {
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: var(--sp-2);
+    text-align: center;
+    padding: var(--sp-3);
+  }
+  .footer-text { font-size: 11px; }
+
+  /* KPI modal — pantalla casi completa */
+  .kpi-modal {
+    max-width: calc(100vw - 24px);
+    max-height: calc(100vh - 80px);
+    border-radius: var(--r-md);
+  }
+  .kpi-modal-title { font-size: 18px; }
+}
+
+/* Extra-narrow (≤ 360px iPhone SE) */
+@media (max-width: 360px) {
+  .kpi-value { font-size: 20px; }
+  .chart-title { font-size: 13px; }
+  .nav-tab { padding: 8px 10px; font-size: 12px; }
+}
+
+/* ─────────────────────────────────────────────────────────────
+   Funnel HORIZONTAL — etapas fijas (reemplaza al SVG vertical)
+   ───────────────────────────────────────────────────────────── */
+.funnel-horizontal {
+  display: flex;
+  gap: var(--sp-3);
+  overflow-x: auto;
+  padding: var(--sp-2) var(--sp-1) var(--sp-3);
+  scrollbar-width: thin;
+}
+.funnel-horizontal::-webkit-scrollbar { height: 6px; }
+.funnel-horizontal::-webkit-scrollbar-thumb {
+  background: rgba(143, 165, 168, 0.3);
+  border-radius: 3px;
+}
+
+.funnel-h-card {
+  flex: 1 1 110px;
+  min-width: 110px;
+  max-width: 200px;
+  padding: var(--sp-3) var(--sp-3);
+  background: var(--bg-card-header);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--r-md);
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  transition: transform 0.15s ease, box-shadow 0.15s ease;
+}
+.funnel-h-card:hover {
+  transform: translateY(-2px);
+  box-shadow: var(--shadow-md);
+}
+
+.funnel-h-card--total {
+  flex: 0 0 140px;
+  background: linear-gradient(180deg, rgba(99,179,237,0.14), rgba(99,179,237,0.04));
+  border-color: rgba(99,179,237,0.30);
+  position: relative;
+}
+.funnel-h-card--total::after {
+  content: '→';
+  position: absolute;
+  right: -16px;
+  top: 50%;
+  transform: translateY(-50%);
+  color: var(--text-muted);
+  font-size: 18px;
+  font-weight: 600;
+  pointer-events: none;
+  z-index: 2;
+}
+
+.funnel-h-label {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.funnel-h-value {
+  font-size: 22px;
+  font-weight: 700;
+  color: var(--text-primary);
+  font-variant-numeric: tabular-nums;
+  line-height: 1.1;
+  margin-top: var(--sp-2);
+}
+.funnel-h-pct {
+  font-size: 12px;
+  color: var(--text-secondary);
+  font-weight: 500;
+  margin-top: 2px;
+}
+.funnel-h-bar {
+  margin-top: var(--sp-3);
+  height: 6px;
+  background: var(--border-subtle);
+  border-radius: 3px;
+  overflow: hidden;
+}
+.funnel-h-bar-fill {
+  height: 100%;
+  border-radius: 3px;
+  transition: width 0.4s ease;
+}
+
+[data-theme="dark"] .funnel-h-card {
+  background: rgba(255,255,255,0.02);
+  border-color: rgba(255,255,255,0.08);
+}
+[data-theme="dark"] .funnel-h-card--total {
+  background: linear-gradient(180deg, rgba(99,179,237,0.18), rgba(99,179,237,0.06));
+  border-color: rgba(99,179,237,0.40);
+}
+[data-theme="dark"] .funnel-h-bar { background: rgba(255,255,255,0.06); }

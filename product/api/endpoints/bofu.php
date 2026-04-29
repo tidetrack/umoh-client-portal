@@ -38,7 +38,7 @@ try {
     // 2. Leads — para enriquecer con tipification + saber si la venta es de campaña.
     $leads = supabase_query('leads', [
         'client_slug' => 'eq.' . CLIENT_SLUG,
-        'select'      => 'meistertask_id,tipification,canal,is_campaign_lead,lead_created_at',
+        'select'      => 'meistertask_id,nombre,tipification,canal,is_campaign_lead,assignee,section,lead_created_at',
         'limit'       => '5000',
     ]);
     $lead_by_id = [];
@@ -178,6 +178,84 @@ try {
     }
     $type_colors = [$C['navy'], $C['slate'], $C['silver'], $C['mist'], $C['light']];
 
+    // 10. Ranking de vendedores (mismas métricas que summary.php — ver allí
+    //     para definiciones). Replicado acá para que la sección BOFU sea
+    //     autosuficiente en una sola request.
+    $sales_by_lead = [];
+    foreach ($closed as $c) {
+        $sales_by_lead[$c['meistertask_id']] = [
+            'price' => (float)($c['precio_final'] ?? 0),
+            'date'  => substr($c['updated_at'] ?? '', 0, 10),
+        ];
+    }
+    $sellers_agg = [];
+    foreach ($leads as $l) {
+        if (empty($l['is_campaign_lead'])) continue;
+        $name = trim($l['assignee'] ?? '');
+        if ($name === '' || strtolower($name) === 'umoh crew') continue;
+        $created = substr($l['lead_created_at'] ?? '', 0, 10);
+        if ($created === '' || $created < $start || $created > $end) continue;
+        if (!isset($sellers_agg[$name])) {
+            $sellers_agg[$name] = ['leads' => 0, 'sales' => 0, 'revenue' => 0.0, 'capitas' => 0, 'cycle_sum' => 0, 'cycle_count' => 0];
+        }
+        $sellers_agg[$name]['leads']++;
+        $sale = $sales_by_lead[$l['meistertask_id']] ?? null;
+        if ($sale && $sale['date'] >= $start && $sale['date'] <= $end) {
+            $sellers_agg[$name]['sales']++;
+            $sellers_agg[$name]['revenue'] += $sale['price'];
+        }
+    }
+    $sellers = [];
+    foreach ($sellers_agg as $name => $s) {
+        $sellers[] = [
+            'name'           => $name,
+            'leads'          => $s['leads'],
+            'sales'          => $s['sales'],
+            'revenue'        => round($s['revenue'], 2),
+            'effectiveness'  => $s['leads'] > 0 ? round($s['sales'] / $s['leads'] * 100, 1) : 0,
+            'avg_ticket'     => $s['sales'] > 0 ? round($s['revenue'] / $s['sales'], 2) : 0,
+            'capitas'        => 0,  // pendiente: capitas vienen NULL del extractor
+            'avg_cycle_days' => 0,  // pendiente
+        ];
+    }
+    usort($sellers, fn($a, $b) => $b['sales'] <=> $a['sales'] ?: $b['revenue'] <=> $a['revenue']);
+
+    // 11. Ventas pendientes de cargar monto: leads en sección is_closed_won
+    //     PERO sin lead_monetary o con precio_final = 0/null. Estos son los
+    //     leads que el vendedor marcó como ganados pero no cargó el precio aún.
+    $closed_won_sections = [];
+    foreach ($stages_resp = supabase_query('funnel_stages', [
+        'client_slug' => 'eq.' . CLIENT_SLUG,
+        'is_closed_won' => 'eq.true',
+        'select'      => 'section_name',
+    ]) as $s) {
+        $closed_won_sections[$s['section_name']] = true;
+    }
+
+    $monetary_by_id = [];
+    foreach ($closed as $c) {
+        $price = (float)($c['precio_final'] ?? 0);
+        $monetary_by_id[$c['meistertask_id']] = $price;
+    }
+
+    $pending_price = [];
+    foreach ($leads as $l) {
+        $sec = $l['section'] ?? '';
+        if (!isset($closed_won_sections[$sec])) continue;
+        $price = $monetary_by_id[$l['meistertask_id']] ?? null;
+        if ($price !== null && $price > 0) continue;
+        $pending_price[] = [
+            'meistertask_id'  => $l['meistertask_id'],
+            'nombre'          => $l['nombre'] ?? '',
+            'assignee'        => $l['assignee'] ?? '',
+            'tipification'    => $l['tipification'] ?? '',
+            'lead_created_at' => $l['lead_created_at'] ?? '',
+            'is_campaign'     => !empty($l['is_campaign_lead']),
+        ];
+    }
+    // Ordenar: más recientes primero
+    usort($pending_price, fn($a, $b) => strcmp($b['lead_created_at'] ?? '', $a['lead_created_at'] ?? ''));
+
     echo json_encode([
         'total_revenue'         => round($total_revenue, 2),
         'closed_sales'          => $closed_sales,
@@ -191,6 +269,8 @@ try {
             'data'   => $type_data,
             'colors' => array_slice($type_colors, 0, count($type_labels)),
         ],
+        'sellers'       => $sellers,
+        'pending_price' => $pending_price,
         'non_campaign' => [
             'closed_sales'   => $nc_sales,
             'total_revenue'  => round($nc_revenue, 2),

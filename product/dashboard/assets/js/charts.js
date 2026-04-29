@@ -71,6 +71,46 @@ function _destroyChart(id) {
   if (_charts[id]) { _charts[id].destroy(); delete _charts[id]; }
 }
 
+/* ── Línea de tendencia (regresión lineal simple) ─────────
+   Calcula y = a + bx para la serie y devuelve un array con
+   los valores de la recta de tendencia, mismo largo que el input.
+   Usar como segundo dataset (type: 'line') en bar charts. */
+function _trendLineData(values) {
+  const n = values.length;
+  if (n < 2) return values.slice();
+  const xs = values.map((_, i) => i);
+  const sumX = xs.reduce((a, b) => a + b, 0);
+  const sumY = values.reduce((a, b) => a + Number(b || 0), 0);
+  const sumXY = xs.reduce((s, x, i) => s + x * Number(values[i] || 0), 0);
+  const sumX2 = xs.reduce((s, x) => s + x * x, 0);
+  const meanX = sumX / n;
+  const meanY = sumY / n;
+  const denom = sumX2 - n * meanX * meanX;
+  const slope = denom === 0 ? 0 : (sumXY - n * meanX * meanY) / denom;
+  const intercept = meanY - slope * meanX;
+  return xs.map(x => intercept + slope * x);
+}
+
+/* Devuelve el dataset Chart.js de la línea de tendencia.
+   color: opcional, usa accent UMOH por default. */
+function _trendLineDataset(values, label = 'Tendencia', color = 'rgba(255, 0, 64, 0.85)') {
+  return {
+    type:             'line',
+    label:            label,
+    data:             _trendLineData(values),
+    borderColor:      color,
+    backgroundColor:  'transparent',
+    borderWidth:      2,
+    borderDash:       [6, 4],
+    pointRadius:      0,
+    pointHoverRadius: 0,
+    fill:             false,
+    tension:          0,
+    order:            0,
+    yAxisID:          'y',
+  };
+}
+
 /* ── Formato numérico ──────────────────────────────────── */
 function fmtCurrency(n) { return '$' + Math.round(n).toLocaleString('es-AR'); }
 function fmtNumber(n)   { return Math.round(n).toLocaleString('es-AR'); }
@@ -245,8 +285,9 @@ function renderPerformance(data) {
           label: 'Ingresos', data: data.trend.revenue,
           backgroundColor: CHART_PALETTE.green.solid,
           borderRadius: 4, borderSkipped: false,
-          barPercentage: 0.6, categoryPercentage: 0.7
-        }]
+          barPercentage: 0.6, categoryPercentage: 0.7,
+          order: 1,
+        }, _trendLineDataset(data.trend.revenue)]
       },
       options: {
         responsive: true, maintainAspectRatio: false,
@@ -272,8 +313,9 @@ function renderPerformance(data) {
           label: 'Inversión', data: data.trend.spend,
           backgroundColor: CHART_PALETTE.coral.solid,
           borderRadius: 4, borderSkipped: false,
-          barPercentage: 0.6, categoryPercentage: 0.7
-        }]
+          barPercentage: 0.6, categoryPercentage: 0.7,
+          order: 1,
+        }, _trendLineDataset(data.trend.spend)]
       },
       options: {
         responsive: true, maintainAspectRatio: false,
@@ -422,8 +464,9 @@ function renderTofu(data) {
           borderRadius:       4,
           borderSkipped:      false,
           barPercentage:      0.6,
-          categoryPercentage: 0.7
-        }]
+          categoryPercentage: 0.7,
+          order:              1,
+        }, _trendLineDataset(data.trend.impressions)]
       },
       options: {
         responsive: true,
@@ -455,8 +498,9 @@ function renderTofu(data) {
           borderRadius:       4,
           borderSkipped:      false,
           barPercentage:      0.6,
-          categoryPercentage: 0.7
-        }]
+          categoryPercentage: 0.7,
+          order:              1,
+        }, _trendLineDataset(data.trend.clicks)]
       },
       options: {
         responsive: true,
@@ -486,8 +530,8 @@ function renderTofu(data) {
   const devFilter = document.getElementById('devices-filter');
   _renderDevices(data, devFilter ? devFilter.value : 'clicks');
 
-  /* ── Geo: choropleth map by department ── */
-  if (data.geo) renderGeoMap(data.geo);
+  /* ── Geo: tabla rankeada de ciudades por clicks ── */
+  if (data.geo) _renderGeoTable(data.geo);
 
   /* ── Wire up filter dropdowns (idempotent: replaces listener on each render) ── */
   const termsEl = document.getElementById('terms-filter');
@@ -506,86 +550,44 @@ function renderTofu(data) {
   }
 }
 
-/* ── Geo choropleth map ─────────────────────────────────── */
-let _leafletMap = null;
-let _geoLayer   = null;
+/* ── Geo: tabla ranking por clicks ──────────────────────── */
+function _renderGeoTable(geoData) {
+  const tbody = document.getElementById('geo-table-body');
+  if (!tbody) return;
 
-function _choroplethColor(value, max) {
-  const t = max > 0 ? value / max : 0;
-  if (t > 0.8) return '#FF0040';
-  if (t > 0.6) return '#FF4068';
-  if (t > 0.4) return '#FF80A0';
-  if (t > 0.2) return '#C8D8DC';
-  return '#E8F0F5';
-}
+  const entries = Object.entries(geoData || {})
+    .filter(([, v]) => Number(v) > 0)
+    .sort((a, b) => b[1] - a[1]);
 
-function renderGeoMap(geoData) {
-  const container = document.getElementById('geo-map');
-  if (!container || typeof L === 'undefined') return;
-
-  if (!_leafletMap) {
-    const isDark = document.documentElement.getAttribute('data-theme') === 'dark';
-    _leafletMap = L.map('geo-map', {
-      center:             [-32.9, -68.8],
-      zoom:               10,
-      zoomControl:        false,
-      scrollWheelZoom:    false,
-      attributionControl: false,
-      dragging:           false,
-      doubleClickZoom:    false,
-      boxZoom:            false,
-      keyboard:           false
-    });
-    const tileUrl = isDark
-      ? 'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png'
-      : 'https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png';
-    L.tileLayer(tileUrl, { maxZoom: 19 }).addTo(_leafletMap);
+  if (entries.length === 0) {
+    tbody.innerHTML = '<tr><td colspan="4" class="geo-empty">Sin datos geográficos en el período</td></tr>';
+    return;
   }
 
-  if (_geoLayer) { _leafletMap.removeLayer(_geoLayer); _geoLayer = null; }
+  const max = entries[0][1];
+  const colors = [
+    CHART_PALETTE.blue.solid,  CHART_PALETTE.teal.solid,   CHART_PALETTE.purple.solid,
+    CHART_PALETTE.amber.solid, CHART_PALETTE.coral.solid,  CHART_PALETTE.green.solid,
+  ];
 
-  const maxVal = Math.max(...Object.values(geoData), 1);
-
-  _geoLayer = L.geoJSON(GRAN_MENDOZA_GEOJSON, {
-    style: feature => {
-      const nombre = feature.properties.nombre;
-      const val    = geoData[nombre] || 0;
-      return {
-        fillColor:   _choroplethColor(val, maxVal),
-        fillOpacity: 0.82,
-        weight:      1.5,
-        color:       '#253040',
-        opacity:     0.5
-      };
-    },
-    onEachFeature: (feature, layer) => {
-      const nombre = feature.properties.nombre;
-      const val    = geoData[nombre] || 0;
-      layer.bindTooltip(
-        `<div style="font-family:Outfit,sans-serif;font-size:13px;font-weight:600">${nombre}</div><div style="font-size:12px">${fmtNumber(val)} clicks</div>`,
-        { className: 'geo-tooltip', sticky: true, direction: 'top' }
-      );
-      layer.on({
-        mouseover: e => e.target.setStyle({ fillOpacity: 1.0, weight: 2.5 }),
-        mouseout:  e => _geoLayer.resetStyle(e.target)
-      });
-    }
-  }).addTo(_leafletMap);
-
-  setTimeout(() => {
-    if (_leafletMap) {
-      _leafletMap.invalidateSize();
-      if (_geoLayer) _leafletMap.fitBounds(_geoLayer.getBounds(), { padding: [20, 20] });
-    }
-  }, 200);
+  tbody.innerHTML = entries.map(([city, clicks], i) => {
+    const pct   = max > 0 ? Math.round((clicks / max) * 100) : 0;
+    const color = colors[i % colors.length];
+    return `
+      <tr>
+        <td class="geo-rank">${i + 1}</td>
+        <td class="geo-city">${city}</td>
+        <td class="geo-bar">
+          <div class="bar-wrap"><div class="bar-fill" style="width:${pct}%; background:${color}; opacity:0.85;"></div></div>
+        </td>
+        <td class="geo-clicks">${fmtNumber(clicks)}</td>
+      </tr>
+    `;
+  }).join('');
 }
 
-function invalidateGeoMap() {
-  if (_leafletMap) {
-    _leafletMap.invalidateSize();
-    if (_geoLayer) _leafletMap.fitBounds(_geoLayer.getBounds(), { padding: [20, 20] });
-  }
-}
+// Stub para compatibilidad con código que llama a invalidateGeoMap (filters.js de tabs)
+function invalidateGeoMap() { /* no-op: geo es tabla, no mapa */ }
 
 /* ══════════════════════════════════════════════════════════
    MOFU
@@ -633,8 +635,9 @@ function renderMofu(data) {
           borderRadius:       4,
           borderSkipped:      false,
           barPercentage:      0.6,
-          categoryPercentage: 0.7
-        }]
+          categoryPercentage: 0.7,
+          order:              1,
+        }, _trendLineDataset(data.trend.leads)]
       },
       options: {
         responsive: true,
@@ -665,8 +668,9 @@ function renderMofu(data) {
           borderRadius:       4,
           borderSkipped:      false,
           barPercentage:      0.6,
-          categoryPercentage: 0.7
-        }]
+          categoryPercentage: 0.7,
+          order:              1,
+        }, _trendLineDataset(data.trend.cpl)]
       },
       options: {
         responsive: true,
@@ -684,135 +688,72 @@ function renderMofu(data) {
     });
   }
 
-  /* ── Status: SVG funnel chart — interactive, no static labels ── */
+  /* ── Status: funnel HORIZONTAL con etapas fijas ────────────
+     La primera tarjeta es el TOTAL de leads (sumatoria de todas las etapas).
+     Las siguientes son cada etapa con su valor y porcentaje del total.
+     Cada tarjeta tiene una barra inferior proporcional al máximo. */
   _destroyChart('chart-status');
   const ctxSt = document.getElementById('chart-status');
   if (ctxSt && data.status) {
+    // Limpiar restos del funnel SVG anterior si existieran
     const prevSvg = ctxSt.parentElement.querySelector('.umoh-funnel');
     if (prevSvg) prevSvg.remove();
     const prevTip = document.getElementById('umoh-funnel-tip');
     if (prevTip) prevTip.remove();
+    const prevLegend = ctxSt.parentElement.querySelector('.funnel-phase-legend');
+    if (prevLegend) prevLegend.remove();
+    const prevHorizontal = ctxSt.parentElement.querySelector('.funnel-horizontal');
+    if (prevHorizontal) prevHorizontal.remove();
     ctxSt.style.display = 'none';
-
-    /*
-     * Fase A — Contacto inicial / filtrado (etapas 1–4):
-     *   Contactado, Erróneo, No prospera, A futuro
-     *   Escala azul slate: del más saturado al más tenue → refleja leads no calificados aún.
-     *
-     * Fase B — Intención real / proceso de cierre (etapas 5–6):
-     *   Cotizado, En emisión
-     *   Escala ámbar: dos tonos progresivos → calor creciente hacia el cierre.
-     *
-     * Fase C — Ganado (etapa 7):
-     *   Cargado 100%
-     *   Verde UMOH (CHART_PALETTE.green) — conversión lograda, inconfundible.
-     */
-    const statusColors = [
-      'rgba(99,179,237,0.90)',   /* Fase A-1: Contactado    — azul pleno         */
-      'rgba(99,179,237,0.68)',   /* Fase A-2: Erróneo       — azul medio-alto     */
-      'rgba(99,179,237,0.46)',   /* Fase A-3: No prospera   — azul medio-bajo     */
-      'rgba(99,179,237,0.28)',   /* Fase A-4: A futuro      — azul tenue          */
-      'rgba(251,191,36,0.75)',   /* Fase B-1: Cotizado      — ámbar base          */
-      'rgba(251,191,36,0.95)',   /* Fase B-2: En emisión    — ámbar intenso       */
-      CHART_PALETTE.green.solid  /* Fase C:   Cargado 100%  — verde UMOH cerrado  */
-    ];
-
-    /* Grupos de fases para la leyenda */
-    const statusPhases = [
-      { label: 'Contacto inicial', color: 'rgba(99,179,237,0.85)'  },
-      { label: 'Intención real',   color: 'rgba(251,191,36,0.85)'  },
-      { label: 'Ganado',           color: CHART_PALETTE.green.solid }
-    ];
 
     const labels = data.status.labels;
     const vals   = data.status.data;
     const total  = vals.reduce((a, b) => a + b, 0);
-    const maxVal = Math.max(...vals);
-    const n      = vals.length;
+    const maxVal = Math.max(...vals, 1);
 
-    const parent  = ctxSt.parentElement;
-    const W       = Math.max(parent.clientWidth || 480, 320);
-    const stageH  = 46;
-    const gap     = 3;
-    const totalH  = n * stageH + (n - 1) * gap;
-    const cx      = W / 2;
-    const maxBarW = W * 0.90;
-    const minBarW = maxBarW * 0.20;
+    // Mismo esquema cromático que tenía el funnel: 4 azules, 2 ámbar, 1 verde
+    const statusColors = [
+      'rgba(99,179,237,0.90)',
+      'rgba(99,179,237,0.68)',
+      'rgba(99,179,237,0.46)',
+      'rgba(99,179,237,0.28)',
+      'rgba(251,191,36,0.75)',
+      'rgba(251,191,36,0.95)',
+      CHART_PALETTE.green.solid,
+    ];
 
-    const widths = vals.map(v => minBarW + (v / maxVal) * (maxBarW - minBarW));
+    const container = document.createElement('div');
+    container.className = 'funnel-horizontal';
 
-    /* Tooltip — fixed position, follows cursor, matches Chart.js style */
-    const tip = document.createElement('div');
-    tip.id = 'umoh-funnel-tip';
-    tip.style.cssText = 'position:fixed;background:rgba(15,23,42,0.92);color:#fff;font-family:Outfit,sans-serif;font-size:13px;font-weight:500;line-height:1.6;padding:8px 12px;border-radius:8px;pointer-events:none;display:none;white-space:nowrap;z-index:9999;box-shadow:0 4px 16px rgba(0,0,0,0.35)';
-    document.body.appendChild(tip);
+    // Card 1: TOTAL (azul UMOH)
+    const totalCard = document.createElement('div');
+    totalCard.className = 'funnel-h-card funnel-h-card--total';
+    totalCard.innerHTML = `
+      <div class="funnel-h-label">Total leads</div>
+      <div class="funnel-h-value">${fmtNumber(total)}</div>
+      <div class="funnel-h-pct">100%</div>
+      <div class="funnel-h-bar"><div class="funnel-h-bar-fill" style="width:100%;background:${CHART_PALETTE.blue.solid}"></div></div>
+    `;
+    container.appendChild(totalCard);
 
-    const NS  = 'http://www.w3.org/2000/svg';
-    const svg = document.createElementNS(NS, 'svg');
-    svg.setAttribute('viewBox', `0 0 ${W} ${totalH}`);
-    svg.style.cssText = `display:block;width:100%;height:${totalH}px;overflow:visible;`;
-    svg.classList.add('umoh-funnel');
-
-    vals.forEach((val, i) => {
-      const topW  = widths[i];
-      const botW  = i < n - 1 ? widths[i + 1] : widths[i] * 0.82;
-      const y     = i * (stageH + gap);
-      const pct   = total > 0 ? ((val / total) * 100).toFixed(1) : '0';
+    // Cards 2..N: cada etapa
+    labels.forEach((label, i) => {
+      const v   = vals[i] || 0;
+      const pct = total > 0 ? ((v / total) * 100).toFixed(1) : '0.0';
+      const w   = maxVal > 0 ? ((v / maxVal) * 100).toFixed(0) : 0;
       const color = statusColors[i % statusColors.length];
-
-      const x1 = cx - topW / 2;
-      const x2 = cx + topW / 2;
-      const x3 = cx + botW / 2;
-      const x4 = cx - botW / 2;
-      const r  = 5;
-
-      const isFirst = i === 0;
-      const isLast  = i === n - 1;
-      let d;
-      if (isFirst) {
-        d = `M ${x1+r} ${y} L ${x2-r} ${y} Q ${x2} ${y} ${x2} ${y+r} L ${x3} ${y+stageH} L ${x4} ${y+stageH} L ${x1} ${y+r} Q ${x1} ${y} ${x1+r} ${y} Z`;
-      } else if (isLast) {
-        d = `M ${x1} ${y} L ${x2} ${y} L ${x3-r} ${y+stageH} Q ${x3} ${y+stageH} ${x3} ${y+stageH-r} L ${x4} ${y+stageH-r} Q ${x4} ${y+stageH} ${x4+r} ${y+stageH} Z`;
-      } else {
-        d = `M ${x1} ${y} L ${x2} ${y} L ${x3} ${y+stageH} L ${x4} ${y+stageH} Z`;
-      }
-
-      const path = document.createElementNS(NS, 'path');
-      path.setAttribute('d', d);
-      path.setAttribute('fill', color);
-      path.style.cursor     = 'pointer';
-      path.style.transition = 'opacity 0.15s';
-
-      path.addEventListener('mousemove', e => {
-        tip.style.display = 'block';
-        tip.style.left    = (e.clientX + 14) + 'px';
-        tip.style.top     = (e.clientY - 10) + 'px';
-        tip.innerHTML     = `<span style="font-weight:700">${labels[i]}</span><br>${fmtNumber(val)} leads &nbsp;&middot;&nbsp; ${pct}%`;
-        path.style.opacity = '0.72';
-      });
-      path.addEventListener('mouseleave', () => {
-        tip.style.display  = 'none';
-        path.style.opacity = '1';
-      });
-
-      svg.appendChild(path);
+      const card = document.createElement('div');
+      card.className = 'funnel-h-card';
+      card.innerHTML = `
+        <div class="funnel-h-label">${label}</div>
+        <div class="funnel-h-value">${fmtNumber(v)}</div>
+        <div class="funnel-h-pct">${pct}%</div>
+        <div class="funnel-h-bar"><div class="funnel-h-bar-fill" style="width:${w}%;background:${color}"></div></div>
+      `;
+      container.appendChild(card);
     });
 
-    parent.appendChild(svg);
-
-    /* Leyenda de fases — se limpia antes de redibujar para no duplicar en cambio de período */
-    const prevLegend = parent.querySelector('.funnel-phase-legend');
-    if (prevLegend) prevLegend.remove();
-
-    const legend = document.createElement('div');
-    legend.className = 'funnel-phase-legend';
-    statusPhases.forEach(phase => {
-      const item = document.createElement('div');
-      item.className = 'funnel-phase-item';
-      item.innerHTML = `<span class="funnel-phase-chip" style="background:${phase.color}"></span><span class="funnel-phase-label">${phase.label}</span>`;
-      legend.appendChild(item);
-    });
-    parent.appendChild(legend);
+    ctxSt.parentElement.appendChild(container);
   }
 
   /* ── Segments donut ── */
@@ -983,8 +924,9 @@ function renderBofu(data) {
           borderRadius:       4,
           borderSkipped:      false,
           barPercentage:      0.6,
-          categoryPercentage: 0.7
-        }]
+          categoryPercentage: 0.7,
+          order:              1,
+        }, _trendLineDataset(data.trend.revenue)]
       },
       options: {
         responsive: true,
@@ -1016,8 +958,9 @@ function renderBofu(data) {
           borderRadius:       4,
           borderSkipped:      false,
           barPercentage:      0.6,
-          categoryPercentage: 0.7
-        }]
+          categoryPercentage: 0.7,
+          order:              1,
+        }, _trendLineDataset(data.trend.sales)]
       },
       options: {
         responsive: true,
@@ -1073,6 +1016,43 @@ function renderBofu(data) {
 
   /* Sellers ranking table */
   if (data.sellers) _renderSellersTable(data.sellers);
+
+  /* Pending price table — ventas marcadas cerradas pero sin monto cargado */
+  _renderPendingPriceTable(data.pending_price || []);
+}
+
+function _renderPendingPriceTable(rows) {
+  const tbody = document.getElementById('pending-price-body');
+  const badge = document.getElementById('pending-price-count');
+  if (!tbody) return;
+
+  if (badge) badge.textContent = `${rows.length} pendiente${rows.length === 1 ? '' : 's'}`;
+
+  if (rows.length === 0) {
+    tbody.innerHTML = '<tr><td colspan="5" class="pending-empty">Todas las ventas tienen monto cargado.</td></tr>';
+    return;
+  }
+
+  tbody.innerHTML = rows.map(r => {
+    const fecha = r.lead_created_at
+      ? new Date(r.lead_created_at).toLocaleDateString('es-AR', { day: '2-digit', month: '2-digit', year: 'numeric' })
+      : '—';
+    const tip = (r.tipification && r.tipification.trim()) || '<span class="muted">Sin clasificar</span>';
+    const origin = r.is_campaign
+      ? '<span class="origin-badge origin-campaign">Campaña</span>'
+      : '<span class="origin-badge origin-vendor">Vendedor</span>';
+    const nombre = r.nombre || `#${r.meistertask_id}`;
+    const asesor = r.assignee || '—';
+    return `
+      <tr>
+        <td class="pending-name">${nombre}</td>
+        <td class="pending-asesor">${asesor}</td>
+        <td class="pending-tip">${tip}</td>
+        <td class="pending-origin">${origin}</td>
+        <td class="pending-date">${fecha}</td>
+      </tr>
+    `;
+  }).join('');
 }
 
 /* ══════════════════════════════════════════════════════════

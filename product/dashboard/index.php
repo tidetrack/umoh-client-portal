@@ -352,25 +352,24 @@ $_asset_v = defined('ASSET_VERSION') ? ASSET_VERSION : filemtime(__DIR__ . '/ass
           </div>
         </div>
 
-        <!-- Geo choropleth map — spans 2 cols -->
+        <!-- Geo: tabla ranking de ciudades por clicks -->
         <div class="chart-card chart-card--wide">
           <div class="chart-card-header">
-            <h3 class="chart-title">Clicks por Departamento</h3>
-            <span class="chart-badge">Gran Mendoza</span>
+            <h3 class="chart-title">Clicks por Ciudad</h3>
+            <span class="chart-badge">Top localidades</span>
           </div>
-          <div class="chart-card-body" style="height: 280px; padding: 0; overflow: hidden; border-radius: 0 0 var(--r-xl) var(--r-xl);">
-            <div id="geo-map" class="geo-map" style="width:100%; height:100%;"></div>
-          </div>
-          <div class="geo-legend" style="padding: 8px 16px 10px;">
-            <span class="geo-legend-label">Menor</span>
-            <div class="geo-legend-scale">
-              <span style="background:#E8F0F5" title="Muy bajo"></span>
-              <span style="background:#C8D8DC" title="Bajo"></span>
-              <span style="background:#FF80A0" title="Medio"></span>
-              <span style="background:#FF4068" title="Alto"></span>
-              <span style="background:#FF0040" title="Muy alto"></span>
-            </div>
-            <span class="geo-legend-label">Mayor</span>
+          <div class="chart-card-body" style="padding: var(--sp-4) var(--sp-6);">
+            <table class="geo-table">
+              <thead>
+                <tr>
+                  <th class="geo-rank">#</th>
+                  <th class="geo-city">Ciudad</th>
+                  <th class="geo-bar"></th>
+                  <th class="geo-clicks">Clicks</th>
+                </tr>
+              </thead>
+              <tbody id="geo-table-body"></tbody>
+            </table>
           </div>
         </div>
 
@@ -592,6 +591,30 @@ $_asset_v = defined('ASSET_VERSION') ? ASSET_VERSION : filemtime(__DIR__ . '/ass
                 <!-- populated by charts.js -->
               </tbody>
               <tfoot id="sellers-foot"></tfoot>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <!-- Ventas pendientes de cargar monto -->
+      <div class="charts-grid charts-grid--full">
+        <div class="chart-card">
+          <div class="chart-card-header">
+            <h3 class="chart-title">Ventas pendientes de cargar monto</h3>
+            <span class="chart-badge" id="pending-price-count">0 pendientes</span>
+          </div>
+          <div class="chart-card-body" style="padding: var(--sp-4);">
+            <table class="pending-table" id="pending-price-table">
+              <thead>
+                <tr>
+                  <th>Lead</th>
+                  <th>Asesor</th>
+                  <th>Tipificación</th>
+                  <th>Origen</th>
+                  <th class="th-num">Fecha ingreso</th>
+                </tr>
+              </thead>
+              <tbody id="pending-price-body"></tbody>
             </table>
           </div>
         </div>
