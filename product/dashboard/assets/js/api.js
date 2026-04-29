@@ -15,10 +15,10 @@
  */
 
 const USE_MOCK = {
-  summary: true,
+  summary: false,
   tofu:    false,
-  mofu:    true,
-  bofu:    true,
+  mofu:    false,
+  bofu:    false,
 };
 const API_BASE = 'api/endpoints';
 
