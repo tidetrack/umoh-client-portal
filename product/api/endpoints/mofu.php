@@ -38,11 +38,13 @@ try {
     }
 
     // 2. Leads del cliente (todos — el filtrado por período se hace en PHP).
-    //    tipification = segmento real (Voluntario/Monotributista/Obligatorio)
-    //    canal       = origen del lead (Form/Wsp = campaña; Referido = vendedor)
+    //    tipification     = segmento real (Voluntario/Monotributista/Obligatorio)
+    //    canal            = origen del lead
+    //    is_campaign_lead = true si canal in (Form/Wsp/Formulario/WhatsApp/Campaña)
+    //                       (columna generada por Postgres, ver migration 008)
     $leads = supabase_query('leads', [
         'client_slug' => 'eq.' . CLIENT_SLUG,
-        'select'      => 'meistertask_id,section,tipification,canal,lead_created_at',
+        'select'      => 'meistertask_id,section,tipification,canal,is_campaign_lead,lead_created_at',
         'limit'       => '5000',
     ]);
 
@@ -59,16 +61,28 @@ try {
         $spend_by_date[$d] = ($spend_by_date[$d] ?? 0) + (float)$r['spend'];
     }
 
-    // 4. Agrupar leads por fecha (lead_created_at::date)
-    $by_date = [];
+    // 4. Separar leads de campaña vs leads del vendedor (Referido/Propio).
+    //    Las métricas principales (total_leads, segmentos, status) reflejan
+    //    solo campaña. Los del vendedor se reportan en bloque non_campaign.
+    $campaign_leads = []; $non_campaign_leads = [];
     foreach ($leads as $l) {
+        if (!empty($l['is_campaign_lead'])) {
+            $campaign_leads[] = $l;
+        } else {
+            $non_campaign_leads[] = $l;
+        }
+    }
+
+    // 5. Agrupar leads de campaña por fecha (lead_created_at::date)
+    $by_date = [];
+    foreach ($campaign_leads as $l) {
         $created = $l['lead_created_at'] ?? null;
         if (!$created) continue;
-        $d = substr($created, 0, 10);  // YYYY-MM-DD
+        $d = substr($created, 0, 10);
         if (!isset($by_date[$d])) {
             $by_date[$d] = [
                 'total_leads' => 0,
-                'leads' => [],  // refs a los lead objects para clasificación posterior
+                'leads' => [],
             ];
         }
         $by_date[$d]['total_leads']++;
@@ -182,6 +196,23 @@ try {
     }
     $seg_colors = [$C['navy'], $C['slate'], $C['silver'], $C['mist'], $C['light']];
 
+    // 11. Bloque non_campaign — leads del vendedor (Referido/Propio/etc.)
+    //     en el período seleccionado. Se reportan separados para que el
+    //     frontend los muestre como "+ N leads del vendedor" sin inflar
+    //     las métricas de campaña.
+    $nc_total = 0; $nc_high = 0; $nc_lost = 0; $nc_incub = 0;
+    foreach ($non_campaign_leads as $l) {
+        $created = $l['lead_created_at'] ?? null;
+        if (!$created) continue;
+        $d = substr($created, 0, 10);
+        if ($d < $start || $d > $end) continue;
+        $nc_total++;
+        $c = $classify($l);
+        if ($c['high_intent']) $nc_high++;
+        if ($c['lost'])        $nc_lost++;
+        if ($c['incubating'])  $nc_incub++;
+    }
+
     echo json_encode([
         'total_leads'       => $total_leads,
         'cpl'               => $cpl,
@@ -197,6 +228,13 @@ try {
             'labels' => $seg_labels,
             'data'   => $seg_data,
             'colors' => array_slice($seg_colors, 0, count($seg_labels)),
+        ],
+        'non_campaign' => [
+            'total_leads'       => $nc_total,
+            'high_intent_leads' => $nc_high,
+            'lost'              => $nc_lost,
+            'incubating'        => $nc_incub,
+            'description'       => 'Leads cargados manualmente por el vendedor (Referido / Propio / etc.). No se cuentan como rendimiento de campaña.',
         ],
         'prev' => $prev,
     ], JSON_UNESCAPED_UNICODE);

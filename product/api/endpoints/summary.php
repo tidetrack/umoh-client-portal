@@ -44,34 +44,44 @@ try {
         $tofu[$d]['spend']       += (float) $r['spend'];
     }
 
-    // 2. MOFU: leads — count por fecha de creación
+    // 2. MOFU: leads de campaña por fecha de creación
     $leads = supabase_query('leads', [
         'client_slug' => 'eq.' . CLIENT_SLUG,
-        'select'      => 'meistertask_id,lead_created_at',
+        'select'      => 'meistertask_id,is_campaign_lead,lead_created_at',
         'limit'       => '5000',
     ]);
-    $mofu = [];
+    $mofu = []; $nc_leads = 0;
     foreach ($leads as $l) {
         $created = $l['lead_created_at'] ?? null;
         if (!$created) continue;
+        if (empty($l['is_campaign_lead'])) { $nc_leads++; continue; }
         $d = substr($created, 0, 10);
         $mofu[$d] = ($mofu[$d] ?? 0) + 1;
     }
 
-    // 3. BOFU: lead_monetary closed
+    // 3. BOFU: ventas cerradas, separando campaña de vendedor
     $closed = supabase_query('lead_monetary', [
         'client_slug' => 'eq.' . CLIENT_SLUG,
         'is_closed'   => 'eq.true',
         'select'      => 'meistertask_id,precio_final,updated_at',
         'limit'       => '5000',
     ]);
-    $bofu = [];
+    // index leads para saber si la venta es de campaña
+    $is_campaign_by_id = [];
+    foreach ($leads as $l) {
+        $is_campaign_by_id[$l['meistertask_id']] = !empty($l['is_campaign_lead']);
+    }
+    $bofu = []; $nc_revenue = 0.0; $nc_sales = 0;
     foreach ($closed as $c) {
         $upd = $c['updated_at'] ?? null;
         if (!$upd) continue;
+        $price = (float)($c['precio_final'] ?? 0);
+        if (empty($is_campaign_by_id[$c['meistertask_id']])) {
+            $nc_revenue += $price; $nc_sales++; continue;
+        }
         $d = substr($upd, 0, 10);
         if (!isset($bofu[$d])) $bofu[$d] = ['revenue' => 0.0, 'sales' => 0];
-        $bofu[$d]['revenue'] += (float)($c['precio_final'] ?? 0);
+        $bofu[$d]['revenue'] += $price;
         $bofu[$d]['sales']++;
     }
 
@@ -137,6 +147,11 @@ try {
         'leads'        => $leads_count,
         'closed_sales' => $sales,
         'trend'        => $trend,
+        'non_campaign' => [
+            'leads_total'   => $nc_leads,
+            'closed_sales'  => $nc_sales,
+            'total_revenue' => round($nc_revenue, 2),
+        ],
         'prev'         => $prev,
     ], JSON_UNESCAPED_UNICODE);
 

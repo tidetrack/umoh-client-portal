@@ -35,10 +35,10 @@ try {
         'limit'       => '5000',
     ]);
 
-    // 2. Leads — para enriquecer con tipification (segmento real: Voluntario/Mono/Obligatorio)
+    // 2. Leads — para enriquecer con tipification + saber si la venta es de campaña.
     $leads = supabase_query('leads', [
         'client_slug' => 'eq.' . CLIENT_SLUG,
-        'select'      => 'meistertask_id,tipification,canal,lead_created_at',
+        'select'      => 'meistertask_id,tipification,canal,is_campaign_lead,lead_created_at',
         'limit'       => '5000',
     ]);
     $lead_by_id = [];
@@ -69,12 +69,28 @@ try {
         $impr_by_date[$d] = ($impr_by_date[$d] ?? 0) + (int)$r['impressions'];
     }
 
-    // 4. Agrupar ventas cerradas por fecha (updated_at = momento de cierre)
+    // 4. Agrupar ventas cerradas por fecha de cierre (updated_at).
+    //    Las métricas principales reflejan solo ventas de leads de campaña.
+    //    Las ventas de leads del vendedor se reportan en bloque non_campaign.
     $by_date = [];
+    $nc_revenue = 0.0; $nc_sales = 0; $nc_capitas = 0;
     foreach ($closed as $c) {
         $upd = $c['updated_at'] ?? null;
         if (!$upd) continue;
         $d = substr($upd, 0, 10);
+
+        $price = (float)($c['precio_final'] ?? 0);
+        $caps  = (int)($c['capitas'] ?? 0);
+        $lead  = $lead_by_id[$c['meistertask_id']] ?? null;
+        $is_campaign = !empty($lead['is_campaign_lead']);
+
+        if (!$is_campaign) {
+            $nc_revenue += $price;
+            $nc_sales++;
+            $nc_capitas += $caps;
+            continue;
+        }
+
         if (!isset($by_date[$d])) {
             $by_date[$d] = [
                 'total_revenue' => 0.0,
@@ -83,12 +99,10 @@ try {
                 'sales_by_op'   => [],
             ];
         }
-        $price = (float)($c['precio_final'] ?? 0);
         $by_date[$d]['total_revenue'] += $price;
         $by_date[$d]['closed_sales']++;
-        $by_date[$d]['capitas']       += (int)($c['capitas'] ?? 0);
+        $by_date[$d]['capitas']       += $caps;
 
-        $lead = $lead_by_id[$c['meistertask_id']] ?? null;
         $tip = trim($lead['tipification'] ?? '');
         if ($tip === '') $tip = 'Sin clasificar';
         $by_date[$d]['sales_by_op'][$tip] = ($by_date[$d]['sales_by_op'][$tip] ?? 0) + $price;
@@ -176,6 +190,13 @@ try {
             'labels' => $type_labels,
             'data'   => $type_data,
             'colors' => array_slice($type_colors, 0, count($type_labels)),
+        ],
+        'non_campaign' => [
+            'closed_sales'   => $nc_sales,
+            'total_revenue'  => round($nc_revenue, 2),
+            'capitas_closed' => $nc_capitas,
+            'avg_ticket'     => $nc_sales > 0 ? round($nc_revenue / $nc_sales, 2) : 0,
+            'description'    => 'Ventas cerradas con leads cargados manualmente por el vendedor (no atribuidas a campaña).',
         ],
         'prev' => $prev,
     ], JSON_UNESCAPED_UNICODE);
