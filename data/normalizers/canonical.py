@@ -33,15 +33,21 @@ logger = logging.getLogger(__name__)
 # Conversion de cost_micros (Google) a unidad real
 _MICROS = 1_000_000
 
-# Mapeo de nombres de red de Google Ads al nombre legible para el dashboard
+# Mapeo de nombres de red de Google Ads al nombre legible para el dashboard.
+# Los enums cambiaron entre versiones de la API; mantener compat para v17 (legacy)
+# y v21+ (actual). Si llega un nombre no mapeado, se usa el raw como label.
 _NETWORK_TYPE_MAP = {
-    "SEARCH": "Search",
-    "CONTENT": "Display",
-    "YOUTUBE_WATCH": "YouTube",
-    "YOUTUBE_SEARCH": "YouTube Search",
-    "MIXED": "Mixed",
-    "UNKNOWN": "Unknown",
-    "UNSPECIFIED": "Unspecified",
+    "SEARCH":          "Search",
+    "SEARCH_PARTNERS": "Search Partners",
+    "CONTENT":         "Display",
+    "YOUTUBE":         "YouTube",
+    "YOUTUBE_WATCH":   "YouTube",
+    "YOUTUBE_SEARCH":  "YouTube Search",
+    "DISCOVER":        "Discover",
+    "GOOGLE_TV":       "Google TV",
+    "MIXED":           "Mixed",
+    "UNKNOWN":         "Unknown",
+    "UNSPECIFIED":     "Unspecified",
 }
 
 # Mapeo de nombres de dispositivo de Google Ads al nombre legible

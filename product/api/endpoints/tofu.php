@@ -94,9 +94,14 @@ try {
     [$start, $end] = period_dates($period, $last);
     $selected = filter_range($by_date, $start, $end);
 
-    // Agregar el período
+    // Agregar el período. Para channels/devices guardamos clicks Y impressions
+    // por separado: el frontend tiene un toggle (channels-filter / devices-filter)
+    // que decide cuál mostrar.
     $impressions = 0; $clicks = 0; $spend = 0.0;
-    $all_terms = []; $channels_agg = []; $devices_agg = []; $geo_agg = [];
+    $all_terms_clicks = []; $all_terms_imp = [];
+    $channels_clicks  = []; $channels_imp  = [];
+    $devices_clicks   = []; $devices_imp   = [];
+    $geo_agg          = [];
 
     foreach ($selected as $r) {
         $impressions += (int)   $r['impressions'];
@@ -106,13 +111,16 @@ try {
         foreach ($r['top_search_terms'] as $t) {
             $k = $t['term'] ?? null;
             if ($k === null) continue;
-            $all_terms[$k] = ($all_terms[$k] ?? 0) + (int)($t['clicks'] ?? 0);
+            $all_terms_clicks[$k] = ($all_terms_clicks[$k] ?? 0) + (int)($t['clicks']      ?? 0);
+            $all_terms_imp[$k]    = ($all_terms_imp[$k]    ?? 0) + (int)($t['impressions'] ?? 0);
         }
         foreach ($r['channel_breakdown'] as $ch => $v) {
-            $channels_agg[$ch] = ($channels_agg[$ch] ?? 0) + (int)($v['clicks'] ?? 0);
+            $channels_clicks[$ch] = ($channels_clicks[$ch] ?? 0) + (int)($v['clicks']      ?? 0);
+            $channels_imp[$ch]    = ($channels_imp[$ch]    ?? 0) + (int)($v['impressions'] ?? 0);
         }
         foreach ($r['device_breakdown'] as $dev => $v) {
-            $devices_agg[$dev] = ($devices_agg[$dev] ?? 0) + (int)($v['clicks'] ?? 0);
+            $devices_clicks[$dev] = ($devices_clicks[$dev] ?? 0) + (int)($v['clicks']      ?? 0);
+            $devices_imp[$dev]    = ($devices_imp[$dev]    ?? 0) + (int)($v['impressions'] ?? 0);
         }
         foreach ($r['geo_breakdown'] as $city => $v) {
             $geo_agg[$city] = ($geo_agg[$city] ?? 0) + (int)($v['clicks'] ?? 0);
@@ -121,27 +129,50 @@ try {
 
     $cpc = $clicks > 0 ? round($spend / $clicks, 2) : 0;
 
-    arsort($all_terms);
-    $max = max(array_values($all_terms) ?: [1]);
+    arsort($all_terms_clicks);
+    $max_terms_clicks = max(array_values($all_terms_clicks) ?: [1]);
+    $max_terms_imp    = max(array_values($all_terms_imp) ?: [1]);
     $search_terms = [];
-    foreach (array_slice($all_terms, 0, 10, true) as $term => $cl) {
-        $search_terms[] = ['term' => $term, 'clicks' => $cl, 'pct' => round($cl / $max * 100)];
+    foreach (array_slice($all_terms_clicks, 0, 10, true) as $term => $cl) {
+        $imp = $all_terms_imp[$term] ?? 0;
+        $search_terms[] = [
+            'term'        => $term,
+            'clicks'      => $cl,
+            'impressions' => $imp,
+            'pct'         => round($cl  / $max_terms_clicks * 100),
+            'pct_imp'     => round($imp / $max_terms_imp    * 100),
+        ];
     }
 
-    arsort($channels_agg);
+    // Channels: dataset por clicks (default) y dataset paralelo por impressions.
+    // Mantienen el mismo orden de labels (sorted by clicks desc) para que el
+    // toggle del frontend sea consistente.
+    arsort($channels_clicks);
+    $ch_labels = array_keys($channels_clicks);
     $ch_colors = [COLORS['navy'], COLORS['slate'], COLORS['silver'], COLORS['mist'], COLORS['light']];
     $channels = [
-        'labels' => array_keys($channels_agg),
-        'data'   => array_values($channels_agg),
-        'colors' => array_slice($ch_colors, 0, count($channels_agg)),
+        'labels' => $ch_labels,
+        'data'   => array_values($channels_clicks),
+        'colors' => array_slice($ch_colors, 0, count($ch_labels)),
+    ];
+    $channels_imp_dataset = [
+        'labels' => $ch_labels,
+        'data'   => array_map(fn($l) => $channels_imp[$l] ?? 0, $ch_labels),
+        'colors' => array_slice($ch_colors, 0, count($ch_labels)),
     ];
 
-    arsort($devices_agg);
+    arsort($devices_clicks);
+    $dev_labels = array_keys($devices_clicks);
     $dev_colors = [COLORS['navy'], COLORS['slate'], COLORS['mist'], COLORS['light']];
     $devices = [
-        'labels' => array_keys($devices_agg),
-        'data'   => array_values($devices_agg),
-        'colors' => array_slice($dev_colors, 0, count($devices_agg)),
+        'labels' => $dev_labels,
+        'data'   => array_values($devices_clicks),
+        'colors' => array_slice($dev_colors, 0, count($dev_labels)),
+    ];
+    $devices_imp_dataset = [
+        'labels' => $dev_labels,
+        'data'   => array_map(fn($l) => $devices_imp[$l] ?? 0, $dev_labels),
+        'colors' => array_slice($dev_colors, 0, count($dev_labels)),
     ];
 
     $trend = build_trend($selected, $period, [
@@ -162,10 +193,28 @@ try {
         ];
     }
 
-    // Geo: extraído de Google Ads (geographic_view + geo_target_constant).
-    // Si no hay datos, $geo queda vacío y el mapa del frontend muestra estado inicial.
-    arsort($geo_agg);
-    $geo = array_slice($geo_agg, 0, 15, true);
+    // Geo: normalizar nombres de Google Ads → labels del GeoJSON Gran Mendoza.
+    // Google Ads reporta sin acentos y "Mendoza" para Capital Mendoza; el GeoJSON
+    // del frontend usa "Capital", "Maipú", "Luján de Cuyo" con tildes. Sin este
+    // mapeo el choropleth pinta todo en gris (val=0 por mismatch de strings).
+    $geo_name_map = [
+        'Mendoza'        => 'Capital',
+        'Maipu'          => 'Maipú',
+        'Maipú'          => 'Maipú',
+        'Lujan de Cuyo'  => 'Luján de Cuyo',
+        'Luján de Cuyo'  => 'Luján de Cuyo',
+        'Guaymallen'     => 'Guaymallén',
+        'Guaymallén'     => 'Guaymallén',
+        'Las Heras'      => 'Las Heras',
+        'Godoy Cruz'     => 'Godoy Cruz',
+    ];
+    $geo_normalized = [];
+    foreach ($geo_agg as $city => $cl) {
+        $name = $geo_name_map[$city] ?? $city;
+        $geo_normalized[$name] = ($geo_normalized[$name] ?? 0) + $cl;
+    }
+    arsort($geo_normalized);
+    $geo = array_slice($geo_normalized, 0, 15, true);
 
     echo json_encode([
         'impressions'  => $impressions,
@@ -174,7 +223,9 @@ try {
         'trend'        => $trend,
         'search_terms' => $search_terms,
         'channels'     => $channels,
+        'channels_imp' => $channels_imp_dataset,
         'devices'      => $devices,
+        'devices_imp'  => $devices_imp_dataset,
         'geo'          => $geo,
         'prev'         => $prev,
     ], JSON_UNESCAPED_UNICODE);

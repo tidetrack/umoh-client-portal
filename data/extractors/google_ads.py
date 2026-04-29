@@ -253,6 +253,11 @@ def extract_search_terms(
     ga_service = client.get_service("GoogleAdsService")
     query = _SEARCH_TERMS_QUERY.format(date_start=date_start, date_end=date_end)
 
+    logger.info(
+        "Ejecutando query de search_term_view para customer_id=%s rango=%s a %s",
+        customer_id, date_start, date_end,
+    )
+
     terms = []
     try:
         response = ga_service.search_stream(customer_id=customer_id, query=query)
@@ -272,6 +277,21 @@ def extract_search_terms(
             "No se pudieron extraer terminos de busqueda para customer_id=%s. "
             "Se continua sin este campo.",
             customer_id,
+        )
+        return terms
+
+    if not terms:
+        logger.warning(
+            "search_term_view devolvió 0 filas para customer_id=%s. "
+            "Posibles causas: (1) developer token en BASIC sin acceso a search_term_view, "
+            "(2) anonimización de Google por bajo volumen, (3) campañas sin Search activas. "
+            "Verificar nivel del developer token en https://ads.google.com/aw/apicenter",
+            customer_id,
+        )
+    else:
+        logger.info(
+            "search_term_view: %d filas crudas extraídas (algunos términos pueden repetirse por día).",
+            len(terms),
         )
 
     return terms
