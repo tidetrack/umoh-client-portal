@@ -117,6 +117,7 @@ def _build_row(row: pd.Series, run_id: str) -> dict[str, Any]:
         "top_search_terms": _parse_json_field(row.get("top_search_terms")),
         "channel_breakdown": _parse_json_field(row.get("channel_breakdown")),
         "device_breakdown": _parse_json_field(row.get("device_breakdown")),
+        "geo_breakdown": _parse_json_field(row.get("geo_breakdown")),
         "import_run_id": run_id,
     }
 

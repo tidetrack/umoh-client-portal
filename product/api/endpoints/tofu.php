@@ -56,6 +56,7 @@ try {
                 'top_search_terms'  => [],
                 'channel_breakdown' => [],
                 'device_breakdown'  => [],
+                'geo_breakdown'     => [],
             ];
         }
         $by_date[$d]['impressions'] += (int)   $r['impressions'];
@@ -68,14 +69,18 @@ try {
                 $by_date[$d]['top_search_terms'][] = $t;
             }
         }
-        if (is_array($r['channel_breakdown'] ?? null)) {
-            foreach ($r['channel_breakdown'] as $ch => $v) {
-                $by_date[$d]['channel_breakdown'][$ch] = $v;
-            }
-        }
-        if (is_array($r['device_breakdown'] ?? null)) {
-            foreach ($r['device_breakdown'] as $dev => $v) {
-                $by_date[$d]['device_breakdown'][$dev] = $v;
+        // channel_breakdown / device_breakdown / geo_breakdown:
+        // formato {label: {clicks, impressions}}. Cuando la misma fecha tiene
+        // múltiples plataformas, sumamos por label.
+        foreach (['channel_breakdown', 'device_breakdown', 'geo_breakdown'] as $bk) {
+            if (!is_array($r[$bk] ?? null)) continue;
+            foreach ($r[$bk] as $label => $metrics) {
+                if (!is_array($metrics)) continue;
+                if (!isset($by_date[$d][$bk][$label])) {
+                    $by_date[$d][$bk][$label] = ['clicks' => 0, 'impressions' => 0];
+                }
+                $by_date[$d][$bk][$label]['clicks']      += (int)($metrics['clicks']      ?? 0);
+                $by_date[$d][$bk][$label]['impressions'] += (int)($metrics['impressions'] ?? 0);
             }
         }
     }
@@ -91,7 +96,7 @@ try {
 
     // Agregar el período
     $impressions = 0; $clicks = 0; $spend = 0.0;
-    $all_terms = []; $channels_agg = []; $devices_agg = [];
+    $all_terms = []; $channels_agg = []; $devices_agg = []; $geo_agg = [];
 
     foreach ($selected as $r) {
         $impressions += (int)   $r['impressions'];
@@ -108,6 +113,9 @@ try {
         }
         foreach ($r['device_breakdown'] as $dev => $v) {
             $devices_agg[$dev] = ($devices_agg[$dev] ?? 0) + (int)($v['clicks'] ?? 0);
+        }
+        foreach ($r['geo_breakdown'] as $city => $v) {
+            $geo_agg[$city] = ($geo_agg[$city] ?? 0) + (int)($v['clicks'] ?? 0);
         }
     }
 
@@ -154,12 +162,10 @@ try {
         ];
     }
 
-    // Geo — hardcoded hasta Fase 3 (integración con schema de geo).
-    $geo_90 = ['Mendoza' => 1030, 'Guaymallén' => 315, 'Godoy Cruz' => 189,
-               'Las Heras' => 162, 'Luján de Cuyo' => 156, 'Maipú' => 118];
-    $geo_30 = ['Mendoza' => 495, 'Guaymallén' => 107, 'Godoy Cruz' => 55,
-               'Las Heras' => 43, 'Luján de Cuyo' => 42, 'Maipú' => 36];
-    $geo = ($period === '90d') ? $geo_90 : $geo_30;
+    // Geo: extraído de Google Ads (geographic_view + geo_target_constant).
+    // Si no hay datos, $geo queda vacío y el mapa del frontend muestra estado inicial.
+    arsort($geo_agg);
+    $geo = array_slice($geo_agg, 0, 15, true);
 
     echo json_encode([
         'impressions'  => $impressions,
