@@ -8,10 +8,19 @@
 
 function loadEnv(): void
 {
-    $dir  = dirname(__DIR__, 2); // raíz del proyecto
-    $file = $dir . '/.env';
+    // Sube directorios hasta encontrar el .env. Soporta tanto desarrollo local
+    // (raíz del repo) como producción (vars del servidor: si no hay .env, no-op).
+    $dir = __DIR__;
+    for ($i = 0; $i < 5; $i++) {
+        $candidate = $dir . '/.env';
+        if (file_exists($candidate)) {
+            $file = $candidate;
+            break;
+        }
+        $dir = dirname($dir);
+    }
 
-    if (!file_exists($file)) {
+    if (!isset($file)) {
         return; // en producción las vars se setean directo en el servidor
     }
 
