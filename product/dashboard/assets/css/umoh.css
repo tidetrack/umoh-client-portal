@@ -687,8 +687,17 @@ body {
   z-index: 90;
   background: var(--bg-nav);
   height: var(--nav-h);
-  border-bottom: 1px solid rgba(255, 255, 255, 0.05);
-  transition: background 0.2s;
+  /* Sin border-bottom: el tab activo "come" la línea para verse continuo */
+  transition: background 0.25s, transform 0.25s ease, opacity 0.25s ease;
+}
+
+/* Auto-hide: cuando el usuario hace scroll para abajo, el nav se desvanece
+   hacia arriba. El FAB flotante aparece en la esquina inferior derecha
+   para cambiar de sección sin scrollear hasta arriba. */
+body.nav-hidden .dashboard-nav {
+  transform: translateY(-100%);
+  opacity: 0;
+  pointer-events: none;
 }
 
 .nav-inner {
@@ -698,7 +707,7 @@ body {
   height: 100%;
   display: flex;
   align-items: flex-end;
-  gap: 2px;
+  gap: 4px;
 }
 
 /* Pestañas estilo Chrome — el tab activo "se conecta" al contenido de abajo */
@@ -709,9 +718,9 @@ body {
   color: rgba(255, 255, 255, 0.55);
   background: transparent;
   border: none;
-  border-radius: 10px 10px 0 0;
+  border-radius: 12px 12px 0 0;
   padding: 0 var(--sp-5);
-  height: calc(var(--nav-h) - 6px);
+  height: calc(var(--nav-h) - 4px);
   display: flex;
   align-items: center;
   cursor: pointer;
@@ -722,7 +731,7 @@ body {
 }
 
 .nav-tab:hover:not(.active) {
-  background: rgba(255, 255, 255, 0.06);
+  background: rgba(255, 255, 255, 0.08);
   color: rgba(255, 255, 255, 0.9);
 }
 
@@ -730,11 +739,15 @@ body {
   background: var(--bg-page);
   color: var(--text-primary);
   font-weight: 600;
-  /* "Muerde" el borde inferior del nav: el tab activo se ve pegado al contenido */
-  margin-bottom: -1px;
-  padding-bottom: 1px;
+  /* Doble truco para que la pestaña se sienta pegada al contenido:
+     1. margin-bottom -2px para que el tab "muerda" el final del nav
+     2. box-shadow extiende el bg del tab 6px hacia abajo (cubre el padding
+        del dashboard-main y se conecta visualmente con el primer elemento
+        del contenido) */
+  margin-bottom: -2px;
+  padding-bottom: 2px;
   z-index: 1;
-  box-shadow: 0 -1px 4px rgba(0, 0, 0, 0.05);
+  box-shadow: 0 6px 0 var(--bg-page);
 }
 
 /* Sutil acento UMOH arriba del tab activo (top border) */
@@ -742,11 +755,109 @@ body {
   content: "";
   position: absolute;
   top: 0;
-  left: var(--sp-3);
-  right: var(--sp-3);
-  height: 2px;
+  left: var(--sp-4);
+  right: var(--sp-4);
+  height: 3px;
   background: var(--umoh-accent);
-  border-radius: 2px 2px 0 0;
+  border-radius: 3px 3px 0 0;
+}
+
+/* ── FAB de navegación — aparece cuando el nav está oculto ─── */
+.nav-fab {
+  position: fixed;
+  bottom: 28px;
+  right: 28px;
+  width: 56px;
+  height: 56px;
+  border-radius: 50%;
+  background: var(--umoh-accent);
+  color: #fff;
+  border: none;
+  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.18), 0 2px 4px rgba(0, 0, 0, 0.1);
+  cursor: pointer;
+  z-index: 110;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  opacity: 0;
+  transform: scale(0.6) translateY(20px);
+  pointer-events: none;
+  transition: opacity 0.25s, transform 0.25s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+body.nav-hidden .nav-fab {
+  opacity: 1;
+  transform: scale(1) translateY(0);
+  pointer-events: auto;
+}
+
+.nav-fab:hover {
+  background: #d6002f;
+  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.25), 0 2px 6px rgba(0, 0, 0, 0.15);
+  transform: scale(1.05);
+}
+
+.nav-fab svg {
+  width: 24px;
+  height: 24px;
+}
+
+/* Menú flotante que despliega el FAB */
+.nav-fab-menu {
+  position: fixed;
+  bottom: 96px;
+  right: 28px;
+  background: var(--bg-card);
+  border: 1px solid var(--border-subtle);
+  border-radius: 12px;
+  box-shadow: 0 12px 28px rgba(0, 0, 0, 0.18), 0 4px 8px rgba(0, 0, 0, 0.08);
+  padding: var(--sp-2);
+  z-index: 109;
+  min-width: 200px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  opacity: 0;
+  transform: scale(0.85) translateY(10px);
+  transform-origin: bottom right;
+  pointer-events: none;
+  transition: opacity 0.2s, transform 0.2s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+.nav-fab-menu.open {
+  opacity: 1;
+  transform: scale(1) translateY(0);
+  pointer-events: auto;
+}
+
+.nav-fab-item {
+  background: transparent;
+  border: none;
+  text-align: left;
+  padding: var(--sp-3) var(--sp-4);
+  border-radius: 8px;
+  font-family: var(--font);
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--text-primary);
+  cursor: pointer;
+  transition: background 0.15s;
+  white-space: nowrap;
+}
+
+.nav-fab-item:hover {
+  background: rgba(255, 0, 64, 0.08);
+}
+
+.nav-fab-item.active {
+  background: rgba(255, 0, 64, 0.12);
+  color: var(--umoh-accent);
+  font-weight: 600;
+}
+
+@media (max-width: 768px) {
+  .nav-fab { bottom: 20px; right: 20px; width: 52px; height: 52px; }
+  .nav-fab-menu { bottom: 84px; right: 20px; min-width: 180px; }
 }
 
 /* ── 5. Main Layout ────────────────────────────────────────── */
@@ -755,7 +866,9 @@ body {
   max-width: var(--content-max);
   width: 100%;
   margin: 0 auto;
-  padding: var(--sp-8) var(--content-pad) var(--sp-12);
+  /* Padding top reducido para que la sección activa quede pegada al tab
+     (la pestaña se conecta visualmente con el contenido). */
+  padding: var(--sp-5) var(--content-pad) var(--sp-12);
 }
 
 .dashboard-section {

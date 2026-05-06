@@ -365,7 +365,7 @@ function _renderModalChart(kpiKey) {
     window._kpiModalChartInstance = null;
   }
   const ctx = document.getElementById('kpi-modal-chart');
-  if (!ctx) return;
+  if (!ctx) return false;
 
   const isTofuKey = ['tofu-impressions', 'tofu-clicks', 'tofu-cpc'].includes(kpiKey);
   const isMofuKey = ['mofu-leads', 'mofu-cpl', 'mofu-tipif', 'mofu-highintent'].includes(kpiKey);
@@ -378,7 +378,7 @@ function _renderModalChart(kpiKey) {
   } else {
     data = window._kpiModalData;
   }
-  if (!data || !data.trend) return;
+  if (!data || !data.trend) return false;
 
   const src     = data.trend.sparkline || data.trend;
   const labels  = src.labels || [];
@@ -427,10 +427,10 @@ function _renderModalChart(kpiKey) {
     values = src.leads || data.trend.leads || [];
     color = isUp(values) ? '#22C55E' : '#FF0040'; label = 'Leads (proxy alta intención)';
   } else {
-    return;
+    return false;
   }
 
-  if (!values || values.length < 2) return;
+  if (!values || values.length < 2) return false;
 
   const fill = color === '#22C55E' ? 'rgba(34,197,94,0.10)' : 'rgba(239,68,68,0.10)';
 
@@ -495,6 +495,7 @@ function _renderModalChart(kpiKey) {
       }
     }
   });
+  return true;
 }
 
 function _openKpiModal(kpiKey) {
@@ -515,7 +516,13 @@ function _openKpiModal(kpiKey) {
   example.textContent = typeof info.example === 'function' ? info.example(data) : info.example;
 
   modal.hidden = false;
-  requestAnimationFrame(() => _renderModalChart(kpiKey));
+  // Renderizar el chart si aplica; si no hay datos para chart, ocultar el área
+  // entera para que el modal no muestre un espacio en blanco sin sentido.
+  const chartArea = modal.querySelector('.kpi-modal-chart-area');
+  requestAnimationFrame(() => {
+    const rendered = _renderModalChart(kpiKey);
+    if (chartArea) chartArea.hidden = !rendered;
+  });
   document.getElementById('kpi-modal-close').focus();
   document.body.style.overflow = 'hidden';
 }
@@ -637,11 +644,90 @@ function initFilters() {
   if (themeBtn) themeBtn.addEventListener('click', _toggleTheme);
 }
 
+/* ── Auto-hide nav + FAB de navegación flotante ──────────────
+   Cuando el usuario hace scroll para abajo más allá de un umbral,
+   el nav-bar se desvanece hacia arriba y aparece un FAB en la esquina
+   inferior derecha. El FAB despliega un menú con las 4 secciones para
+   cambiar sin volver al top de la página. */
+function initScrollNavBehavior() {
+  const fab        = document.getElementById('nav-fab');
+  const fabMenu    = document.getElementById('nav-fab-menu');
+  if (!fab || !fabMenu) return;
+
+  const SCROLL_THRESHOLD = 180;  // px desde el top antes de ocultar el nav
+  let lastY  = 0;
+  let ticking = false;
+
+  function onScroll() {
+    const y = window.scrollY || document.documentElement.scrollTop;
+    if (y > SCROLL_THRESHOLD) {
+      document.body.classList.add('nav-hidden');
+    } else {
+      document.body.classList.remove('nav-hidden');
+      // Si el nav vuelve, también cierra el menú del FAB para no quedar
+      // con un menú flotante huérfano
+      _closeFabMenu();
+    }
+    lastY = y;
+    ticking = false;
+  }
+
+  window.addEventListener('scroll', () => {
+    if (!ticking) {
+      requestAnimationFrame(onScroll);
+      ticking = true;
+    }
+  }, { passive: true });
+
+  function _openFabMenu() {
+    fabMenu.classList.add('open');
+    fab.setAttribute('aria-expanded', 'true');
+    _highlightActiveFabItem();
+  }
+  function _closeFabMenu() {
+    fabMenu.classList.remove('open');
+    fab.setAttribute('aria-expanded', 'false');
+  }
+  function _highlightActiveFabItem() {
+    fabMenu.querySelectorAll('.nav-fab-item').forEach(item => {
+      item.classList.toggle('active', item.dataset.section === _currentSection);
+    });
+  }
+
+  fab.addEventListener('click', e => {
+    e.stopPropagation();
+    if (fabMenu.classList.contains('open')) _closeFabMenu();
+    else _openFabMenu();
+  });
+
+  fabMenu.querySelectorAll('.nav-fab-item').forEach(item => {
+    item.addEventListener('click', () => {
+      const section = item.dataset.section;
+      _closeFabMenu();
+      if (section === _currentSection) return;
+      // Reusa la lógica de los nav-tab — un solo flujo de cambio de sección
+      const tab = document.querySelector(`.nav-tab[data-section="${section}"]`);
+      if (tab) tab.click();
+    });
+  });
+
+  // Cerrar el menú al click fuera
+  document.addEventListener('click', e => {
+    if (!fabMenu.contains(e.target) && e.target !== fab) _closeFabMenu();
+  });
+
+  // Cerrar el menú con Escape
+  document.addEventListener('keydown', e => {
+    if (e.key === 'Escape' && fabMenu.classList.contains('open')) _closeFabMenu();
+  });
+}
+
 /* ── Bootstrap ──────────────────────────────────────────── */
 document.addEventListener('DOMContentLoaded', () => {
   initTheme();
   initUserMenu();
   initFilters();
   initKpiModals();
+  initScrollNavBehavior();
   refreshDashboard(_currentSection, _currentPeriod);
 });
