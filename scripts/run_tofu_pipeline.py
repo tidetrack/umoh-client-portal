@@ -242,9 +242,53 @@ def main() -> None:
         facts_errors.append(err_msg)
 
     # ------------------------------------------------------------------
-    # Paso 6: Resumen
+    # Paso 6: Espejo de tofu_facts a Google Sheets (Fase 3 — sprint 1.7)
     # ------------------------------------------------------------------
-    has_errors = bool(supabase_error or facts_errors)
+    # Lee tofu_facts desde Supabase y las replica en la pestaña 'tofu_facts'
+    # de la Sheet de cada cliente. Independiente del flag --no-sheets (que
+    # controla el flujo legacy tofu_raw). Se saltea si falta el secret
+    # GOOGLE_SHEETS_SA_JSON. No bloquea el pipeline si falla.
+    sheets_mirror_results: dict[str, dict[str, int]] = {}
+    sheets_mirror_errors: list[str] = []
+
+    if not facts_errors and "GOOGLE_SHEETS_SA_JSON" in os.environ:
+        try:
+            from loaders.supabase_writer import SupabaseWriter
+            writer = SupabaseWriter()
+
+            for raw in raw_results:
+                client_id = raw.get("client_id", "")
+                sheet_id = raw.get("sheets_output_id", "")
+                if not sheet_id or str(sheet_id).startswith("REEMPLAZAR"):
+                    logger.info(
+                        "Mirror sheets — sheet_id no configurado para cliente=%s, se omite.",
+                        client_id,
+                    )
+                    continue
+                try:
+                    mirror = writer.mirror_facts_to_sheets(
+                        client_slug=client_id,
+                        spreadsheet_id=str(sheet_id),
+                        mirror_tofu=True,
+                        mirror_mofu=False,
+                        mirror_bofu=False,
+                    )
+                    sheets_mirror_results[client_id] = mirror.get("tofu", {})
+                except Exception as exc:
+                    err_msg = f"Mirror sheets falló para cliente={client_id}: {exc}"
+                    logger.error(err_msg)
+                    sheets_mirror_errors.append(err_msg)
+        except Exception as exc:
+            err_msg = f"Error inicializando mirror_facts_to_sheets: {exc}"
+            logger.error(err_msg)
+            sheets_mirror_errors.append(err_msg)
+    elif "GOOGLE_SHEETS_SA_JSON" not in os.environ:
+        logger.info("Mirror sheets — GOOGLE_SHEETS_SA_JSON ausente, se omite.")
+
+    # ------------------------------------------------------------------
+    # Paso 7: Resumen
+    # ------------------------------------------------------------------
+    has_errors = bool(supabase_error or facts_errors or sheets_mirror_errors)
     summary = {
         "status": "ok" if not has_errors else "partial_failure",
         "days_back": days_back,
@@ -258,6 +302,8 @@ def main() -> None:
         "supabase_platforms": supabase_result.get("platforms", []),
         "supabase_error": supabase_error,
         "facts_errors": facts_errors,
+        "sheets_mirror": sheets_mirror_results,
+        "sheets_mirror_errors": sheets_mirror_errors,
     }
 
     print(json.dumps(summary, indent=2, ensure_ascii=False))

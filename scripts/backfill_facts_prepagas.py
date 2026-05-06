@@ -68,6 +68,7 @@ CLIENT_SLUG = "prepagas"
 CAMPAIGN_ID = "PMAX_PREPAGAS"
 CAMPAIGN_NAME = "PMAX Prevención Salud"
 DEFAULT_DATE_START = "2026-01-01"
+DEFAULT_SHEET_ID = "12iVYwOtU969NVZ1v6kP32GBbv-AUOkqV25KhN1tDAew"
 
 
 def parse_args() -> argparse.Namespace:
@@ -98,6 +99,19 @@ def parse_args() -> argparse.Namespace:
         action="store_true",
         default=False,
         help="Omitir el backfill de mofu_facts y bofu_facts (solo TOFU)",
+    )
+    parser.add_argument(
+        "--mirror-sheets",
+        action="store_true",
+        default=False,
+        help="Después del backfill, espejar las 3 facts a Google Sheets "
+             "(requiere GOOGLE_SHEETS_SA_JSON en env).",
+    )
+    parser.add_argument(
+        "--sheet-id",
+        type=str,
+        default=DEFAULT_SHEET_ID,
+        help="ID de la Google Sheet destino para el mirror (default: Sheet de Prepagas).",
     )
     return parser.parse_args()
 
@@ -217,6 +231,31 @@ def main() -> None:
         logger.info("--skip-mofu-bofu activo: se omite backfill de mofu_facts y bofu_facts.")
         results["mofu_rows_upserted"] = "skipped"
         results["bofu_rows_upserted"] = "skipped"
+
+    # ---- Espejo a Google Sheets (opcional) ----
+    if args.mirror_sheets:
+        import os
+        if "GOOGLE_SHEETS_SA_JSON" not in os.environ:
+            logger.warning(
+                "--mirror-sheets activo pero GOOGLE_SHEETS_SA_JSON no está en env. "
+                "Cargá el secret antes de correr o desactivá el flag."
+            )
+            results["sheets_mirror"] = "skipped: missing GOOGLE_SHEETS_SA_JSON"
+        else:
+            try:
+                logger.info("Mirror sheets → %s", args.sheet_id)
+                mirror = writer.mirror_facts_to_sheets(
+                    client_slug=CLIENT_SLUG,
+                    spreadsheet_id=args.sheet_id,
+                    mirror_tofu=not args.skip_tofu,
+                    mirror_mofu=not args.skip_mofu_bofu,
+                    mirror_bofu=not args.skip_mofu_bofu,
+                )
+                results["sheets_mirror"] = mirror
+                logger.info("Mirror sheets completado: %s", mirror)
+            except Exception as exc:
+                logger.error("Mirror sheets falló: %s", exc, exc_info=True)
+                results["errors"].append(f"sheets mirror: {exc}")
 
     # ---- Resumen ----
     print("\n=== RESULTADO DEL BACKFILL ===")

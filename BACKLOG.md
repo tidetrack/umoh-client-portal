@@ -86,10 +86,9 @@ Estas tareas bloquean el lanzamiento. Sin ellas el cliente no puede usar el prod
 
 ### 1.7 — Google Sheet espejo de Supabase (transparencia de datos)
 
-- [ ] **1.7** Activar la escritura paralela en Google Sheets para que el cliente pueda auditar los datos crudos.
+- [x] **1.7** Activar la escritura paralela en Google Sheets para que el cliente pueda auditar los datos crudos.
+  **Hecho:** 2026-05-05 — implementado en `sheets_writer.py` (3 funciones genéricas `write_tofu_facts/write_mofu_facts/write_bofu_facts`) + método `SupabaseWriter.mirror_facts_to_sheets()` + integración en ambos runners + workflow `extract_all.yml` con `GOOGLE_SHEETS_SA_JSON`. Pendiente: validar visualmente que los datos aparecen en la Sheet del cliente cuando corra el próximo cron (cada 6h) o ejecutar `backfill_facts_prepagas.py --mirror-sheets` manualmente con el secret cargado en local.
   **Complejidad:** Media
-  **Qué es:** Hoy los datos viven en Supabase (la base de datos interna). El cliente solo ve el dashboard, no puede ver los números crudos. La idea es que en paralelo a guardar en Supabase, también se escriban en una Google Sheet (hoja de cálculo de Google) con las mismas tablas. El cliente puede abrir esa hoja y verificar los números por sí mismo.
-  **Por qué importa:** Es una capa de transparencia — el cliente puede "auditar" los datos sin depender de nosotros. Esto construye confianza en el producto, que es el diferencial de UMOH. El código ya tiene parte de esta infraestructura (`data/loaders/sheets_writer.py`); hay que reactivarla y conectarla bien al pipeline actual.
 
 ---
 

@@ -18,6 +18,7 @@
 #   GOOGLE_ADS_LOGIN_CUSTOMER_ID
 #   SUPABASE_URL
 #   SUPABASE_SERVICE_KEY
+#   GOOGLE_SHEETS_SA_JSON  (Service Account JSON — para espejo facts → Sheets)
 # ---------------------------------------------------------------------------
 
 name: Extract & Load — All Platforms
@@ -61,6 +62,9 @@ jobs:
       GOOGLE_ADS_LOGIN_CUSTOMER_ID: ${{ secrets.GOOGLE_ADS_LOGIN_CUSTOMER_ID }}
       SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
       SUPABASE_SERVICE_KEY: ${{ secrets.SUPABASE_SERVICE_KEY }}
+      # Service Account de UMOH para escribir en las Sheets de los clientes
+      # (espejo facts — sprint 1.7 Fase 3). Si está vacío, el mirror se saltea.
+      GOOGLE_SHEETS_SA_JSON: ${{ secrets.GOOGLE_SHEETS_SA_JSON }}
 
     steps:
       - name: Checkout repositorio
@@ -75,7 +79,12 @@ jobs:
       - name: Instalar dependencias
         run: pip install -r requirements.txt
 
-      - name: Ejecutar pipeline TOFU (Google Ads → Supabase)
+      - name: Ejecutar pipeline TOFU (Google Ads → Supabase + facts mirror Sheets)
+        # NOTA: --no-sheets desactiva la escritura legacy en la pestaña tofu_raw
+        # (DataFrame normalizado). El espejo de tofu_facts a la pestaña 'tofu_facts'
+        # se ejecuta dentro del pipeline (Paso 6) cuando GOOGLE_SHEETS_SA_JSON está
+        # presente y siempre que --no-sheets no esté activo a nivel de toda la
+        # escritura a Sheets. Para una corrida sin ningún mirror, omitir el secret.
         run: |
           python scripts/run_tofu_pipeline.py \
             --days "${{ github.event.inputs.days_back || '7' }}" \

@@ -263,3 +263,222 @@ def write_normalized_data(df: pd.DataFrame) -> None:
                 e,
             )
             raise
+
+
+# ---------------------------------------------------------------------------
+# Facts mirror — espejo de tofu_facts/mofu_facts/bofu_facts a Google Sheets
+# ---------------------------------------------------------------------------
+# Pestañas + esquemas que matchean 1-a-1 las tablas facts de Supabase
+# (migración 009 + 010). El cliente abre la Sheet y ve los mismos datos
+# que sirven el dashboard — capa de transparencia / auditoría.
+
+TOFU_FACTS_SHEET_NAME = "tofu_facts"
+MOFU_FACTS_SHEET_NAME = "mofu_facts"
+BOFU_FACTS_SHEET_NAME = "bofu_facts"
+
+TOFU_FACTS_COLUMNS = [
+    "client_slug", "date", "campaign_id", "platform", "campaign_name",
+    "impressions", "clicks", "spend", "ctr", "cpc", "cpm",
+    "last_computed_at",
+]
+TOFU_FACTS_KEY = ["date", "campaign_id", "platform"]
+
+MOFU_FACTS_COLUMNS = [
+    "client_slug", "date", "campaign_id", "campaign_name",
+    "total_leads", "high_intent_leads", "typified_leads",
+    "closed_won_leads", "lost_leads", "incubating_leads",
+    "typification_rate",
+    "section_inbox", "section_nuevo", "section_prioritarios",
+    "section_para_hoy", "section_procesando", "section_contactados",
+    "section_cotizados", "section_en_auditoria",
+    "section_mes_que_viene", "section_a_futuro",
+    "section_ventas_ganadas", "section_no_prospera",
+    "last_computed_at",
+]
+MOFU_FACTS_KEY = ["date", "campaign_id"]
+
+BOFU_FACTS_COLUMNS = [
+    "client_slug", "date", "campaign_id", "campaign_name",
+    "sales_count", "revenue", "avg_ticket", "capitas_closed",
+    "avg_ticket_capita",
+    "conversion_rate_acumulado", "conversion_rate_mes", "conversion_rate_30d",
+    "sales_voluntario", "revenue_voluntario",
+    "sales_monotributista", "revenue_monotributista",
+    "sales_obligatorio", "revenue_obligatorio",
+    "sales_sin_segmento", "revenue_sin_segmento",
+    "last_computed_at",
+]
+BOFU_FACTS_KEY = ["date", "campaign_id"]
+
+
+def _col_letter(idx: int) -> str:
+    """Convierte un índice 0-based a letra de columna A1 (A, B, ..., Z, AA...)."""
+    result = ""
+    n = idx
+    while True:
+        result = chr(ord("A") + (n % 26)) + result
+        n = n // 26 - 1
+        if n < 0:
+            break
+    return result
+
+
+def _ensure_sheet_with_columns(
+    sheets: Any,
+    spreadsheet_id: str,
+    tab_name: str,
+    columns: list[str],
+) -> None:
+    """Crea la pestaña + headers si no existe. Idempotente."""
+    metadata = sheets.get(spreadsheetId=spreadsheet_id).execute()
+    existing = [s["properties"]["title"] for s in metadata.get("sheets", [])]
+
+    if tab_name in existing:
+        return
+
+    logger.info("Creando pestaña '%s' en sheet=%s.", tab_name, spreadsheet_id)
+    sheets.batchUpdate(
+        spreadsheetId=spreadsheet_id,
+        body={"requests": [{"addSheet": {"properties": {"title": tab_name}}}]},
+    ).execute()
+    sheets.values().update(
+        spreadsheetId=spreadsheet_id,
+        range=f"{tab_name}!A1",
+        valueInputOption="RAW",
+        body={"values": [columns]},
+    ).execute()
+
+
+def _get_existing_keys(
+    sheets: Any,
+    spreadsheet_id: str,
+    tab_name: str,
+    columns: list[str],
+    key_columns: list[str],
+) -> dict[str, int]:
+    """
+    Lee las filas existentes de la pestaña y construye un dict
+    {composite_key: row_index_1based} para hacer upsert por clave.
+    """
+    last_col = _col_letter(len(columns) - 1)
+    result = sheets.values().get(
+        spreadsheetId=spreadsheet_id,
+        range=f"{tab_name}!A:{last_col}",
+    ).execute()
+
+    rows = result.get("values", [])
+    key_idxs = [columns.index(kc) for kc in key_columns]
+
+    key_to_row: dict[str, int] = {}
+    for i, row in enumerate(rows):
+        if i == 0:
+            continue  # headers
+        if not row:
+            continue
+        key_parts = [str(row[idx]) if idx < len(row) else "" for idx in key_idxs]
+        key_to_row["|".join(key_parts)] = i + 1
+    return key_to_row
+
+
+def _normalize_cell(value: Any) -> str:
+    """Convierte un valor de Supabase a string apto para Sheets."""
+    if value is None:
+        return ""
+    if isinstance(value, bool):
+        return "TRUE" if value else "FALSE"
+    return str(value)
+
+
+def write_facts_to_sheet(
+    rows: list[dict],
+    spreadsheet_id: str,
+    tab_name: str,
+    columns: list[str],
+    key_columns: list[str],
+) -> dict[str, int]:
+    """
+    Upsert genérico de filas (lista de dicts) en una pestaña, usando un
+    composite key formado por `key_columns`. Si la key ya existe se
+    actualiza la fila; si no, se appendea al final.
+
+    Args:
+        rows: Lista de dicts con las columnas de la fact table (las extra se ignoran).
+        spreadsheet_id: ID de la Google Sheet del cliente.
+        tab_name: Nombre de la pestaña destino.
+        columns: Lista canónica de columnas en orden.
+        key_columns: Subset de `columns` que forman el composite key.
+
+    Returns:
+        Dict con counts: {'updates': N, 'appends': M}.
+    """
+    if not rows:
+        return {"updates": 0, "appends": 0}
+
+    sheets = build_sheets_service()
+    _ensure_sheet_with_columns(sheets, spreadsheet_id, tab_name, columns)
+    existing_keys = _get_existing_keys(sheets, spreadsheet_id, tab_name, columns, key_columns)
+
+    updates: list[dict] = []
+    appends: list[list] = []
+
+    for row in rows:
+        key = "|".join(_normalize_cell(row.get(kc)) for kc in key_columns)
+        values = [_normalize_cell(row.get(col)) for col in columns]
+
+        if key in existing_keys:
+            row_num = existing_keys[key]
+            updates.append({
+                "range": f"{tab_name}!A{row_num}",
+                "values": [values],
+            })
+        else:
+            appends.append(values)
+
+    if updates:
+        sheets.values().batchUpdate(
+            spreadsheetId=spreadsheet_id,
+            body={"valueInputOption": "RAW", "data": updates},
+        ).execute()
+        logger.info(
+            "facts mirror: actualizadas %d filas en '%s' (sheet=%s).",
+            len(updates), tab_name, spreadsheet_id,
+        )
+
+    if appends:
+        sheets.values().append(
+            spreadsheetId=spreadsheet_id,
+            range=f"{tab_name}!A1",
+            valueInputOption="RAW",
+            insertDataOption="INSERT_ROWS",
+            body={"values": appends},
+        ).execute()
+        logger.info(
+            "facts mirror: agregadas %d filas en '%s' (sheet=%s).",
+            len(appends), tab_name, spreadsheet_id,
+        )
+
+    return {"updates": len(updates), "appends": len(appends)}
+
+
+def write_tofu_facts(rows: list[dict], spreadsheet_id: str) -> dict[str, int]:
+    """Espeja tofu_facts → pestaña 'tofu_facts' con upsert por (date, campaign_id, platform)."""
+    return write_facts_to_sheet(
+        rows, spreadsheet_id,
+        TOFU_FACTS_SHEET_NAME, TOFU_FACTS_COLUMNS, TOFU_FACTS_KEY,
+    )
+
+
+def write_mofu_facts(rows: list[dict], spreadsheet_id: str) -> dict[str, int]:
+    """Espeja mofu_facts → pestaña 'mofu_facts' con upsert por (date, campaign_id)."""
+    return write_facts_to_sheet(
+        rows, spreadsheet_id,
+        MOFU_FACTS_SHEET_NAME, MOFU_FACTS_COLUMNS, MOFU_FACTS_KEY,
+    )
+
+
+def write_bofu_facts(rows: list[dict], spreadsheet_id: str) -> dict[str, int]:
+    """Espeja bofu_facts → pestaña 'bofu_facts' con upsert por (date, campaign_id)."""
+    return write_facts_to_sheet(
+        rows, spreadsheet_id,
+        BOFU_FACTS_SHEET_NAME, BOFU_FACTS_COLUMNS, BOFU_FACTS_KEY,
+    )

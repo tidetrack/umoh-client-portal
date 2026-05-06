@@ -268,6 +268,38 @@ def main() -> None:
         logger.error("Error calculando facts: %s", exc, exc_info=True)
         facts_result = {'mofu_rows': 0, 'bofu_rows': 0, 'error': str(exc)}
 
+    # 11.5 Espejo de mofu_facts + bofu_facts a Google Sheets (Fase 3 — sprint 1.7)
+    # Solo se ejecuta si hay GOOGLE_SHEETS_SA_JSON disponible y la Sheet del
+    # cliente está configurada en clients/{slug}.yaml. No bloquea el pipeline
+    # si falla — los datos siguen vivos en Supabase.
+    mirror_result: dict = {}
+    sheet_id = yaml_config.get('sheets', {}).get('output_id', '')
+    if (
+        sheet_id
+        and not str(sheet_id).startswith('REEMPLAZAR')
+        and 'GOOGLE_SHEETS_SA_JSON' in os.environ
+    ):
+        try:
+            mirror_result = writer.mirror_facts_to_sheets(
+                client_slug=client_slug,
+                spreadsheet_id=str(sheet_id),
+                mirror_tofu=False,
+                mirror_mofu=True,
+                mirror_bofu=True,
+            )
+            logger.info(
+                "Mirror sheets actualizado — mofu=%s bofu=%s",
+                mirror_result.get('mofu', {}),
+                mirror_result.get('bofu', {}),
+            )
+        except Exception as exc:
+            logger.error("Error en mirror_facts_to_sheets: %s", exc, exc_info=True)
+            mirror_result = {'error': str(exc)}
+    elif 'GOOGLE_SHEETS_SA_JSON' not in os.environ:
+        logger.info("Mirror sheets — GOOGLE_SHEETS_SA_JSON ausente, se omite.")
+    else:
+        logger.info("Mirror sheets — sheets.output_id no configurado, se omite.")
+
     # 12. Resumen
     summary = {
         'run_id': run_id,
@@ -282,6 +314,7 @@ def main() -> None:
         'facts_mofu_rows': facts_result.get('mofu_rows', 0),
         'facts_bofu_rows': facts_result.get('bofu_rows', 0),
         'facts_error': facts_result.get('error'),
+        'sheets_mirror': mirror_result,
     }
 
     print('\n=== RESUMEN DEL PIPELINE ===')

@@ -760,6 +760,78 @@ class SupabaseWriter:
         )
         return cohort
 
+    # ------------------------------------------------------------------
+    # Espejo a Google Sheets (Fase 3 — sprint 1.7)
+    # ------------------------------------------------------------------
+    def mirror_facts_to_sheets(
+        self,
+        client_slug: str,
+        spreadsheet_id: str,
+        mirror_tofu: bool = True,
+        mirror_mofu: bool = True,
+        mirror_bofu: bool = True,
+    ) -> dict[str, dict[str, int]]:
+        """Espeja las facts tables del cliente a Google Sheets.
+
+        Lee `tofu_facts` / `mofu_facts` / `bofu_facts` desde Supabase y las
+        replica fila-a-fila en pestañas dedicadas de la Sheet del cliente
+        para que pueda auditar los datos crudos.
+
+        Cada flag permite saltear una de las 3 tablas — útil para integrar
+        en pipelines parciales (TOFU pipeline solo espeja TOFU, MeisterTask
+        pipeline solo espeja MOFU+BOFU).
+
+        Args:
+            client_slug: Slug del cliente.
+            spreadsheet_id: ID de la Google Sheet destino.
+            mirror_tofu/mofu/bofu: flags para activar/saltear cada fase.
+
+        Returns:
+            Dict por fase con counts: {'tofu': {'updates': N, 'appends': M}, ...}
+        """
+        # Import perezoso para no acoplar este módulo al de Sheets
+        # (permite que el pipeline corra sin GOOGLE_SHEETS_SA_JSON si no se usa).
+        from loaders.sheets_writer import (
+            write_tofu_facts, write_mofu_facts, write_bofu_facts,
+        )
+
+        result: dict[str, dict[str, int]] = {}
+
+        if mirror_tofu:
+            rows = (
+                self._sb.table("tofu_facts").select("*")
+                .eq("client_slug", client_slug).execute().data
+            ) or []
+            result["tofu"] = write_tofu_facts(rows, spreadsheet_id)
+            logger.info(
+                "mirror_facts_to_sheets[tofu]: cliente=%s rows=%d %s",
+                client_slug, len(rows), result["tofu"],
+            )
+
+        if mirror_mofu:
+            rows = (
+                self._sb.table("mofu_facts").select("*")
+                .eq("client_slug", client_slug).execute().data
+            ) or []
+            result["mofu"] = write_mofu_facts(rows, spreadsheet_id)
+            logger.info(
+                "mirror_facts_to_sheets[mofu]: cliente=%s rows=%d %s",
+                client_slug, len(rows), result["mofu"],
+            )
+
+        if mirror_bofu:
+            rows = (
+                self._sb.table("bofu_facts").select("*")
+                .eq("client_slug", client_slug).execute().data
+            ) or []
+            result["bofu"] = write_bofu_facts(rows, spreadsheet_id)
+            logger.info(
+                "mirror_facts_to_sheets[bofu]: cliente=%s rows=%d %s",
+                client_slug, len(rows), result["bofu"],
+            )
+
+        return result
+
 
 # ---------------------------------------------------------------------------
 # Helpers internos
