@@ -243,13 +243,19 @@ def main() -> None:
         facts_errors.append(err_msg)
 
     # ------------------------------------------------------------------
-    # Paso 6: Espejo de tofu_facts a Google Sheets (Fase 3 — sprint 1.7)
+    # Paso 6: Espejo de las 3 facts a Google Sheets (Fase 3 — sprint 1.7)
     # ------------------------------------------------------------------
-    # Lee tofu_facts desde Supabase y las replica en la pestaña 'tofu_facts'
-    # de la Sheet de cada cliente. Independiente del flag --no-sheets (que
-    # controla el flujo legacy tofu_raw). Se saltea si falta el secret
-    # GOOGLE_SHEETS_SA_JSON. No bloquea el pipeline si falla.
-    sheets_mirror_results: dict[str, dict[str, int]] = {}
+    # Lee tofu_facts + mofu_facts + bofu_facts desde Supabase y las replica
+    # en las 3 pestañas correspondientes de la Sheet del cliente. Aunque el
+    # TOFU pipeline solo actualiza tofu_facts, espejamos también las otras
+    # dos para que la Sheet quede sincronizada en cada cron run (los datos
+    # de MOFU/BOFU vienen del último run del MeisterTask pipeline; el upsert
+    # es idempotente — re-mirrorearlos no rompe nada).
+    #
+    # Independiente del flag --no-sheets (que controla el flujo legacy
+    # tofu_raw). Se saltea si falta el secret GOOGLE_SHEETS_SA_JSON.
+    # No bloquea el pipeline si falla.
+    sheets_mirror_results: dict[str, dict] = {}
     sheets_mirror_errors: list[str] = []
 
     if not facts_errors and "GOOGLE_SHEETS_SA_JSON" in os.environ:
@@ -272,10 +278,10 @@ def main() -> None:
                         client_slug=client_id,
                         spreadsheet_id=str(sheet_id),
                         mirror_tofu=True,
-                        mirror_mofu=False,
-                        mirror_bofu=False,
+                        mirror_mofu=True,
+                        mirror_bofu=True,
                     )
-                    sheets_mirror_results[client_id] = mirror.get("tofu", {})
+                    sheets_mirror_results[client_id] = mirror
                 except Exception as exc:
                     err_msg = f"Mirror sheets falló para cliente={client_id}: {exc}"
                     logger.error(err_msg)
