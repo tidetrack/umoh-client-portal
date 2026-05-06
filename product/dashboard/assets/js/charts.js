@@ -883,11 +883,13 @@ function renderMofu(data) {
   setKPI('mofu-cpl',        fmtCurrency(data.cpl));
   setKPI('mofu-tipif',      fmtPercent(data.tipification_rate));
   setKPI('mofu-highintent', fmtNumber(data.high_intent_leads));
+  setKPI('mofu-closedwon',  fmtNumber(data.closed_won_leads || 0));
 
   _setDelta('delta-mofu-leads',      data.total_leads,       prev.total_leads);
   _setDelta('delta-mofu-cpl',        data.cpl,               prev.cpl,               true);
   _setDelta('delta-mofu-tipif',      data.tipification_rate, prev.tipification_rate);
   _setDelta('delta-mofu-highintent', data.high_intent_leads, prev.high_intent_leads);
+  _setDelta('delta-mofu-closedwon',  data.closed_won_leads,  prev.closed_won_leads);
 
   /* ── MOFU sparklines ── */
   if (data.trend) {
@@ -897,6 +899,7 @@ function renderMofu(data) {
     _renderSparkline('sparkline-mofu-cpl',       src.cpl,   !isUp(src.cpl),      src.labels || []);
     _renderSparkline('sparkline-mofu-tipif',     src.leads, isUp(src.leads),     src.labels || []);
     _renderSparkline('sparkline-mofu-highintent',src.leads, isUp(src.leads),     src.labels || []);
+    _renderSparkline('sparkline-mofu-closedwon', src.leads, isUp(src.leads),     src.labels || []);
   }
 
   /* ── Trend: separate bar charts for Leads and CPL ── */

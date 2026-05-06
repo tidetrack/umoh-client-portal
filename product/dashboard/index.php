@@ -386,7 +386,7 @@ $_asset_v = defined('ASSET_VERSION') ? ASSET_VERSION : filemtime(__DIR__ . '/ass
         <p class="section-subtitle">Efectividad de la estrategia para filtrar y calificar interesados</p>
       </div>
 
-      <div class="kpi-grid kpi-grid--4">
+      <div class="kpi-grid kpi-grid--5">
         <div class="kpi-card" data-kpi="mofu-leads">
           <span class="kpi-label">Leads Totales</span>
           <span class="kpi-value" id="mofu-leads">—</span>
@@ -410,6 +410,12 @@ $_asset_v = defined('ASSET_VERSION') ? ASSET_VERSION : filemtime(__DIR__ . '/ass
           <span class="kpi-value" id="mofu-highintent">—</span>
           <span class="kpi-delta" id="delta-mofu-highintent"></span>
           <canvas class="kpi-sparkline" id="sparkline-mofu-highintent" aria-hidden="true"></canvas>
+        </div>
+        <div class="kpi-card" data-kpi="mofu-closedwon">
+          <span class="kpi-label">Ventas Ganadas</span>
+          <span class="kpi-value" id="mofu-closedwon">—</span>
+          <span class="kpi-delta" id="delta-mofu-closedwon"></span>
+          <canvas class="kpi-sparkline" id="sparkline-mofu-closedwon" aria-hidden="true"></canvas>
         </div>
       </div>
 

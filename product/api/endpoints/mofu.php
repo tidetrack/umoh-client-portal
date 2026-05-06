@@ -122,6 +122,7 @@ try {
     $total_leads = 0;
     $leads_alta_intencion = 0; $leads_contactado = 0; $leads_a_futuro = 0;
     $leads_en_emision = 0; $leads_erroneo = 0; $leads_no_prospera = 0;
+    $leads_closed_won = 0; $leads_typified = 0;
     $segs = [];   // {operatoria_label: count}
 
     foreach ($selected as $d => $bucket) {
@@ -134,8 +135,10 @@ try {
             if ($c['en_emision'])  $leads_en_emision++;
             if ($c['excluded'])    $leads_erroneo++;
             if ($c['lost'])        $leads_no_prospera++;
+            if ($c['closed_won'])  $leads_closed_won++;
 
             $tip = trim($l['tipification'] ?? '');
+            if ($tip !== '') $leads_typified++;
             if ($tip === '') $tip = 'Sin clasificar';
             $segs[$tip] = ($segs[$tip] ?? 0) + 1;
         }
@@ -146,11 +149,12 @@ try {
     foreach ($selected as $d => $_) $period_spend += $spend_by_date[$d] ?? 0;
     $cpl = $total_leads > 0 ? round($period_spend / $total_leads, 2) : 0;
 
-    // En blanco: leads que no encajan en ninguna categoría tipificada
-    $en_blanco = max(0, $total_leads - ($leads_contactado + $leads_no_prospera + $leads_a_futuro
-                   + $leads_en_emision + $leads_erroneo + $leads_alta_intencion));
+    // Tipification rate = leads con campo tipification no vacío / total.
+    // (Antes se usaba "en_blanco" como proxy, pero leads con stage='closed_won'
+    //  no caían en ningún bucket nominado y se contaban como tipificados aunque
+    //  no lo estuvieran — inflaba el rate ~10pts. Ver auditoría 2026-05-05.)
     $tipification_rate = $total_leads > 0
-        ? round(($total_leads - $en_blanco) / $total_leads * 100, 1) : 0;
+        ? round($leads_typified / $total_leads * 100, 1) : 0;
 
     // 8. Trend: leads y CPL por día
     $trend_data = [];
@@ -168,11 +172,12 @@ try {
     if ($prev_d && isset($by_date[$prev_d])) {
         $pr = $by_date[$prev_d];
         $pr_total = $pr['total_leads'];
-        $pr_high = 0; $pr_typified = 0;
+        $pr_high = 0; $pr_typified = 0; $pr_closed_won = 0;
         foreach ($pr['leads'] as $l) {
             $c = $classify($l);
             if ($c['high_intent']) $pr_high++;
             if ($c['typified'])    $pr_typified++;
+            if ($c['closed_won'])  $pr_closed_won++;
         }
         $prev_spend = $spend_by_date[$prev_d] ?? 0;
         $prev = [
@@ -180,6 +185,7 @@ try {
             'cpl'               => $pr_total > 0 ? round($prev_spend / $pr_total, 2) : 0,
             'tipification_rate' => $pr_total > 0 ? round($pr_typified / $pr_total * 100, 1) : 0,
             'high_intent_leads' => $pr_high,
+            'closed_won_leads'  => $pr_closed_won,
         ];
     }
 
@@ -242,6 +248,7 @@ try {
         'cpl'               => $cpl,
         'tipification_rate' => $tipification_rate,
         'high_intent_leads' => $leads_alta_intencion,
+        'closed_won_leads'  => $leads_closed_won,
         'trend' => $trend,
         'status' => [
             'labels' => $status_labels,
