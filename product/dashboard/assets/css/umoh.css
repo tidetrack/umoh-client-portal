@@ -755,14 +755,20 @@ body.nav-hidden .dashboard-nav {
   background: var(--bg-page);
   color: var(--text-primary);
   font-weight: 600;
-  /* La pestaña se conecta al contenido y a la vez tapa la línea roja del
-     nav (::after de .dashboard-nav) en su porción:
-     - margin-bottom -3px: el tab "sale" 3px abajo del nav, cubriendo
-       exactamente la altura de la línea roja
-     - padding-bottom 3px: compensa para que el texto siga centrado
-     - z-index 2: queda encima de la línea (que está en z-index 0)
-     - box-shadow 0 6px 0 bg-page: extiende el bg del tab 6px más hacia
-       abajo cubriendo el padding superior del contenido */
+  /* Borde rojo UMOH en TOP + LEFT + RIGHT — los bordes laterales aterrizan
+     justo donde está la línea horizontal del nav (.dashboard-nav::after),
+     formando un contorno continuo en U invertida alrededor de la pestaña.
+     El bottom no tiene border porque la pestaña se conecta al contenido. */
+  border-top:    3px solid var(--umoh-accent);
+  border-left:   3px solid var(--umoh-accent);
+  border-right:  3px solid var(--umoh-accent);
+  border-bottom: none;
+  /* La pestaña activa es 3px más alta que las inactivas (el border-top
+     extra "sobresale" del nav, efecto pestaña levantada). */
+  height: calc(var(--nav-h) - 1px);
+  /* margin-bottom -3px: el tab muerde 3px del bottom del nav, cubriendo
+     la línea horizontal en su porción y conectando los bordes laterales
+     con la línea continua del nav. */
   margin-bottom: -3px;
   padding-bottom: 3px;
   z-index: 2;
