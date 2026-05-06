@@ -255,7 +255,8 @@ def main() -> None:
     if not facts_errors and "GOOGLE_SHEETS_SA_JSON" in os.environ:
         try:
             from loaders.supabase_writer import SupabaseWriter
-            writer = SupabaseWriter()
+            # Reutilizamos sb (cliente Supabase) ya inicializado en el Paso 5
+            writer = SupabaseWriter(sb)
 
             for raw in raw_results:
                 client_id = raw.get("client_id", "")
