@@ -317,6 +317,13 @@ body {
   overflow-y: auto;
 }
 
+/* El selector de clase tiene mayor especificidad que el atributo [hidden]
+   (que UA-stylesheet aplica display:none). Sin esta regla, popover.hidden
+   = true no oculta el popover porque display:flex de arriba lo sobreescribe. */
+.campaign-selector-popover[hidden] {
+  display: none;
+}
+
 .campaign-option {
   display: flex;
   flex-direction: column;

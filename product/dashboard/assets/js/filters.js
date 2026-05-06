@@ -742,8 +742,11 @@ function initCampaignSelector() {
     _selectCampaign(opt.dataset.campaignId, opt.dataset.campaignName || opt.querySelector('.cs-opt-name')?.textContent || '');
   });
 
+  // Click outside cierra el popover. Usamos contains() en btn (no ===) porque
+  // si el click cae en un descendiente del btn (svg chevron, span name), e.target
+  // sería ese descendiente y un === fallaría incorrectamente.
   document.addEventListener('click', e => {
-    if (!popover.contains(e.target) && e.target !== btn) _closePopover();
+    if (!popover.contains(e.target) && !btn.contains(e.target)) _closePopover();
   });
   document.addEventListener('keydown', e => {
     if (e.key === 'Escape' && !popover.hidden) _closePopover();
