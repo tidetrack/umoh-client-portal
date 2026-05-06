@@ -275,6 +275,7 @@ def write_normalized_data(df: pd.DataFrame) -> None:
 TOFU_FACTS_SHEET_NAME = "tofu_facts"
 MOFU_FACTS_SHEET_NAME = "mofu_facts"
 BOFU_FACTS_SHEET_NAME = "bofu_facts"
+SELLER_FACTS_SHEET_NAME = "seller_facts"
 
 # Cada lista COLUMNS es el orden técnico (matchea Supabase). HEADERS es la lista
 # paralela que se escribe en la fila 1 de la Sheet — nombres legibles en español
@@ -341,6 +342,24 @@ BOFU_FACTS_HEADERS = [
     "Última actualización",
 ]
 BOFU_FACTS_KEY = ["date", "campaign_id"]
+
+SELLER_FACTS_COLUMNS = [
+    "client_slug", "date", "campaign_id", "campaign_name",
+    "seller_name", "seller_email",
+    "leads_assigned", "sales_count", "revenue",
+    "effectiveness", "avg_ticket",
+    "capitas_closed", "avg_cycle_days",
+    "last_computed_at",
+]
+SELLER_FACTS_HEADERS = [
+    "Cliente", "Fecha", "ID Campaña", "Nombre Campaña",
+    "Vendedor", "Email Vendedor",
+    "Leads Asignados", "Ventas", "Ingresos (ARS)",
+    "Efectividad (%)", "Ticket Promedio (ARS)",
+    "Cápitas Cerradas", "Ciclo Promedio (días)",
+    "Última actualización",
+]
+SELLER_FACTS_KEY = ["date", "campaign_id", "seller_name"]
 
 
 def _col_letter(idx: int) -> str:
@@ -577,4 +596,13 @@ def write_bofu_facts(rows: list[dict], spreadsheet_id: str) -> dict[str, int]:
         rows, spreadsheet_id,
         BOFU_FACTS_SHEET_NAME, BOFU_FACTS_COLUMNS, BOFU_FACTS_KEY,
         headers=BOFU_FACTS_HEADERS,
+    )
+
+
+def write_seller_facts(rows: list[dict], spreadsheet_id: str) -> dict[str, int]:
+    """Espeja seller_facts → pestaña 'seller_facts' con upsert por (date, campaign_id, seller_name)."""
+    return write_facts_to_sheet(
+        rows, spreadsheet_id,
+        SELLER_FACTS_SHEET_NAME, SELLER_FACTS_COLUMNS, SELLER_FACTS_KEY,
+        headers=SELLER_FACTS_HEADERS,
     )

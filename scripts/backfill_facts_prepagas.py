@@ -65,7 +65,10 @@ logger = logging.getLogger(__name__)
 # ---------------------------------------------------------------------------
 
 CLIENT_SLUG = "prepagas"
-CAMPAIGN_ID = "PMAX_PREPAGAS"
+# campaign_id real de Google Ads para la PMAX de Prepagas (unificado 2026-05-06).
+# Antes era el placeholder 'PMAX_PREPAGAS' — actualizado tras el UPDATE de
+# limpieza para que los backfills no re-introduzcan filas con el placeholder.
+CAMPAIGN_ID = "23534226120"
 CAMPAIGN_NAME = "PMAX Prevención Salud"
 DEFAULT_DATE_START = "2026-01-01"
 DEFAULT_SHEET_ID = "12iVYwOtU969NVZ1v6kP32GBbv-AUOkqV25KhN1tDAew"

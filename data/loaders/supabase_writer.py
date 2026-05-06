@@ -398,7 +398,7 @@ class SupabaseWriter:
         campaign_id: str,
         campaign_name: str,
     ) -> dict[str, int]:
-        """Llama a los stored procedures compute_mofu_facts y compute_bofu_facts.
+        """Llama a los stored procedures compute_mofu/bofu/seller_facts.
 
         Debe ejecutarse al final de cada run del pipeline MeisterTask, después
         de que todos los leads, lead_section_history y lead_monetary hayan sido
@@ -417,8 +417,9 @@ class SupabaseWriter:
             campaign_name: Nombre legible de la campaña.
 
         Returns:
-            Dict con claves 'mofu_rows' y 'bofu_rows' — filas upserted por cada
-            stored procedure. Ambos valores son 0 si el stored procedure falló.
+            Dict con claves 'mofu_rows', 'bofu_rows' y 'seller_rows' — filas
+            upserted por cada stored procedure. Cada valor es 0 si su procedure
+            falló (los demás siguen ejecutándose — no se aborta encadenado).
         """
         params = {
             "p_client_slug":   client_slug,
@@ -430,6 +431,7 @@ class SupabaseWriter:
 
         mofu_rows = 0
         bofu_rows = 0
+        seller_rows = 0
 
         try:
             result = self._sb.rpc("compute_mofu_facts", params).execute()
@@ -457,6 +459,19 @@ class SupabaseWriter:
                 client_slug, exc,
             )
 
+        try:
+            result = self._sb.rpc("compute_seller_facts", params).execute()
+            seller_rows = result.data if result.data is not None else 0
+            logger.info(
+                "compute_seller_facts completado — cliente=%s filas_upserted=%s",
+                client_slug, seller_rows,
+            )
+        except Exception as exc:
+            logger.error(
+                "compute_seller_facts falló para cliente=%s: %s",
+                client_slug, exc,
+            )
+
         # Calcular las 3 conversion rates en bofu_facts
         self.calcular_conversion_rates(
             client_slug=client_slug,
@@ -465,7 +480,11 @@ class SupabaseWriter:
             campaign_id=campaign_id,
         )
 
-        return {"mofu_rows": mofu_rows, "bofu_rows": bofu_rows}
+        return {
+            "mofu_rows":   mofu_rows,
+            "bofu_rows":   bofu_rows,
+            "seller_rows": seller_rows,
+        }
 
     def calcular_conversion_rates(
         self,
@@ -770,21 +789,21 @@ class SupabaseWriter:
         mirror_tofu: bool = True,
         mirror_mofu: bool = True,
         mirror_bofu: bool = True,
+        mirror_seller: bool = True,
     ) -> dict[str, dict[str, int]]:
         """Espeja las facts tables del cliente a Google Sheets.
 
-        Lee `tofu_facts` / `mofu_facts` / `bofu_facts` desde Supabase y las
-        replica fila-a-fila en pestañas dedicadas de la Sheet del cliente
-        para que pueda auditar los datos crudos.
+        Lee `tofu_facts` / `mofu_facts` / `bofu_facts` / `seller_facts` desde
+        Supabase y las replica fila-a-fila en pestañas dedicadas de la Sheet
+        del cliente para que pueda auditar los datos crudos.
 
-        Cada flag permite saltear una de las 3 tablas — útil para integrar
-        en pipelines parciales (TOFU pipeline solo espeja TOFU, MeisterTask
-        pipeline solo espeja MOFU+BOFU).
+        Cada flag permite saltear una de las 4 tablas — útil para integrar
+        en pipelines parciales.
 
         Args:
             client_slug: Slug del cliente.
             spreadsheet_id: ID de la Google Sheet destino.
-            mirror_tofu/mofu/bofu: flags para activar/saltear cada fase.
+            mirror_tofu/mofu/bofu/seller: flags para activar/saltear cada fase.
 
         Returns:
             Dict por fase con counts: {'tofu': {'updates': N, 'appends': M}, ...}
@@ -793,6 +812,7 @@ class SupabaseWriter:
         # (permite que el pipeline corra sin GOOGLE_SHEETS_SA_JSON si no se usa).
         from loaders.sheets_writer import (
             write_tofu_facts, write_mofu_facts, write_bofu_facts,
+            write_seller_facts,
         )
 
         result: dict[str, dict[str, int]] = {}
@@ -828,6 +848,17 @@ class SupabaseWriter:
             logger.info(
                 "mirror_facts_to_sheets[bofu]: cliente=%s rows=%d %s",
                 client_slug, len(rows), result["bofu"],
+            )
+
+        if mirror_seller:
+            rows = (
+                self._sb.table("seller_facts").select("*")
+                .eq("client_slug", client_slug).execute().data
+            ) or []
+            result["seller"] = write_seller_facts(rows, spreadsheet_id)
+            logger.info(
+                "mirror_facts_to_sheets[seller]: cliente=%s rows=%d %s",
+                client_slug, len(rows), result["seller"],
             )
 
         return result
