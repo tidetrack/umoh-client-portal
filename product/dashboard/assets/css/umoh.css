@@ -1847,40 +1847,204 @@ body {
 .cs-up   { color: #22C55E; }
 .cs-down { color: var(--umoh-accent); }
 
-/* ── Funnel phase legend (MOFU status chart) ─────────────── */
-.funnel-phase-legend {
+/* ── Customer Journey horizontal (MOFU status chart) ────────
+   Visualiza el ciclo de vida del lead como pasos de izquierda
+   a derecha. Cada etapa = columna con barra vertical + footer.
+   El orden de etapas respeta el journey del negocio, no el
+   orden estadístico por volumen.
+   ─────────────────────────────────────────────────────────── */
+
+/* Wrapper externo: ocupa el espacio del canvas oculto */
+.journey-wrap {
   display: flex;
-  flex-wrap: wrap;
-  gap: var(--sp-3) var(--sp-5);
-  padding: var(--sp-3) var(--sp-4) var(--sp-2);
-  border-top: 1px solid var(--border-subtle);
-  margin-top: var(--sp-3);
+  flex-direction: column;
+  gap: var(--sp-3);
+  padding: var(--sp-3) var(--sp-4) var(--sp-4);
+  width: 100%;
 }
 
-.funnel-phase-item {
+/* Header: Total leads como subtítulo del bloque */
+.journey-header {
   display: flex;
+  align-items: baseline;
+  gap: var(--sp-2);
+  padding-bottom: var(--sp-2);
+  border-bottom: 1px solid var(--border-subtle);
+}
+
+.journey-header-label {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.journey-header-value {
+  font-size: 20px;
+  font-weight: 700;
+  color: var(--accent-blue, #63b3ed);
+  font-variant-numeric: tabular-nums;
+  line-height: 1;
+}
+
+.journey-header-pct {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--accent-blue, #63b3ed);
+  opacity: 0.75;
+}
+
+/* Fila de columnas: scroll horizontal si no caben */
+.journey-row {
+  display: flex;
+  align-items: flex-end;
+  gap: 0;
+  overflow-x: auto;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(143,165,168,0.3) transparent;
+  padding-bottom: var(--sp-1);
+}
+
+.journey-row::-webkit-scrollbar { height: 4px; }
+.journey-row::-webkit-scrollbar-thumb {
+  background: rgba(143,165,168,0.3);
+  border-radius: 2px;
+}
+
+/* Cada etapa del journey */
+.journey-col {
+  flex: 1 1 0;
+  min-width: 52px;
+  display: flex;
+  flex-direction: column;
   align-items: center;
+}
+
+/* Inner: barra + footer apilados verticalmente */
+.journey-col-inner {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  width: 100%;
   gap: var(--sp-2);
 }
 
-.funnel-phase-chip {
-  display: inline-block;
-  width: 10px;
-  height: 10px;
-  border-radius: 3px;
-  flex-shrink: 0;
+/* Zona de la barra: altura fija de referencia, barra crece desde abajo */
+.journey-bar-wrap {
+  width: 100%;
+  height: 120px;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  padding: 0 var(--sp-2);
 }
 
-.funnel-phase-label {
-  font-family: var(--font);
-  font-size: 12px;
-  font-weight: 500;
-  color: var(--text-secondary);
+/* La barra coloreada: su height% viene del JS (relativo al máximo de la serie) */
+.journey-bar {
+  width: 100%;
+  max-width: 48px;
+  border-radius: var(--r-sm, 4px) var(--r-sm, 4px) 2px 2px;
+  transition: height 0.5s cubic-bezier(0.4, 0, 0.2, 1);
+  min-height: 4px;
+}
+
+/* Footer de la columna: valor, porcentaje y label */
+.journey-col-footer {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1px;
+  width: 100%;
+  text-align: center;
+}
+
+.journey-col-value {
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--text-primary);
+  font-variant-numeric: tabular-nums;
+  line-height: 1.1;
   white-space: nowrap;
 }
 
-[data-theme="dark"] .funnel-phase-legend {
-  border-top-color: rgba(255, 255, 255, 0.08);
+.journey-col-pct {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text-secondary);
+  font-variant-numeric: tabular-nums;
+}
+
+.journey-col-label {
+  font-size: 10px;
+  font-weight: 600;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 100%;
+  padding: 0 2px;
+}
+
+/* Hover: highlight leve en la barra */
+.journey-col:hover .journey-bar {
+  filter: brightness(1.15);
+}
+
+.journey-col:hover .journey-col-value,
+.journey-col:hover .journey-col-label {
+  color: var(--text-primary);
+}
+
+/* Flecha conectora entre etapas */
+.journey-arrow {
+  flex-shrink: 0;
+  width: 16px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding-bottom: 52px; /* alinear verticalmente con el centro de las barras */
+  color: var(--text-muted);
+  font-size: 12px;
+  font-weight: 600;
+  pointer-events: none;
+  opacity: 0.5;
+}
+
+.journey-arrow::after {
+  content: '→';
+}
+
+/* ── Dark theme overrides ── */
+[data-theme="dark"] .journey-header {
+  border-bottom-color: rgba(255,255,255,0.08);
+}
+
+[data-theme="dark"] .journey-col-value {
+  color: rgba(255,255,255,0.90);
+}
+
+[data-theme="dark"] .journey-col-pct {
+  color: rgba(255,255,255,0.50);
+}
+
+[data-theme="dark"] .journey-col-label {
+  color: rgba(255,255,255,0.38);
+}
+
+[data-theme="dark"] .journey-col:hover .journey-col-value,
+[data-theme="dark"] .journey-col:hover .journey-col-label {
+  color: rgba(255,255,255,0.90);
+}
+
+/* Responsive: en móvil, barras más compactas y font más pequeño */
+@media (max-width: 480px) {
+  .journey-bar-wrap { height: 80px; }
+  .journey-col-value { font-size: 12px; }
+  .journey-col-label { font-size: 9px; }
+  .journey-arrow { width: 10px; font-size: 10px; padding-bottom: 38px; }
 }
 
 .cs-flat { color: var(--text-muted); }
@@ -2025,12 +2189,6 @@ body {
 
   .term-name { width: 140px; max-width: 140px; }
 
-  /* Funnel MOFU — etapas se apilan en mobile */
-  .funnel-phases-row {
-    flex-direction: column;
-    gap: var(--sp-2);
-  }
-
   /* Footer */
   .footer-inner {
     flex-wrap: wrap;
@@ -2057,233 +2215,3 @@ body {
   .nav-tab { padding: 8px 10px; font-size: 12px; }
 }
 
-/* ─────────────────────────────────────────────────────────────
-   Funnel HORIZONTAL — etapas fijas (reemplaza al SVG vertical)
-   ───────────────────────────────────────────────────────────── */
-.funnel-horizontal {
-  display: flex;
-  gap: var(--sp-3);
-  overflow-x: auto;
-  padding: var(--sp-2) var(--sp-1) var(--sp-3);
-  scrollbar-width: thin;
-}
-.funnel-horizontal::-webkit-scrollbar { height: 6px; }
-.funnel-horizontal::-webkit-scrollbar-thumb {
-  background: rgba(143, 165, 168, 0.3);
-  border-radius: 3px;
-}
-
-.funnel-h-card {
-  flex: 1 1 110px;
-  min-width: 110px;
-  max-width: 200px;
-  padding: var(--sp-3) var(--sp-3);
-  background: var(--bg-card-header);
-  border: 1px solid var(--border-subtle);
-  border-radius: var(--r-md);
-  display: flex;
-  flex-direction: column;
-  justify-content: space-between;
-  transition: transform 0.15s ease, box-shadow 0.15s ease;
-}
-.funnel-h-card:hover {
-  transform: translateY(-2px);
-  box-shadow: var(--shadow-md);
-}
-
-.funnel-h-card--total {
-  flex: 0 0 140px;
-  background: linear-gradient(180deg, rgba(99,179,237,0.14), rgba(99,179,237,0.04));
-  border-color: rgba(99,179,237,0.30);
-  position: relative;
-}
-.funnel-h-card--total::after {
-  content: '→';
-  position: absolute;
-  right: -16px;
-  top: 50%;
-  transform: translateY(-50%);
-  color: var(--text-muted);
-  font-size: 18px;
-  font-weight: 600;
-  pointer-events: none;
-  z-index: 2;
-}
-
-.funnel-h-label {
-  font-size: 11px;
-  font-weight: 600;
-  color: var(--text-muted);
-  text-transform: uppercase;
-  letter-spacing: 0.04em;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-.funnel-h-value {
-  font-size: 22px;
-  font-weight: 700;
-  color: var(--text-primary);
-  font-variant-numeric: tabular-nums;
-  line-height: 1.1;
-  margin-top: var(--sp-2);
-}
-.funnel-h-pct {
-  font-size: 12px;
-  color: var(--text-secondary);
-  font-weight: 500;
-  margin-top: 2px;
-}
-.funnel-h-bar {
-  margin-top: var(--sp-3);
-  height: 6px;
-  background: var(--border-subtle);
-  border-radius: 3px;
-  overflow: hidden;
-}
-.funnel-h-bar-fill {
-  height: 100%;
-  border-radius: 3px;
-  transition: width 0.4s ease;
-}
-
-[data-theme="dark"] .funnel-h-card {
-  background: rgba(255,255,255,0.02);
-  border-color: rgba(255,255,255,0.08);
-}
-[data-theme="dark"] .funnel-h-card--total {
-  background: linear-gradient(180deg, rgba(99,179,237,0.18), rgba(99,179,237,0.06));
-  border-color: rgba(99,179,237,0.40);
-}
-[data-theme="dark"] .funnel-h-bar { background: rgba(255,255,255,0.06); }
-
-/* ─────────────────────────────────────────────────────────────
-   Funnel VERTICAL — barras horizontales centradas que se angostan
-   hacia abajo, formando la silueta clásica del embudo de ventas.
-   Reemplaza la vista horizontal de tarjetas en la sección MOFU.
-   ───────────────────────────────────────────────────────────── */
-.funnel-vertical {
-  display: flex;
-  flex-direction: column;
-  gap: var(--sp-2);
-  padding: var(--sp-3) var(--sp-4) var(--sp-4);
-  width: 100%;
-}
-
-/* Cada fila del funnel: meta (label+valor) | barra | porcentaje */
-.funnel-v-row {
-  display: grid;
-  grid-template-columns: 130px 1fr 48px;
-  align-items: center;
-  gap: var(--sp-3);
-  min-height: 36px;
-}
-
-/* El header (Total leads) tiene fila ligeramente más alta y separador */
-.funnel-v-row--header {
-  min-height: 42px;
-  padding-bottom: var(--sp-2);
-  border-bottom: 1px solid var(--border-subtle);
-  margin-bottom: var(--sp-1);
-}
-
-/* Columna izquierda: label arriba, valor abajo */
-.funnel-v-meta {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-  min-width: 0;
-}
-
-.funnel-v-label {
-  font-size: 11px;
-  font-weight: 600;
-  color: var(--text-muted);
-  text-transform: uppercase;
-  letter-spacing: 0.04em;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
-.funnel-v-row--header .funnel-v-label {
-  font-size: 12px;
-  color: var(--text-secondary);
-}
-
-.funnel-v-value {
-  font-size: 16px;
-  font-weight: 700;
-  color: var(--text-primary);
-  font-variant-numeric: tabular-nums;
-  line-height: 1;
-}
-
-.funnel-v-row--header .funnel-v-value {
-  font-size: 20px;
-  color: var(--accent-blue, #63b3ed);
-}
-
-/* Columna central: pista completa donde vive la barra centrada */
-.funnel-v-track {
-  width: 100%;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-
-/* La barra coloreada — su width% viene del JS y es relativo al total */
-.funnel-v-bar {
-  height: 28px;
-  border-radius: var(--r-sm, 4px);
-  transition: width 0.5s cubic-bezier(0.4, 0, 0.2, 1);
-  /* La barra se centra dentro del track, creando la silueta del embudo */
-  margin: 0 auto;
-  /* Ancho mínimo para que nunca desaparezca visualmente */
-  min-width: 4px;
-}
-
-.funnel-v-row--header .funnel-v-bar {
-  height: 34px;
-  border-radius: var(--r-md, 6px);
-}
-
-/* Columna derecha: porcentaje alineado */
-.funnel-v-pct {
-  font-size: 12px;
-  font-weight: 600;
-  color: var(--text-secondary);
-  text-align: right;
-  white-space: nowrap;
-  font-variant-numeric: tabular-nums;
-}
-
-.funnel-v-row--header .funnel-v-pct {
-  font-size: 13px;
-  color: var(--accent-blue, #63b3ed);
-  font-weight: 700;
-}
-
-/* Hover: leve highlight de fila */
-.funnel-v-row:not(.funnel-v-row--header):hover .funnel-v-bar {
-  filter: brightness(1.15);
-  transition: filter 0.15s ease, width 0.5s cubic-bezier(0.4, 0, 0.2, 1);
-}
-.funnel-v-row:not(.funnel-v-row--header):hover .funnel-v-label,
-.funnel-v-row:not(.funnel-v-row--header):hover .funnel-v-value {
-  color: var(--text-primary);
-}
-
-/* ── Dark theme overrides ── */
-[data-theme="dark"] .funnel-v-row--header {
-  border-bottom-color: rgba(255,255,255,0.08);
-}
-[data-theme="dark"] .funnel-v-label {
-  color: rgba(255,255,255,0.45);
-}
-[data-theme="dark"] .funnel-v-row--header .funnel-v-label {
-  color: rgba(255,255,255,0.55);
-}
-[data-theme="dark"] .funnel-v-pct {
-  color: rgba(255,255,255,0.50);
-}

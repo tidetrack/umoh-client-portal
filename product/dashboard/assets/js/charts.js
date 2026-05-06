@@ -688,31 +688,30 @@ function renderMofu(data) {
     });
   }
 
-  /* ── Status: funnel VERTICAL — barras centradas que se angostan hacia abajo ──
-     El header muestra el total (barra al 100%). Cada etapa siguiente tiene una
-     barra proporcional al porcentaje del total, centrada, formando la silueta
-     del embudo de ventas. Los datos vienen de data.status sin modificación. */
+  /* ── Status: Customer Journey horizontal ──────────────────────────────────
+     Visualiza las etapas del proceso de ventas de izquierda a derecha,
+     respetando el orden semántico del journey tal como viene en data.status.labels.
+     Cada etapa es una columna con barra vertical cuya altura es proporcional al
+     valor. No se ordena por cantidad — el orden del backend es el orden del negocio.
+     El header "Total leads" aparece como título del bloque, fuera de las columnas. */
   _destroyChart('chart-status');
   const ctxSt = document.getElementById('chart-status');
   if (ctxSt && data.status) {
-    // Limpiar cualquier render anterior (SVG, leyenda, horizontales, verticales)
+    // Limpiar cualquier render anterior (todas las variantes históricas)
     const prevSvg = ctxSt.parentElement.querySelector('.umoh-funnel');
     if (prevSvg) prevSvg.remove();
     const prevTip = document.getElementById('umoh-funnel-tip');
     if (prevTip) prevTip.remove();
-    const prevLegend = ctxSt.parentElement.querySelector('.funnel-phase-legend');
-    if (prevLegend) prevLegend.remove();
-    const prevHorizontal = ctxSt.parentElement.querySelector('.funnel-horizontal');
-    if (prevHorizontal) prevHorizontal.remove();
-    const prevVertical = ctxSt.parentElement.querySelector('.funnel-vertical');
-    if (prevVertical) prevVertical.remove();
+    const prevJourney = ctxSt.parentElement.querySelector('.journey-wrap');
+    if (prevJourney) prevJourney.remove();
     ctxSt.style.display = 'none';
 
     const labels = data.status.labels;
     const vals   = data.status.data;
     const total  = vals.reduce((a, b) => a + b, 0);
+    const maxVal = Math.max(...vals);
 
-    // 4 azules degradados → 2 ámbar → 1 verde (ciclo de vida del lead)
+    // 4 azules degradados → 2 ámbar → 1 verde (ciclo de vida del lead, por índice fijo)
     const statusColors = [
       'rgba(99,179,237,0.90)',
       'rgba(99,179,237,0.68)',
@@ -723,50 +722,64 @@ function renderMofu(data) {
       CHART_PALETTE.green.solid,
     ];
 
-    const container = document.createElement('div');
-    container.className = 'funnel-vertical';
+    // Contenedor principal del journey
+    const wrap = document.createElement('div');
+    wrap.className = 'journey-wrap';
 
-    // Fila 0: header — Total leads al 100% del ancho
-    const headerRow = document.createElement('div');
-    headerRow.className = 'funnel-v-row funnel-v-row--header';
-    headerRow.innerHTML = `
-      <div class="funnel-v-meta">
-        <span class="funnel-v-label">Total leads</span>
-        <span class="funnel-v-value">${fmtNumber(total)}</span>
-      </div>
-      <div class="funnel-v-track">
-        <div class="funnel-v-bar" style="width:100%;background:${CHART_PALETTE.blue.solid}"></div>
-      </div>
-      <div class="funnel-v-pct">100%</div>
+    // Header: Total leads como título flotante del bloque
+    const header = document.createElement('div');
+    header.className = 'journey-header';
+    header.innerHTML = `
+      <span class="journey-header-label">Total leads</span>
+      <span class="journey-header-value">${fmtNumber(total)}</span>
+      <span class="journey-header-pct">100%</span>
     `;
-    container.appendChild(headerRow);
+    wrap.appendChild(header);
 
-    // Filas 1..N: cada etapa — ancho = (valor / total) * 100%
+    // Fila de columnas: una por etapa del journey
+    const row = document.createElement('div');
+    row.className = 'journey-row';
+
     labels.forEach((label, i) => {
-      const v     = vals[i] || 0;
-      const pct   = total > 0 ? ((v / total) * 100) : 0;
-      const pctFmt = pct.toFixed(1) + '%';
-      // Ancho mínimo del 4% para que etapas con cero valor sigan siendo visibles
-      const barW  = Math.max(pct, v > 0 ? 4 : 0).toFixed(1) + '%';
-      const color = statusColors[i % statusColors.length];
+      const v       = vals[i] || 0;
+      const pct     = total > 0 ? ((v / total) * 100) : 0;
+      const pctFmt  = pct.toFixed(1) + '%';
+      // Altura relativa al valor máximo de la serie (no al total)
+      // Mínimo 6% para que etapas con cero valor tengan presencia visual
+      const barH    = maxVal > 0 ? Math.max((v / maxVal) * 100, v > 0 ? 6 : 0) : 0;
+      const color   = statusColors[i % statusColors.length];
+      const isLast  = i === labels.length - 1;
 
-      const row = document.createElement('div');
-      row.className = 'funnel-v-row';
-      row.setAttribute('title', `${label}: ${fmtNumber(v)} leads (${pctFmt})`);
-      row.innerHTML = `
-        <div class="funnel-v-meta">
-          <span class="funnel-v-label">${label}</span>
-          <span class="funnel-v-value">${fmtNumber(v)}</span>
+      const col = document.createElement('div');
+      col.className = 'journey-col';
+      col.setAttribute('title', `${label}: ${fmtNumber(v)} leads (${pctFmt})`);
+
+      col.innerHTML = `
+        <div class="journey-col-inner">
+          <div class="journey-bar-wrap">
+            <div class="journey-bar" style="height:${barH.toFixed(1)}%;background:${color};"></div>
+          </div>
+          <div class="journey-col-footer">
+            <span class="journey-col-value">${fmtNumber(v)}</span>
+            <span class="journey-col-pct">${pctFmt}</span>
+            <span class="journey-col-label">${label}</span>
+          </div>
         </div>
-        <div class="funnel-v-track">
-          <div class="funnel-v-bar" style="width:${barW};background:${color}"></div>
-        </div>
-        <div class="funnel-v-pct">${pctFmt}</div>
       `;
-      container.appendChild(row);
+
+      row.appendChild(col);
+
+      // Flecha conectora entre etapas (no después de la última)
+      if (!isLast) {
+        const arrow = document.createElement('div');
+        arrow.className = 'journey-arrow';
+        arrow.setAttribute('aria-hidden', 'true');
+        row.appendChild(arrow);
+      }
     });
 
-    ctxSt.parentElement.appendChild(container);
+    wrap.appendChild(row);
+    ctxSt.parentElement.appendChild(wrap);
   }
 
   /* ── Segments donut ── */
