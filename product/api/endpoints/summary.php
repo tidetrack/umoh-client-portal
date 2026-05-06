@@ -140,64 +140,113 @@ try {
         ];
     }
 
-    // 8. Ranking de vendedores (por assignee). Solo leads de campaña.
-    //    Métricas por vendedor:
-    //      leads          — leads totales asignados (en período)
-    //      sales          — ventas cerradas (lead_monetary.is_closed=true) en período
-    //      revenue        — sumatoria precio_final
-    //      effectiveness  — sales / leads * 100
-    //      avg_cycle_days — promedio (status_updated_at - lead_created_at) de los cerrados
-    //      avg_ticket     — revenue / sales
-    $sales_by_lead = [];
-    foreach ($closed as $c) {
-        $sales_by_lead[$c['meistertask_id']] = [
-            'price' => (float)($c['precio_final'] ?? 0),
-            'date'  => substr($c['updated_at'] ?? '', 0, 10),
-        ];
-    }
+    // 8. Ranking + summary de vendedores — lee de seller_facts (migración 012)
+    //    en vez de calcular runtime. Esto cierra el bug de la card "Mejor
+    //    Vendedor / Efectividad Promedio / Ciclo Promedio..." en Performance,
+    //    que no se renderizaba porque el endpoint no devolvía sellers_summary.
+    $period_days_seller = (strtotime($end) - strtotime($start)) / 86400 + 1;
+    $prev_end_seller   = date('Y-m-d', strtotime($start) - 86400);
+    $prev_start_seller = date('Y-m-d', strtotime($prev_end_seller) - ($period_days_seller - 1) * 86400);
 
-    $sellers_agg = [];
-    foreach ($leads as $l) {
-        if (empty($l['is_campaign_lead'])) continue;
-        $name    = trim($l['assignee'] ?? '');
-        if ($name === '' || strtolower($name) === 'umoh crew') continue;
-        $created = substr($l['lead_created_at'] ?? '', 0, 10);
-        if ($created === '' || $created < $start || $created > $end) continue;
+    // Helper: lee seller_facts en un rango y agrega por seller_name.
+    $aggregate_sellers = function(string $rs, string $re) {
+        $rows = supabase_query('seller_facts', [
+            'client_slug' => 'eq.' . CLIENT_SLUG,
+            'date'        => 'gte.' . $rs,
+            'select'      => 'seller_name,leads_assigned,sales_count,revenue,capitas_closed,avg_cycle_days,date',
+            'limit'       => '5000',
+        ]);
+        $rows = array_filter($rows, fn($r) => ($r['date'] ?? '') <= $re);
 
-        if (!isset($sellers_agg[$name])) {
-            $sellers_agg[$name] = ['leads' => 0, 'sales' => 0, 'revenue' => 0.0, 'cycle_sum' => 0, 'cycle_count' => 0];
-        }
-        $sellers_agg[$name]['leads']++;
-
-        $sale = $sales_by_lead[$l['meistertask_id']] ?? null;
-        if ($sale && $sale['date'] >= $start && $sale['date'] <= $end) {
-            $sellers_agg[$name]['sales']++;
-            $sellers_agg[$name]['revenue'] += $sale['price'];
-
-            $st_upd = $l['status_updated_at'] ?? null;
-            if ($st_upd && $created) {
-                $diff = (strtotime(substr($st_upd, 0, 10)) - strtotime($created)) / 86400;
-                if ($diff >= 0) {
-                    $sellers_agg[$name]['cycle_sum']   += $diff;
-                    $sellers_agg[$name]['cycle_count']++;
-                }
+        $agg = [];
+        foreach ($rows as $r) {
+            $name = $r['seller_name'] ?? '';
+            if ($name === '') continue;
+            if (!isset($agg[$name])) {
+                $agg[$name] = [
+                    'leads' => 0, 'sales' => 0, 'revenue' => 0.0,
+                    'capitas' => 0, 'cycle_weighted' => 0.0,
+                ];
             }
+            $sales = (int)($r['sales_count'] ?? 0);
+            $agg[$name]['leads']          += (int)($r['leads_assigned'] ?? 0);
+            $agg[$name]['sales']          += $sales;
+            $agg[$name]['revenue']        += (float)($r['revenue'] ?? 0);
+            $agg[$name]['capitas']        += (int)($r['capitas_closed'] ?? 0);
+            $agg[$name]['cycle_weighted'] += (float)($r['avg_cycle_days'] ?? 0) * $sales;
         }
-    }
+        return $agg;
+    };
 
-    $sellers = [];
-    foreach ($sellers_agg as $name => $s) {
-        $sellers[] = [
+    $curr_sellers = $aggregate_sellers($start, $end);
+    $prev_sellers = $aggregate_sellers($prev_start_seller, $prev_end_seller);
+
+    // 8a. Lista detallada de sellers (formato esperado por _renderSellersTable)
+    $build_seller_row = function(string $name, array $s) {
+        $cycle = $s['sales'] > 0 ? round($s['cycle_weighted'] / $s['sales'], 1) : 0.0;
+        return [
             'name'           => $name,
             'leads'          => $s['leads'],
             'sales'          => $s['sales'],
             'revenue'        => round($s['revenue'], 2),
             'effectiveness'  => $s['leads'] > 0 ? round($s['sales'] / $s['leads'] * 100, 1) : 0,
-            'avg_cycle_days' => $s['cycle_count'] > 0 ? round($s['cycle_sum'] / $s['cycle_count'], 1) : 0,
             'avg_ticket'     => $s['sales'] > 0 ? round($s['revenue'] / $s['sales'], 2) : 0,
+            'capitas'        => $s['capitas'],
+            'cycle_days'     => $cycle,
+            'avg_cycle_days' => $cycle,
         ];
+    };
+
+    $sellers = [];
+    foreach ($curr_sellers as $name => $s) {
+        $row = $build_seller_row($name, $s);
+        if (isset($prev_sellers[$name])) {
+            $row['prev'] = $build_seller_row($name, $prev_sellers[$name]);
+        }
+        $sellers[] = $row;
     }
     usort($sellers, fn($a, $b) => $b['sales'] <=> $a['sales'] ?: $b['revenue'] <=> $a['revenue']);
+
+    // 8b. sellers_summary — los 6 KPIs agregados que muestra _renderCommercialSummary
+    //     en la card "Resumen Comercial" del Performance. Faltaba este bloque
+    //     en el JSON, por eso la card no se renderizaba (return temprano si !s).
+    $build_seller_summary = function(array $rows) {
+        if (empty($rows)) {
+            return [
+                'top_seller'           => '—',
+                'avg_effectiveness'    => 0.0,
+                'total_sales'          => 0,
+                'avg_cycle_days'       => 0.0,
+                'avg_ticket'           => 0.0,
+                'avg_capitas_per_sale' => 0.0,
+            ];
+        }
+        // Top seller = el que tiene más ventas (tiebreaker: revenue)
+        $top = array_keys($rows)[0]; $top_score = -1; $top_rev = -1;
+        $total_leads = 0; $total_sales = 0; $total_revenue = 0.0;
+        $total_capitas = 0; $cycle_weighted_total = 0.0;
+        foreach ($rows as $name => $s) {
+            if ($s['sales'] > $top_score || ($s['sales'] === $top_score && $s['revenue'] > $top_rev)) {
+                $top = $name; $top_score = $s['sales']; $top_rev = $s['revenue'];
+            }
+            $total_leads          += $s['leads'];
+            $total_sales          += $s['sales'];
+            $total_revenue        += $s['revenue'];
+            $total_capitas        += $s['capitas'];
+            $cycle_weighted_total += $s['cycle_weighted'];
+        }
+        return [
+            'top_seller'           => $top,
+            'avg_effectiveness'    => $total_leads > 0 ? round($total_sales / $total_leads * 100, 1) : 0.0,
+            'total_sales'          => $total_sales,
+            'avg_cycle_days'       => $total_sales > 0 ? round($cycle_weighted_total / $total_sales, 1) : 0.0,
+            'avg_ticket'           => $total_sales > 0 ? round($total_revenue / $total_sales, 2) : 0.0,
+            'avg_capitas_per_sale' => $total_sales > 0 ? round($total_capitas / $total_sales, 2) : 0.0,
+        ];
+    };
+
+    $sellers_summary = $build_seller_summary($curr_sellers);
+    $sellers_summary['prev'] = $build_seller_summary($prev_sellers);
 
     echo json_encode([
         'revenue'      => round($revenue, 2),
@@ -211,7 +260,8 @@ try {
             'closed_sales'  => $nc_sales,
             'total_revenue' => round($nc_revenue, 2),
         ],
-        'sellers'      => $sellers,
+        'sellers'         => $sellers,
+        'sellers_summary' => $sellers_summary,
         'prev'         => $prev,
     ], JSON_UNESCAPED_UNICODE);
 
