@@ -642,12 +642,13 @@ const _JOURNEY_PHASE_MAP = {
 };
 
 // Configuración de las bandas de sub-fases (cols = número de columnas del journey en esa fase)
+// sections: nombres exactos de etapas que pertenecen a esta sub-fase (para calcular totales por nombre, sin asumir índices)
 const _JOURNEY_PHASES_DEF = [
-  { name: 'Entrada',        color: '#63b3ed', cols: 2 },
-  { name: 'Seguimiento',    color: '#4299e1', cols: 3 },
-  { name: 'Alta intención', color: '#f6ad55', cols: 3 },
-  { name: 'Incubando',      color: '#b794f4', cols: 2 },
-  { name: 'Resultado',      color: '#68d391', cols: 3 },
+  { name: 'Entrada',        color: '#63b3ed', cols: 2, sections: ['Inbox', 'Nuevo'] },
+  { name: 'Seguimiento',    color: '#4299e1', cols: 3, sections: ['Para Hoy', 'Procesando', 'Contactados'] },
+  { name: 'Alta intención', color: '#f6ad55', cols: 3, sections: ['Prioritarios', 'Cotizados', 'En Auditoria'] },
+  { name: 'Incubando',      color: '#b794f4', cols: 2, sections: ['Mes que viene', 'A futuro'] },
+  { name: 'Resultado',      color: '#68d391', cols: 3, sections: ['Ventas Ganadas', 'No prospera', 'Erroneos'] },
 ];
 
 /**
@@ -680,6 +681,13 @@ function _renderJourney(data) {
   const total        = vals.reduce((a, b) => a + b, 0);
   const maxVal       = Math.max(...vals, 1);
   const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+  // Totales por sub-fase: suma de vals cuyo label pertenece a phase.sections (match por nombre, no por índice)
+  const phaseTotals = _JOURNEY_PHASES_DEF.map(function(phase) {
+    return filteredPairs.reduce(function(sum, pair) {
+      return phase.sections.indexOf(pair.label) !== -1 ? sum + pair.val : sum;
+    }, 0);
+  });
 
   /* ── RE-RENDER INCREMENTAL ──────────────────────────────────
      Si la wrap ya existe (el usuario cambió el período),
@@ -716,6 +724,14 @@ function _renderJourney(data) {
 
     const headerVal = existingWrap.querySelector('.journey-header-value');
     if (headerVal) headerVal.textContent = fmtNumber(total);
+
+    // Actualizar totales de la banda de sub-fases
+    const phaseBands = existingWrap.querySelectorAll('.journey-phase-band');
+    phaseBands.forEach(function(band, i) {
+      const totalEl = band.querySelector('.journey-phase-total');
+      if (totalEl && phaseTotals[i] !== undefined) totalEl.textContent = fmtNumber(phaseTotals[i]);
+    });
+
     return; // No reconstruir el DOM
   }
 
@@ -777,14 +793,17 @@ function _renderJourney(data) {
   // Banda de sub-fases
   const phasesEl = document.createElement('div');
   phasesEl.className = 'journey-phases';
-  _JOURNEY_PHASES_DEF.forEach(function(phase) {
+  _JOURNEY_PHASES_DEF.forEach(function(phase, pi) {
     const band = document.createElement('div');
     band.className = 'journey-phase-band';
     band.style.setProperty('--phase-cols', phase.cols);
     band.style.setProperty('--phase-color', phase.color);
     band.innerHTML =
       '<div class="journey-phase-bar"></div>' +
-      '<span class="journey-phase-label">' + phase.name + '</span>';
+      '<div class="journey-phase-caption">' +
+        '<span class="journey-phase-label">' + phase.name + '</span>' +
+        '<span class="journey-phase-total">' + fmtNumber(phaseTotals[pi]) + '</span>' +
+      '</div>';
     phasesEl.appendChild(band);
   });
   wrap.appendChild(phasesEl);

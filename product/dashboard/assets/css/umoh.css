@@ -1929,6 +1929,14 @@ body {
   opacity: 0.55;
 }
 
+/* Contenedor inline: label + total lado a lado */
+.journey-phase-caption {
+  display: flex;
+  align-items: baseline;
+  gap: 4px;
+  min-width: 0;
+}
+
 .journey-phase-label {
   font-size: 9px;
   font-weight: 700;
@@ -1939,6 +1947,19 @@ body {
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+  flex-shrink: 1;
+  min-width: 0;
+}
+
+/* Total acumulado de leads por sub-fase */
+.journey-phase-total {
+  font-size: 10px;
+  font-weight: 800;
+  color: var(--phase-color, var(--text-muted));
+  opacity: 1;
+  white-space: nowrap;
+  flex-shrink: 0;
+  letter-spacing: 0;
 }
 
 /* Fila de columnas: scroll horizontal si no caben */
