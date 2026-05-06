@@ -483,11 +483,21 @@ class SupabaseWriter:
         Las 3 fórmulas:
           - conversion_rate_acumulado: SUM(sales_count en bofu_facts hasta hoy) /
               SUM(total_leads en mofu_facts hasta hoy) * 100
-          - conversion_rate_mes: SUM(sales_count donde date IN mes_de(bofu_date)) /
-              SUM(total_leads donde date IN mes_de(bofu_date)) * 100
-              Es la MÉTRICA PRIMARIA del cliente.
+              Sin cambio respecto a la implementación anterior.
+
+          - conversion_rate_mes (COHORT): ventas de leads creados en el mes /
+              leads creados en el mes. El denominador y el numerador se anclan
+              al mes de CREACIÓN del lead, no al mes de cierre.
+              Fórmula: COUNT(leads donde lead_created_at IN mes_X Y is_closed_won=true)
+                       / COUNT(leads donde lead_created_at IN mes_X) * 100
+              Esto garantiza que el rate esté siempre entre 0% y 100%, porque
+              el numerador es un subconjunto del denominador (misma cohorte).
+              Los leads se leen de la tabla `leads` JOINada con `funnel_stages`
+              para resolver el flag is_closed_won por section_name.
+
           - conversion_rate_30d: SUM(sales_count últimos 30 días) /
               SUM(total_leads últimos 30 días) * 100
+              Sin cambio respecto a la implementación anterior.
 
         El cálculo se hace por cada fila de bofu_facts para el cliente y rango.
         Para cada fila (date, campaign_id), la tasa acumulada usa todos los datos
@@ -522,7 +532,8 @@ class SupabaseWriter:
             return 0
 
         # Obtener TODOS los leads de mofu_facts para este cliente+campaña
-        # (sin filtro de fecha — necesitamos el acumulado histórico completo)
+        # (sin filtro de fecha — necesitamos el acumulado histórico completo
+        # para conversion_rate_acumulado y conversion_rate_30d)
         mofu_resp = (
             self._sb.table("mofu_facts")
             .select("date, total_leads")
@@ -532,12 +543,29 @@ class SupabaseWriter:
         )
         mofu_rows = mofu_resp.data or []
 
-        # Indexar mofu por fecha para lookups rápidos
+        # Indexar mofu por fecha para lookups rápidos (usado por acumulado y 30d)
         mofu_by_date: dict[str, int] = {
             row["date"]: row["total_leads"] for row in mofu_rows
         }
 
+        # ------------------------------------------------------------------
+        # Precalcular cohort por mes para conversion_rate_mes (Opción B).
+        #
+        # Se consultan todos los leads del cliente desde `leads` JOINando con
+        # `funnel_stages` para resolver is_closed_won por section_name. La tabla
+        # `leads` no tiene campaign_id — el cohort es a nivel cliente, no campaña.
+        # Esto es consistente con cómo mofu_facts agrega leads: por fecha de entrada
+        # al pipeline, no por campaña individual.
+        #
+        # cohort_by_mes[mes_prefix] = {
+        #     'total':  int,   # leads creados en el mes (denominador)
+        #     'closed': int,   # de esos leads, cuántos tienen is_closed_won=true (numerador)
+        # }
+        # ------------------------------------------------------------------
+        cohort_by_mes = self._calcular_cohort_por_mes(client_slug)
+
         updated_count = 0
+        rate_mes = 0.0  # se sobreescribe en el loop; se usa en el log final
 
         for bofu_row in bofu_rows:
             bofu_date_str = bofu_row["date"]
@@ -568,22 +596,16 @@ class SupabaseWriter:
                 round(sales_acum / leads_acum * 100, 2) if leads_acum > 0 else 0.0
             )
 
-            # ---- conversion_rate_mes ----
-            # Ventas del mes de bofu_date / Leads del mismo mes
-            # Mes se define como year-month del bofu_date
+            # ---- conversion_rate_mes (COHORT — Opción B) ----
+            # Numerador: leads creados en el mes de bofu_date que tienen is_closed_won=true
+            # Denominador: todos los leads creados en el mes de bofu_date
+            # Fuente: cohort_by_mes precalculado desde la tabla `leads`
             mes_prefix = bofu_date_str[:7]  # 'YYYY-MM'
-            sales_mes = sum(
-                r.get("sales_count", 0) or 0
-                for r in bofu_rows
-                if r["date"][:7] == mes_prefix
-            )
-            leads_mes = sum(
-                leads
-                for date_str, leads in mofu_by_date.items()
-                if date_str[:7] == mes_prefix
-            )
+            cohort = cohort_by_mes.get(mes_prefix, {'total': 0, 'closed': 0})
             rate_mes = (
-                round(sales_mes / leads_mes * 100, 2) if leads_mes > 0 else 0.0
+                round(cohort['closed'] / cohort['total'] * 100, 2)
+                if cohort['total'] > 0
+                else 0.0
             )
 
             # ---- conversion_rate_30d ----
@@ -623,12 +645,102 @@ class SupabaseWriter:
 
         logger.info(
             "calcular_conversion_rates: cliente=%s filas_actualizadas=%d "
-            "(rate_mes de la última fila=%.2f%%)",
+            "(rate_mes cohort de la última fila=%.2f%%)",
             client_slug,
             updated_count,
-            rate_mes if bofu_rows else 0.0,
+            rate_mes,
         )
         return updated_count
+
+    def _calcular_cohort_por_mes(self, client_slug: str) -> dict[str, dict[str, int]]:
+        """Precalcula el cohort de leads por mes de creación para conversion_rate_mes.
+
+        Consulta la tabla `leads` y la tabla `funnel_stages` para saber qué leads
+        están en secciones con is_closed_won=true. Agrupa por el mes de lead_created_at
+        y cuenta total de leads y leads cerrados por mes.
+
+        La tabla `leads` no tiene campaign_id — el cohort es a nivel cliente. Esto
+        es consistente con cómo mofu_facts agrega leads en compute_mofu_facts.
+
+        Fuentes:
+          - leads.lead_created_at  → mes de creación del lead (YYYY-MM)
+          - leads.section          → sección actual del lead en MeisterTask
+          - funnel_stages.is_closed_won → true si esa sección es "Ventas Ganadas"
+            (o equivalente según config del cliente)
+
+        Args:
+            client_slug: Slug del cliente.
+
+        Returns:
+            Dict keyed por mes_prefix 'YYYY-MM', con subdict:
+              {'total': int, 'closed': int}
+            Ejemplo: {'2026-03': {'total': 120, 'closed': 18}, ...}
+            Meses sin leads devuelven {'total': 0, 'closed': 0} via .get() en el caller.
+        """
+        # Traer todos los leads del cliente con su sección actual y fecha de creación
+        leads_resp = (
+            self._sb.table("leads")
+            .select("lead_created_at, section")
+            .eq("client_slug", client_slug)
+            .execute()
+        )
+        leads_data = leads_resp.data or []
+
+        if not leads_data:
+            logger.info(
+                "_calcular_cohort_por_mes: sin leads para cliente=%s", client_slug
+            )
+            return {}
+
+        # Traer las secciones con is_closed_won=true para este cliente
+        stages_resp = (
+            self._sb.table("funnel_stages")
+            .select("section_name, is_closed_won")
+            .eq("client_slug", client_slug)
+            .eq("is_active", True)
+            .execute()
+        )
+        stages_data = stages_resp.data or []
+
+        # Set de nombres de sección que representan una venta cerrada
+        closed_won_sections: set[str] = {
+            row["section_name"]
+            for row in stages_data
+            if row.get("is_closed_won") is True
+        }
+
+        logger.debug(
+            "_calcular_cohort_por_mes: cliente=%s secciones_closed_won=%s",
+            client_slug, closed_won_sections,
+        )
+
+        # Agregar leads por mes de creación
+        cohort: dict[str, dict[str, int]] = {}
+
+        for lead in leads_data:
+            created_at_str = lead.get("lead_created_at")
+            if not created_at_str:
+                # Lead sin fecha de creación — no puede asignarse a ningún cohort
+                continue
+
+            # Extraer YYYY-MM del timestamp ISO (puede ser '2026-03-15T10:30:00+00:00')
+            mes_prefix = str(created_at_str)[:7]
+
+            if mes_prefix not in cohort:
+                cohort[mes_prefix] = {"total": 0, "closed": 0}
+
+            cohort[mes_prefix]["total"] += 1
+
+            section = lead.get("section", "")
+            if section in closed_won_sections:
+                cohort[mes_prefix]["closed"] += 1
+
+        logger.info(
+            "_calcular_cohort_por_mes: cliente=%s meses_calculados=%d "
+            "total_leads_procesados=%d",
+            client_slug, len(cohort), len(leads_data),
+        )
+        return cohort
 
 
 # ---------------------------------------------------------------------------
