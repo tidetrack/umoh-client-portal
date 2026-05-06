@@ -28,9 +28,11 @@ const CLIENT_SLUG = 'prepagas';
 
 try {
     // 1. Funnel stages config: section_name → flags (high_intent, lost, incubating, etc.)
+    //    Incluye display_order para construir el journey en el mismo orden que el CRM.
     $stages = supabase_query('funnel_stages', [
         'client_slug' => 'eq.' . CLIENT_SLUG,
-        'select'      => 'section_name,funnel_stage,is_high_intent,is_closed_won,is_typified,is_lost,is_incubating',
+        'select'      => 'section_name,funnel_stage,is_high_intent,is_closed_won,is_typified,is_lost,is_incubating,display_order',
+        'order'       => 'display_order.asc',
     ]);
     $stage_by_section = [];
     foreach ($stages as $s) {
@@ -181,11 +183,33 @@ try {
         ];
     }
 
-    // 10. Status breakdown — etiquetas que el frontend espera
+    // 10. Status breakdown — 14 columnas literales de MeisterTask, en orden del journey.
+    //    Se construye a partir de $stage_by_section (ya ordenado por display_order.asc).
+    //    Se cuentan solo campaign_leads del período seleccionado.
+    //    Las secciones con stage='excluded' (Erroneos, Tareas Finalizadas) se incluyen:
+    //    Erroneos aporta información de calidad del lead; Tareas Finalizadas indica
+    //    limpieza del CRM. Franco confirma si quiere excluirlas del render frontend.
     $C = COLORS;
-    $status_labels = ['Cargado 100%', 'Contactado', 'En emisión', 'A futuro', 'No prospera', 'Erróneo', 'En blanco'];
-    $status_data   = [$leads_alta_intencion, $leads_contactado, $leads_en_emision,
-                      $leads_a_futuro, $leads_no_prospera, $leads_erroneo, $en_blanco];
+
+    // Inicializar mapa sección → count, respetando el orden del journey
+    $status_counts = [];
+    foreach ($stage_by_section as $name => $_cfg) {
+        $status_counts[$name] = 0;
+    }
+
+    // Contar campaign_leads del período por sección
+    foreach ($selected as $_d => $bucket) {
+        foreach ($bucket['leads'] as $l) {
+            $sec = $l['section'] ?? '';
+            if (array_key_exists($sec, $status_counts)) {
+                $status_counts[$sec]++;
+            }
+        }
+    }
+
+    // Construir arrays de labels y data en el mismo orden del journey
+    $status_labels = array_keys($status_counts);
+    $status_data   = array_values($status_counts);
 
     // Segmentos: top 5 operatorias por count
     arsort($segs);
@@ -222,7 +246,9 @@ try {
         'status' => [
             'labels' => $status_labels,
             'data'   => $status_data,
-            'colors' => [$C['navy'], $C['slate'], $C['accent'], $C['silver'], $C['mist'], $C['light'], '#E8EDF2'],
+            // Colors are overridden by charts.js semantic palette; this array is a
+            // structural placeholder with the correct length for schema validation.
+            'colors' => array_fill(0, count($status_labels), $C['slate']),
         ],
         'segments' => [
             'labels' => $seg_labels,

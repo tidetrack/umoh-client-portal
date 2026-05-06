@@ -434,8 +434,10 @@ const MOCK_DATA = {
         }
       },
       status: {
-        labels: ['Contactado', 'Erróneo', 'No prospera', 'A futuro', 'Cotizado', 'En emisión', 'Cargado 100%'],
-        data:   [9, 4, 5, 7, 5, 6, 12]
+        labels: ['Inbox', 'Nuevo', 'Prioritarios', 'Para Hoy', 'Procesando', 'Contactados',
+                 'Cotizados', 'En Auditoria', 'Mes que viene', 'A futuro',
+                 'Ventas Ganadas', 'No prospera', 'Erroneos', 'Tareas Finalizadas'],
+        data:   [3, 4, 2, 3, 4, 5, 3, 2, 2, 4, 6, 4, 3, 1]
       },
       segments: {
         labels: ['Voluntario', 'Monotributista', 'Obligatorio'],
@@ -460,8 +462,10 @@ const MOCK_DATA = {
         }
       },
       status: {
-        labels: ['Contactado', 'Erróneo', 'No prospera', 'A futuro', 'Cotizado', 'En emisión', 'Cargado 100%'],
-        data:   [38, 14, 21, 28, 19, 24, 46]
+        labels: ['Inbox', 'Nuevo', 'Prioritarios', 'Para Hoy', 'Procesando', 'Contactados',
+                 'Cotizados', 'En Auditoria', 'Mes que viene', 'A futuro',
+                 'Ventas Ganadas', 'No prospera', 'Erroneos', 'Tareas Finalizadas'],
+        data:   [12, 18, 9, 14, 16, 22, 11, 8, 10, 18, 24, 21, 14, 5]
       },
       segments: {
         labels: ['Voluntario', 'Monotributista', 'Obligatorio'],
@@ -486,8 +490,10 @@ const MOCK_DATA = {
         }
       },
       status: {
-        labels: ['Contactado', 'Erróneo', 'No prospera', 'A futuro', 'Cotizado', 'En emisión', 'Cargado 100%'],
-        data:   [108, 40, 61, 82, 56, 69, 132]
+        labels: ['Inbox', 'Nuevo', 'Prioritarios', 'Para Hoy', 'Procesando', 'Contactados',
+                 'Cotizados', 'En Auditoria', 'Mes que viene', 'A futuro',
+                 'Ventas Ganadas', 'No prospera', 'Erroneos', 'Tareas Finalizadas'],
+        data:   [34, 52, 27, 42, 46, 65, 34, 22, 30, 52, 70, 61, 40, 14]
       },
       segments: {
         labels: ['Voluntario', 'Monotributista', 'Obligatorio'],
@@ -504,8 +510,10 @@ const MOCK_DATA = {
         cpl:    [4050, 3980, 3850, 3900, 4020, 3870, 3840, 3980, 3940, 4121, 4057, 3660]
       },
       status: {
-        labels: ['Contactado', 'Erróneo', 'No prospera', 'A futuro', 'Cotizado', 'En emisión', 'Cargado 100%'],
-        data:   [108, 40, 61, 82, 56, 69, 132]
+        labels: ['Inbox', 'Nuevo', 'Prioritarios', 'Para Hoy', 'Procesando', 'Contactados',
+                 'Cotizados', 'En Auditoria', 'Mes que viene', 'A futuro',
+                 'Ventas Ganadas', 'No prospera', 'Erroneos', 'Tareas Finalizadas'],
+        data:   [144, 220, 114, 180, 195, 276, 144, 92, 126, 220, 296, 258, 168, 60]
       },
       segments: {
         labels: ['Voluntario', 'Monotributista', 'Obligatorio'],
@@ -522,8 +530,10 @@ const MOCK_DATA = {
         cpl:    [4280, 4080, 3980, 4060, 4150, 4020, 4060, 3940, 4060, 3820, 3940, 3720, 3660]
       },
       status: {
-        labels: ['Contactado', 'Erróneo', 'No prospera', 'A futuro', 'Cotizado', 'En emisión', 'Cargado 100%'],
-        data:   [108, 40, 61, 82, 56, 69, 132]
+        labels: ['Inbox', 'Nuevo', 'Prioritarios', 'Para Hoy', 'Procesando', 'Contactados',
+                 'Cotizados', 'En Auditoria', 'Mes que viene', 'A futuro',
+                 'Ventas Ganadas', 'No prospera', 'Erroneos', 'Tareas Finalizadas'],
+        data:   [34, 52, 27, 42, 46, 65, 34, 22, 30, 52, 70, 61, 40, 14]
       },
       segments: {
         labels: ['Voluntario', 'Monotributista', 'Obligatorio'],
@@ -540,8 +550,10 @@ const MOCK_DATA = {
         cpl:    [4400, 4000, 3714, 4000, 3250, 3833, 4400, 3571, 3250, 4000, 3714, 4400, 3571, 2778, 4000, 3714, 4400, 3571, 3250, 4000, 3714, 3571, 4400, 3250, 4000, 3714, 4400, 3571, 3250, 4400]
       },
       status: {
-        labels: ['Contactado', 'Erróneo', 'No prospera', 'A futuro', 'Cotizado', 'En emisión', 'Cargado 100%'],
-        data:   [38, 14, 21, 28, 19, 24, 46]
+        labels: ['Inbox', 'Nuevo', 'Prioritarios', 'Para Hoy', 'Procesando', 'Contactados',
+                 'Cotizados', 'En Auditoria', 'Mes que viene', 'A futuro',
+                 'Ventas Ganadas', 'No prospera', 'Erroneos', 'Tareas Finalizadas'],
+        data:   [12, 18, 9, 14, 16, 22, 11, 8, 10, 18, 24, 21, 14, 5]
       },
       segments: {
         labels: ['Voluntario', 'Monotributista', 'Obligatorio'],

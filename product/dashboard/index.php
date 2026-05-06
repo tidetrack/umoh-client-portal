@@ -435,21 +435,21 @@ $_asset_v = defined('ASSET_VERSION') ? ASSET_VERSION : filemtime(__DIR__ . '/ass
         </div>
       </div>
 
-      <!-- Status stacked bar + Segments donut: side by side -->
-      <div class="charts-grid charts-grid--2col">
-
-        <!-- Status vertical funnel bar chart -->
+      <!-- Customer Journey — card grande full-width (14 etapas de MeisterTask) -->
+      <div class="charts-grid charts-grid--full">
         <div class="chart-card">
           <div class="chart-card-header">
-            <h3 class="chart-title">Distribución por Estado</h3>
-            <span class="chart-note">Fuente: MeisterTask · datos manuales</span>
+            <h3 class="chart-title">Customer Journey — CRM</h3>
+            <span class="chart-note">Fuente: MeisterTask · 14 etapas en orden del proceso de ventas</span>
           </div>
           <div class="chart-card-body chart-body--tall">
             <canvas id="chart-status" aria-label="Distribución por estado de lead" style="height: 340px;"></canvas>
           </div>
         </div>
+      </div>
 
-        <!-- Segments donut -->
+      <!-- Distribución por Segmento — donut centrado, fila propia -->
+      <div class="charts-grid charts-grid--donut-solo">
         <div class="chart-card">
           <div class="chart-card-header">
             <h3 class="chart-title">Distribución por Segmento</h3>
@@ -458,7 +458,6 @@ $_asset_v = defined('ASSET_VERSION') ? ASSET_VERSION : filemtime(__DIR__ . '/ass
             <canvas id="chart-segments" aria-label="Distribución por segmento"></canvas>
           </div>
         </div>
-
       </div>
     </section>
 

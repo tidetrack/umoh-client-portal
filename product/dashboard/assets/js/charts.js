@@ -711,15 +711,31 @@ function renderMofu(data) {
     const total  = vals.reduce((a, b) => a + b, 0);
     const maxVal = Math.max(...vals);
 
-    // 4 azules degradados → 2 ámbar → 1 verde (ciclo de vida del lead, por índice fijo)
+    // Paleta semántica de 14 posiciones — sigue el orden del customer journey:
+    //   1-2  Inbox / Nuevo             → azul entrada (suave)
+    //   3    Prioritarios              → ámbar alta intención
+    //   4-6  Para Hoy / Procesando / Contactados → azul medio (tipificados activos)
+    //   7-8  Cotizados / En Auditoria  → ámbar intensa (listos para cerrar)
+    //   9-10 Mes que viene / A futuro  → púrpura incubando
+    //   11   Ventas Ganadas            → verde cierre
+    //   12   No prospera               → rojo pérdida
+    //   13   Erroneos                  → gris excluido
+    //   14   Tareas Finalizadas        → gris claro limpieza CRM
     const statusColors = [
-      'rgba(99,179,237,0.90)',
-      'rgba(99,179,237,0.68)',
-      'rgba(99,179,237,0.46)',
-      'rgba(99,179,237,0.28)',
-      'rgba(251,191,36,0.75)',
-      'rgba(251,191,36,0.95)',
-      CHART_PALETTE.green.solid,
+      'rgba(99,179,237,0.55)',    // 1  Inbox
+      'rgba(99,179,237,0.80)',    // 2  Nuevo
+      'rgba(251,191,36,0.70)',    // 3  Prioritarios
+      'rgba(66,153,225,0.75)',    // 4  Para Hoy
+      'rgba(66,153,225,0.90)',    // 5  Procesando
+      'rgba(49,130,206,1.00)',    // 6  Contactados
+      'rgba(251,191,36,0.88)',    // 7  Cotizados
+      'rgba(245,158,11,1.00)',    // 8  En Auditoria
+      'rgba(159,122,234,0.70)',   // 9  Mes que viene
+      'rgba(159,122,234,0.92)',   // 10 A futuro
+      CHART_PALETTE.green.solid, // 11 Ventas Ganadas
+      'rgba(245,101,101,0.85)',   // 12 No prospera
+      'rgba(160,174,192,0.65)',   // 13 Erroneos
+      'rgba(160,174,192,0.38)',   // 14 Tareas Finalizadas
     ];
 
     // Contenedor principal del journey

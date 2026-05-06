@@ -910,6 +910,12 @@ body {
   grid-template-columns: repeat(3, 1fr);
 }
 
+/* Donut solitario: card centrada con ancho máximo para no estirarse al ancho completo */
+.charts-grid--donut-solo {
+  grid-template-columns: minmax(280px, 480px);
+  justify-content: center;
+}
+
 .chart-card {
   background: var(--bg-card);
   border: 1px solid var(--border-subtle);
@@ -1937,13 +1943,13 @@ body {
   display: flex;
   align-items: flex-end;
   justify-content: center;
-  padding: 0 var(--sp-2);
+  padding: 0 var(--sp-1);
 }
 
 /* La barra coloreada: su height% viene del JS (relativo al máximo de la serie) */
 .journey-bar {
   width: 100%;
-  max-width: 48px;
+  max-width: 40px;
   border-radius: var(--r-sm, 4px) var(--r-sm, 4px) 2px 2px;
   transition: height 0.5s cubic-bezier(0.4, 0, 0.2, 1);
   min-height: 4px;
@@ -1976,11 +1982,11 @@ body {
 }
 
 .journey-col-label {
-  font-size: 10px;
+  font-size: 9px;
   font-weight: 600;
   color: var(--text-muted);
   text-transform: uppercase;
-  letter-spacing: 0.04em;
+  letter-spacing: 0.03em;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
