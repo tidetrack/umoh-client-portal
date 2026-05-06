@@ -2156,3 +2156,134 @@ body {
   border-color: rgba(99,179,237,0.40);
 }
 [data-theme="dark"] .funnel-h-bar { background: rgba(255,255,255,0.06); }
+
+/* ─────────────────────────────────────────────────────────────
+   Funnel VERTICAL — barras horizontales centradas que se angostan
+   hacia abajo, formando la silueta clásica del embudo de ventas.
+   Reemplaza la vista horizontal de tarjetas en la sección MOFU.
+   ───────────────────────────────────────────────────────────── */
+.funnel-vertical {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-2);
+  padding: var(--sp-3) var(--sp-4) var(--sp-4);
+  width: 100%;
+}
+
+/* Cada fila del funnel: meta (label+valor) | barra | porcentaje */
+.funnel-v-row {
+  display: grid;
+  grid-template-columns: 130px 1fr 48px;
+  align-items: center;
+  gap: var(--sp-3);
+  min-height: 36px;
+}
+
+/* El header (Total leads) tiene fila ligeramente más alta y separador */
+.funnel-v-row--header {
+  min-height: 42px;
+  padding-bottom: var(--sp-2);
+  border-bottom: 1px solid var(--border-subtle);
+  margin-bottom: var(--sp-1);
+}
+
+/* Columna izquierda: label arriba, valor abajo */
+.funnel-v-meta {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.funnel-v-label {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.funnel-v-row--header .funnel-v-label {
+  font-size: 12px;
+  color: var(--text-secondary);
+}
+
+.funnel-v-value {
+  font-size: 16px;
+  font-weight: 700;
+  color: var(--text-primary);
+  font-variant-numeric: tabular-nums;
+  line-height: 1;
+}
+
+.funnel-v-row--header .funnel-v-value {
+  font-size: 20px;
+  color: var(--accent-blue, #63b3ed);
+}
+
+/* Columna central: pista completa donde vive la barra centrada */
+.funnel-v-track {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* La barra coloreada — su width% viene del JS y es relativo al total */
+.funnel-v-bar {
+  height: 28px;
+  border-radius: var(--r-sm, 4px);
+  transition: width 0.5s cubic-bezier(0.4, 0, 0.2, 1);
+  /* La barra se centra dentro del track, creando la silueta del embudo */
+  margin: 0 auto;
+  /* Ancho mínimo para que nunca desaparezca visualmente */
+  min-width: 4px;
+}
+
+.funnel-v-row--header .funnel-v-bar {
+  height: 34px;
+  border-radius: var(--r-md, 6px);
+}
+
+/* Columna derecha: porcentaje alineado */
+.funnel-v-pct {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-secondary);
+  text-align: right;
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+
+.funnel-v-row--header .funnel-v-pct {
+  font-size: 13px;
+  color: var(--accent-blue, #63b3ed);
+  font-weight: 700;
+}
+
+/* Hover: leve highlight de fila */
+.funnel-v-row:not(.funnel-v-row--header):hover .funnel-v-bar {
+  filter: brightness(1.15);
+  transition: filter 0.15s ease, width 0.5s cubic-bezier(0.4, 0, 0.2, 1);
+}
+.funnel-v-row:not(.funnel-v-row--header):hover .funnel-v-label,
+.funnel-v-row:not(.funnel-v-row--header):hover .funnel-v-value {
+  color: var(--text-primary);
+}
+
+/* ── Dark theme overrides ── */
+[data-theme="dark"] .funnel-v-row--header {
+  border-bottom-color: rgba(255,255,255,0.08);
+}
+[data-theme="dark"] .funnel-v-label {
+  color: rgba(255,255,255,0.45);
+}
+[data-theme="dark"] .funnel-v-row--header .funnel-v-label {
+  color: rgba(255,255,255,0.55);
+}
+[data-theme="dark"] .funnel-v-pct {
+  color: rgba(255,255,255,0.50);
+}

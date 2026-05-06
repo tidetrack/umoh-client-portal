@@ -688,14 +688,14 @@ function renderMofu(data) {
     });
   }
 
-  /* ── Status: funnel HORIZONTAL con etapas fijas ────────────
-     La primera tarjeta es el TOTAL de leads (sumatoria de todas las etapas).
-     Las siguientes son cada etapa con su valor y porcentaje del total.
-     Cada tarjeta tiene una barra inferior proporcional al máximo. */
+  /* ── Status: funnel VERTICAL — barras centradas que se angostan hacia abajo ──
+     El header muestra el total (barra al 100%). Cada etapa siguiente tiene una
+     barra proporcional al porcentaje del total, centrada, formando la silueta
+     del embudo de ventas. Los datos vienen de data.status sin modificación. */
   _destroyChart('chart-status');
   const ctxSt = document.getElementById('chart-status');
   if (ctxSt && data.status) {
-    // Limpiar restos del funnel SVG anterior si existieran
+    // Limpiar cualquier render anterior (SVG, leyenda, horizontales, verticales)
     const prevSvg = ctxSt.parentElement.querySelector('.umoh-funnel');
     if (prevSvg) prevSvg.remove();
     const prevTip = document.getElementById('umoh-funnel-tip');
@@ -704,14 +704,15 @@ function renderMofu(data) {
     if (prevLegend) prevLegend.remove();
     const prevHorizontal = ctxSt.parentElement.querySelector('.funnel-horizontal');
     if (prevHorizontal) prevHorizontal.remove();
+    const prevVertical = ctxSt.parentElement.querySelector('.funnel-vertical');
+    if (prevVertical) prevVertical.remove();
     ctxSt.style.display = 'none';
 
     const labels = data.status.labels;
     const vals   = data.status.data;
     const total  = vals.reduce((a, b) => a + b, 0);
-    const maxVal = Math.max(...vals, 1);
 
-    // Mismo esquema cromático que tenía el funnel: 4 azules, 2 ámbar, 1 verde
+    // 4 azules degradados → 2 ámbar → 1 verde (ciclo de vida del lead)
     const statusColors = [
       'rgba(99,179,237,0.90)',
       'rgba(99,179,237,0.68)',
@@ -723,34 +724,46 @@ function renderMofu(data) {
     ];
 
     const container = document.createElement('div');
-    container.className = 'funnel-horizontal';
+    container.className = 'funnel-vertical';
 
-    // Card 1: TOTAL (azul UMOH)
-    const totalCard = document.createElement('div');
-    totalCard.className = 'funnel-h-card funnel-h-card--total';
-    totalCard.innerHTML = `
-      <div class="funnel-h-label">Total leads</div>
-      <div class="funnel-h-value">${fmtNumber(total)}</div>
-      <div class="funnel-h-pct">100%</div>
-      <div class="funnel-h-bar"><div class="funnel-h-bar-fill" style="width:100%;background:${CHART_PALETTE.blue.solid}"></div></div>
+    // Fila 0: header — Total leads al 100% del ancho
+    const headerRow = document.createElement('div');
+    headerRow.className = 'funnel-v-row funnel-v-row--header';
+    headerRow.innerHTML = `
+      <div class="funnel-v-meta">
+        <span class="funnel-v-label">Total leads</span>
+        <span class="funnel-v-value">${fmtNumber(total)}</span>
+      </div>
+      <div class="funnel-v-track">
+        <div class="funnel-v-bar" style="width:100%;background:${CHART_PALETTE.blue.solid}"></div>
+      </div>
+      <div class="funnel-v-pct">100%</div>
     `;
-    container.appendChild(totalCard);
+    container.appendChild(headerRow);
 
-    // Cards 2..N: cada etapa
+    // Filas 1..N: cada etapa — ancho = (valor / total) * 100%
     labels.forEach((label, i) => {
-      const v   = vals[i] || 0;
-      const pct = total > 0 ? ((v / total) * 100).toFixed(1) : '0.0';
-      const w   = maxVal > 0 ? ((v / maxVal) * 100).toFixed(0) : 0;
+      const v     = vals[i] || 0;
+      const pct   = total > 0 ? ((v / total) * 100) : 0;
+      const pctFmt = pct.toFixed(1) + '%';
+      // Ancho mínimo del 4% para que etapas con cero valor sigan siendo visibles
+      const barW  = Math.max(pct, v > 0 ? 4 : 0).toFixed(1) + '%';
       const color = statusColors[i % statusColors.length];
-      const card = document.createElement('div');
-      card.className = 'funnel-h-card';
-      card.innerHTML = `
-        <div class="funnel-h-label">${label}</div>
-        <div class="funnel-h-value">${fmtNumber(v)}</div>
-        <div class="funnel-h-pct">${pct}%</div>
-        <div class="funnel-h-bar"><div class="funnel-h-bar-fill" style="width:${w}%;background:${color}"></div></div>
+
+      const row = document.createElement('div');
+      row.className = 'funnel-v-row';
+      row.setAttribute('title', `${label}: ${fmtNumber(v)} leads (${pctFmt})`);
+      row.innerHTML = `
+        <div class="funnel-v-meta">
+          <span class="funnel-v-label">${label}</span>
+          <span class="funnel-v-value">${fmtNumber(v)}</span>
+        </div>
+        <div class="funnel-v-track">
+          <div class="funnel-v-bar" style="width:${barW};background:${color}"></div>
+        </div>
+        <div class="funnel-v-pct">${pctFmt}</div>
       `;
-      container.appendChild(card);
+      container.appendChild(row);
     });
 
     ctxSt.parentElement.appendChild(container);
