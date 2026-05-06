@@ -36,6 +36,8 @@ logger = logging.getLogger(__name__)
 _CANONICAL_COLS = [
     "date",
     "platform",
+    "campaign_id",
+    "campaign_name",
     "impressions",
     "clicks",
     "spend",
@@ -83,6 +85,8 @@ def _build_row(row: pd.Series, run_id: str) -> dict[str, Any]:
         client_slug      <- row['client_id']       (rename: convención Supabase)
         date             <- row['date']             (YYYY-MM-DD str → Supabase lo acepta)
         platform         <- row['platform']         ('google' | 'meta' | 'linkedin')
+        campaign_id      <- row['campaign_id']      (ID real de Google Ads; 'PMAX_PREPAGAS' si falta)
+        campaign_name    <- row['campaign_name']    (nombre legible de la campaña)
         impressions      <- row['impressions']
         clicks           <- row['clicks']
         spend            <- row['spend']            (ya en unidad monetaria real)
@@ -109,6 +113,8 @@ def _build_row(row: pd.Series, run_id: str) -> dict[str, Any]:
         "client_slug": row["client_id"],
         "date": str(row["date"]),
         "platform": str(row["platform"]),
+        "campaign_id": str(row.get("campaign_id") or "PMAX_PREPAGAS"),
+        "campaign_name": str(row.get("campaign_name") or "PMAX Prevención Salud"),
         "impressions": impressions,
         "clicks": clicks,
         "spend": float(row.get("spend", 0) or 0),

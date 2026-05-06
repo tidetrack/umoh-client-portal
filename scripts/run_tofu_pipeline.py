@@ -47,6 +47,7 @@ sys.path.insert(0, str(_REPO_ROOT / "data"))
 from dotenv import load_dotenv
 
 # Los imports de los módulos del pipeline van después del sys.path.insert
+from connections.supabase_client import get_client as get_supabase_client
 from extractors.google_ads import run as extract_google_ads
 from loaders.supabase_tofu_writer import write_tofu_ads
 from normalizers.canonical import normalize
@@ -181,10 +182,71 @@ def main() -> None:
         logger.exception("Error escribiendo en Supabase.")
 
     # ------------------------------------------------------------------
-    # Paso 5: Resumen
+    # Paso 5: Poblar tofu_facts via stored procedure
+    #
+    # Se ejecuta por cada cliente procesado. Para v1 (Prepagas, campaña única)
+    # el campaign_id se toma del DataFrame si está disponible; si no, usa el
+    # placeholder 'PMAX_PREPAGAS'.
+    #
+    # El stored procedure es idempotente (UPSERT) — re-ejecutarlo es seguro.
+    # Si el upsert a tofu_ads_daily falló (supabase_error), igual intentamos
+    # compute_tofu_facts para actualizar con los datos que sí llegaron.
     # ------------------------------------------------------------------
+    facts_errors: list[str] = []
+
+    try:
+        sb = get_supabase_client()
+
+        for raw in raw_results:
+            client_id = raw.get("client_id", "")
+            date_start = raw.get("date_start", "")
+            date_end = raw.get("date_end", "")
+
+            # Determinar campaign_id y campaign_name del run.
+            # Si el extractor trajo campaign_id reales, usamos el primer valor
+            # encontrado en raw_metrics (en v1 siempre hay una sola campaña).
+            raw_metrics_list = raw.get("raw_metrics", [])
+            if raw_metrics_list and raw_metrics_list[0].get("campaign_id"):
+                campaign_id = raw_metrics_list[0]["campaign_id"]
+                campaign_name = raw_metrics_list[0].get("campaign_name", "PMAX Prevención Salud")
+            else:
+                campaign_id = "PMAX_PREPAGAS"
+                campaign_name = "PMAX Prevención Salud"
+
+            logger.info(
+                "Calculando tofu_facts — cliente=%s rango=%s a %s campaign_id=%s",
+                client_id, date_start, date_end, campaign_id,
+            )
+
+            try:
+                result = sb.rpc("compute_tofu_facts", {
+                    "p_client_slug":   client_id,
+                    "p_date_start":    date_start,
+                    "p_date_end":      date_end,
+                    "p_campaign_id":   campaign_id,
+                    "p_campaign_name": campaign_name,
+                }).execute()
+                rows_computed = result.data if result.data is not None else 0
+                logger.info(
+                    "compute_tofu_facts completado — cliente=%s filas_upserted=%s",
+                    client_id, rows_computed,
+                )
+            except Exception as exc:
+                err_msg = f"compute_tofu_facts falló para cliente={client_id}: {exc}"
+                logger.error(err_msg)
+                facts_errors.append(err_msg)
+
+    except Exception as exc:
+        err_msg = f"Error inicializando Supabase para compute_tofu_facts: {exc}"
+        logger.error(err_msg)
+        facts_errors.append(err_msg)
+
+    # ------------------------------------------------------------------
+    # Paso 6: Resumen
+    # ------------------------------------------------------------------
+    has_errors = bool(supabase_error or facts_errors)
     summary = {
-        "status": "ok" if not supabase_error else "partial_failure",
+        "status": "ok" if not has_errors else "partial_failure",
         "days_back": days_back,
         "clients_processed": [r.get("client_id") for r in raw_results],
         "clients_failed_normalization": failed_clients,
@@ -195,11 +257,12 @@ def main() -> None:
         "supabase_clients": supabase_result.get("clients", []),
         "supabase_platforms": supabase_result.get("platforms", []),
         "supabase_error": supabase_error,
+        "facts_errors": facts_errors,
     }
 
     print(json.dumps(summary, indent=2, ensure_ascii=False))
 
-    if supabase_error:
+    if has_errors:
         sys.exit(1)
 
 

@@ -121,6 +121,8 @@ def load_active_clients(config_dir: str = "config/clients") -> list[dict[str, An
 
 _TOFU_METRICS_QUERY = """
 SELECT
+  campaign.id,
+  campaign.name,
   segments.date,
   metrics.impressions,
   metrics.clicks,
@@ -194,8 +196,19 @@ def extract_tofu_metrics(
     para el customer_id dado en el rango de fechas indicado.
 
     Los cost_micros de Google se convierten a la unidad monetaria real dividiendo por 1e6.
-    El desglose por canal (ad_network_type) y dispositivo (device) se construye
-    sumando sobre todas las campanas del dia.
+    Devuelve una fila por (date, campaign_id, ad_network_type, device), con el ID y
+    nombre real de la campaña. El normalizador y el loader agregan por fecha antes de
+    escribir en tofu_ads_daily (que tiene PK por date+platform, sin campaign_id).
+
+    Mapeo de campos de la API Google Ads:
+        campaign.id             → campaign_id   (str del ID numerico de Google)
+        campaign.name           → campaign_name (nombre legible de la campaña)
+        segments.date           → date          (YYYY-MM-DD)
+        metrics.impressions     → impressions
+        metrics.clicks          → clicks
+        metrics.cost_micros / 1e6 → spend_micros  (unidad monetaria real)
+        segments.ad_network_type.name → channel
+        segments.device.name    → device
 
     Args:
         client: GoogleAdsClient autenticado contra el MCC.
@@ -204,7 +217,7 @@ def extract_tofu_metrics(
         date_end: Fecha fin en formato YYYY-MM-DD.
 
     Returns:
-        Lista de dicts con una entrada por (date, platform, network_type, device).
+        Lista de dicts con una entrada por (date, campaign_id, network_type, device).
     """
     ga_service = client.get_service("GoogleAdsService")
     query = _TOFU_METRICS_QUERY.format(date_start=date_start, date_end=date_end)
@@ -217,6 +230,10 @@ def extract_tofu_metrics(
                 rows.append({
                     "date": row.segments.date,
                     "platform": "google",
+                    # campaign.id devuelve un entero; lo convertimos a str para consistencia
+                    # con el placeholder 'PMAX_PREPAGAS' y para el upsert en Supabase.
+                    "campaign_id": str(row.campaign.id),
+                    "campaign_name": row.campaign.name,
                     "impressions": row.metrics.impressions,
                     "clicks": row.metrics.clicks,
                     # cost_micros: Google almacena el costo multiplicado por 1_000_000
@@ -443,8 +460,10 @@ def extract_client(
           - customer_id: str
           - date_start: str
           - date_end: str
-          - raw_metrics: list[dict]   (una fila por date+channel+device)
+          - raw_metrics: list[dict]   (una fila por date+campaign_id+channel+device,
+                                       incluye campaign_id y campaign_name reales de Google Ads)
           - raw_search_terms: list[dict]
+          - raw_geo: list[dict]
     """
     date_start, date_end = _date_range(days_back)
     customer_id = client_config["customer_id"]

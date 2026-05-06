@@ -23,6 +23,13 @@ sheets:
 reporting:
   timezone: "America/Argentina/Mendoza"
   currency: "ARS"
+  # campaign_id y campaign_name: identifican la campaña activa.
+  # En v1 hay una sola campaña PMAX. Cuando Google Ads traiga el ID real
+  # (número de campaña de la API), reemplazar 'PMAX_PREPAGAS' con ese valor.
+  # El extractor ya trae campaign.id real — este campo es el fallback que usa
+  # run_meistertask_pipeline.py para asociar los leads de MeisterTask a la campaña.
+  campaign_id: "PMAX_PREPAGAS"
+  campaign_name: "PMAX Prevención Salud"
   segments:
     - Voluntario
     - Monotributista

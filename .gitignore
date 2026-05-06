@@ -44,6 +44,7 @@ scripts/*
 !.github/scripts/
 !scripts/run_*.py
 !scripts/sync_*.py
+!scripts/backfill_*.py
 
 # OS
 .DS_Store
