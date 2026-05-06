@@ -655,18 +655,17 @@ class SupabaseWriter:
     def _calcular_cohort_por_mes(self, client_slug: str) -> dict[str, dict[str, int]]:
         """Precalcula el cohort de leads por mes de creación para conversion_rate_mes.
 
-        Consulta la tabla `leads` y la tabla `funnel_stages` para saber qué leads
-        están en secciones con is_closed_won=true. Agrupa por el mes de lead_created_at
-        y cuenta total de leads y leads cerrados por mes.
-
-        La tabla `leads` no tiene campaign_id — el cohort es a nivel cliente. Esto
-        es consistente con cómo mofu_facts agrega leads en compute_mofu_facts.
+        Un lead se cuenta como "cerrado" si **alguna vez** transitó por una
+        sección con is_closed_won=true (consultando lead_section_history),
+        independientemente de dónde esté ahora. Esto le da más procedimiento
+        a la métrica: si un lead fue venta ganada y luego se reabrió, sigue
+        contando en el cohort.
 
         Fuentes:
-          - leads.lead_created_at  → mes de creación del lead (YYYY-MM)
-          - leads.section          → sección actual del lead en MeisterTask
-          - funnel_stages.is_closed_won → true si esa sección es "Ventas Ganadas"
-            (o equivalente según config del cliente)
+          - leads.lead_created_at         → mes de creación del lead (YYYY-MM)
+          - leads.meistertask_id          → ID del lead
+          - lead_section_history.section_to → secciones por las que pasó
+          - funnel_stages.is_closed_won   → set de secciones "venta ganada"
 
         Args:
             client_slug: Slug del cliente.
@@ -675,12 +674,54 @@ class SupabaseWriter:
             Dict keyed por mes_prefix 'YYYY-MM', con subdict:
               {'total': int, 'closed': int}
             Ejemplo: {'2026-03': {'total': 120, 'closed': 18}, ...}
-            Meses sin leads devuelven {'total': 0, 'closed': 0} via .get() en el caller.
         """
-        # Traer todos los leads del cliente con su sección actual y fecha de creación
+        # 1. Set de secciones que representan venta cerrada
+        stages_resp = (
+            self._sb.table("funnel_stages")
+            .select("section_name, is_closed_won")
+            .eq("client_slug", client_slug)
+            .eq("is_active", True)
+            .execute()
+        )
+        closed_won_sections: set[str] = {
+            row["section_name"]
+            for row in (stages_resp.data or [])
+            if row.get("is_closed_won") is True
+        }
+
+        if not closed_won_sections:
+            logger.warning(
+                "_calcular_cohort_por_mes: cliente=%s no tiene secciones "
+                "con is_closed_won=true configuradas", client_slug
+            )
+
+        # 2. Set de meistertask_id que alguna vez transitaron por una sección closed_won.
+        #    Filtramos server-side con .in_() — más eficiente que traer todo el historial.
+        closed_lead_ids: set[int] = set()
+        if closed_won_sections:
+            history_resp = (
+                self._sb.table("lead_section_history")
+                .select("meistertask_id")
+                .eq("client_slug", client_slug)
+                .in_("section_to", list(closed_won_sections))
+                .execute()
+            )
+            closed_lead_ids = {
+                row["meistertask_id"]
+                for row in (history_resp.data or [])
+                if row.get("meistertask_id") is not None
+            }
+
+        logger.debug(
+            "_calcular_cohort_por_mes: cliente=%s secciones_closed_won=%s "
+            "leads_que_pasaron_por_cerrado=%d",
+            client_slug, closed_won_sections, len(closed_lead_ids),
+        )
+
+        # 3. Traer todos los leads del cliente (id + fecha)
         leads_resp = (
             self._sb.table("leads")
-            .select("lead_created_at, section")
+            .select("meistertask_id, lead_created_at")
             .eq("client_slug", client_slug)
             .execute()
         )
@@ -692,53 +733,30 @@ class SupabaseWriter:
             )
             return {}
 
-        # Traer las secciones con is_closed_won=true para este cliente
-        stages_resp = (
-            self._sb.table("funnel_stages")
-            .select("section_name, is_closed_won")
-            .eq("client_slug", client_slug)
-            .eq("is_active", True)
-            .execute()
-        )
-        stages_data = stages_resp.data or []
-
-        # Set de nombres de sección que representan una venta cerrada
-        closed_won_sections: set[str] = {
-            row["section_name"]
-            for row in stages_data
-            if row.get("is_closed_won") is True
-        }
-
-        logger.debug(
-            "_calcular_cohort_por_mes: cliente=%s secciones_closed_won=%s",
-            client_slug, closed_won_sections,
-        )
-
-        # Agregar leads por mes de creación
+        # 4. Agregar por mes de creación
         cohort: dict[str, dict[str, int]] = {}
 
         for lead in leads_data:
             created_at_str = lead.get("lead_created_at")
             if not created_at_str:
-                # Lead sin fecha de creación — no puede asignarse a ningún cohort
-                continue
+                continue  # Lead sin fecha — no se puede asignar a cohort
 
-            # Extraer YYYY-MM del timestamp ISO (puede ser '2026-03-15T10:30:00+00:00')
-            mes_prefix = str(created_at_str)[:7]
+            mes_prefix = str(created_at_str)[:7]  # 'YYYY-MM' del ISO timestamp
 
             if mes_prefix not in cohort:
                 cohort[mes_prefix] = {"total": 0, "closed": 0}
 
             cohort[mes_prefix]["total"] += 1
 
-            section = lead.get("section", "")
-            if section in closed_won_sections:
+            mt_id = lead.get("meistertask_id")
+            if mt_id is not None and mt_id in closed_lead_ids:
                 cohort[mes_prefix]["closed"] += 1
 
         logger.info(
             "_calcular_cohort_por_mes: cliente=%s meses_calculados=%d "
-            "total_leads_procesados=%d",
+            "total_leads_procesados=%d cerrados=%d",
             client_slug, len(cohort), len(leads_data),
+            sum(c["closed"] for c in cohort.values()),
         )
         return cohort
 
