@@ -207,34 +207,34 @@ function _renderCommercialSummary(s) {
 
   el.innerHTML =
     '<div class="cs-grid">' +
-      '<div class="cs-item">' +
+      '<div class="cs-item" data-cs-kpi="cs-top-seller" tabindex="0" role="button" aria-label="Ver detalle de Mejor Vendedor">' +
         '<span class="cs-label">Mejor Vendedor</span>' +
         '<span class="cs-value cs-value--name">' + s.top_seller + '</span>' +
         (p.top_seller && p.top_seller !== s.top_seller
           ? '<span class="cs-delta cs-flat">ant. ' + p.top_seller + '</span>'
           : '<span class="cs-delta cs-flat">—</span>') +
       '</div>' +
-      '<div class="cs-item">' +
+      '<div class="cs-item" data-cs-kpi="cs-avg-effectiveness" tabindex="0" role="button" aria-label="Ver detalle de Efectividad Promedio">' +
         '<span class="cs-label">Efectividad Promedio</span>' +
         '<span class="cs-value">' + fmtPercent(s.avg_effectiveness) + '</span>' +
         mini(s.avg_effectiveness, p.avg_effectiveness, false) +
       '</div>' +
-      '<div class="cs-item">' +
+      '<div class="cs-item" data-cs-kpi="cs-total-sales" tabindex="0" role="button" aria-label="Ver detalle de Ventas del Equipo">' +
         '<span class="cs-label">Ventas del Equipo</span>' +
         '<span class="cs-value">' + fmtNumber(s.total_sales) + '</span>' +
         mini(s.total_sales, p.total_sales, false) +
       '</div>' +
-      '<div class="cs-item">' +
+      '<div class="cs-item" data-cs-kpi="cs-avg-cycle-days" tabindex="0" role="button" aria-label="Ver detalle de Ciclo Promedio">' +
         '<span class="cs-label">Ciclo Promedio</span>' +
         '<span class="cs-value">' + s.avg_cycle_days.toFixed(1) + ' días</span>' +
         mini(s.avg_cycle_days, p.avg_cycle_days, true) +
       '</div>' +
-      '<div class="cs-item">' +
+      '<div class="cs-item" data-cs-kpi="cs-avg-ticket" tabindex="0" role="button" aria-label="Ver detalle de Ticket Promedio">' +
         '<span class="cs-label">Ticket Promedio</span>' +
         '<span class="cs-value">' + fmtCurrency(s.avg_ticket) + '</span>' +
         mini(s.avg_ticket, p.avg_ticket, false) +
       '</div>' +
-      '<div class="cs-item">' +
+      '<div class="cs-item" data-cs-kpi="cs-avg-capitas-per-sale" tabindex="0" role="button" aria-label="Ver detalle de Cápitas por Venta">' +
         '<span class="cs-label">Cápitas / Venta</span>' +
         '<span class="cs-value">' + (s.avg_capitas_per_sale ? s.avg_capitas_per_sale.toFixed(2) : '—') + '</span>' +
         (s.avg_capitas_per_sale ? mini(s.avg_capitas_per_sale, p.avg_capitas_per_sale, false) : '') +

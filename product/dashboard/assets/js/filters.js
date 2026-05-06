@@ -290,6 +290,72 @@ const KPI_INFO = {
     formula: 'Ventas cerradas ÷ Total leads × 100',
     desc: 'Porcentaje de leads que terminaron en venta. Combina la calidad del lead generado por marketing con la eficiencia del equipo de ventas al cerrarlo.',
     example: '8 ventas de 80 leads = 10% de conversión. Si el promedio de la industria aseguradora es 5–7%, esta campaña está operando por encima del benchmark.'
+  },
+
+  /* ── Resumen Comercial (Performance) — leen de data.sellers_summary ── */
+  'cs-top-seller': {
+    name: 'Mejor Vendedor del Período',
+    formula: '',
+    desc: 'El integrante del equipo comercial que cerró más ventas en el período seleccionado. Si dos vendedores empatan en cantidad, gana el que generó mayor revenue.',
+    example: d => {
+      const ss = d.sellers_summary || {};
+      const top = ss.top_seller || '—';
+      const prev = ss.prev?.top_seller || null;
+      if (prev && prev !== top) return `${top} cerró más ventas este período. En el período anterior el top era ${prev} — el ranking del equipo se está moviendo.`;
+      return `${top} cerró más ventas este período y mantiene el primer puesto del ranking comercial.`;
+    }
+  },
+  'cs-avg-effectiveness': {
+    name: 'Efectividad Promedio del Equipo',
+    formula: 'Suma de ventas del equipo ÷ Suma de leads asignados × 100',
+    desc: 'Porcentaje agregado de leads que el equipo logró convertir en ventas. Mide la eficiencia colectiva: cuántos leads de los que entran al CRM terminan cerrados.',
+    example: d => {
+      const ss = d.sellers_summary || {};
+      const eff = ss.avg_effectiveness || 0;
+      const sales = ss.total_sales || 0;
+      return `El equipo convirtió ${eff.toFixed(1)}% de los leads en ventas. ${_fn(sales)} ventas cerradas en total.`;
+    }
+  },
+  'cs-total-sales': {
+    name: 'Ventas del Equipo',
+    formula: 'Suma de ventas cerradas por todo el equipo',
+    desc: 'Total de ventas cerradas por el equipo comercial en el período. Es el indicador agregado de productividad colectiva.',
+    example: d => {
+      const ss = d.sellers_summary || {};
+      const sales = ss.total_sales || 0;
+      const ticket = ss.avg_ticket || 0;
+      return `${_fn(sales)} ventas cerradas, con un ticket promedio de ${_fc(ticket)}. Esto suma ${_fc(sales * ticket)} en ingresos del período.`;
+    }
+  },
+  'cs-avg-cycle-days': {
+    name: 'Ciclo Promedio de Venta',
+    formula: 'Promedio (ponderado por ventas) de días entre creación del lead y cierre',
+    desc: 'Días promedio que tarda un lead desde que entra al CRM hasta que se convierte en venta cerrada. Un ciclo más corto indica mayor velocidad comercial. Promedio ponderado por ventas para representar fielmente al equipo.',
+    example: d => {
+      const ss = d.sellers_summary || {};
+      const cycle = ss.avg_cycle_days || 0;
+      return `El equipo tarda en promedio ${cycle.toFixed(1)} días en cerrar una venta desde que el lead entra al CRM. Un ciclo más corto suele correlacionar con leads de mayor calidad o procesos comerciales más ágiles.`;
+    }
+  },
+  'cs-avg-ticket': {
+    name: 'Ticket Promedio del Equipo',
+    formula: 'Revenue total del equipo ÷ Ventas totales del equipo',
+    desc: 'Valor económico promedio de cada venta cerrada por el equipo. Un ticket en alza puede indicar que se están vendiendo planes de mayor valor o cápitas más grandes.',
+    example: d => {
+      const ss = d.sellers_summary || {};
+      const ticket = ss.avg_ticket || 0;
+      return `Cada venta del equipo genera en promedio ${_fc(ticket)} de ingreso. Es la cifra clave para proyectar el revenue total a partir del volumen de ventas esperado.`;
+    }
+  },
+  'cs-avg-capitas-per-sale': {
+    name: 'Cápitas por Venta',
+    formula: 'Cápitas totales cerradas ÷ Ventas totales',
+    desc: 'Cantidad promedio de cápitas (titulares + grupo familiar) que se cierran en cada venta. Indica el tamaño promedio del grupo familiar/empresa contratante.',
+    example: d => {
+      const ss = d.sellers_summary || {};
+      const cps = ss.avg_capitas_per_sale || 0;
+      return `Cada venta del equipo suma en promedio ${cps.toFixed(2)} cápitas. Si el número crece, el equipo está cerrando ventas con grupos familiares o empresas más grandes — más revenue por venta.`;
+    }
   }
 };
 
@@ -469,6 +535,26 @@ function initKpiModals() {
   document.querySelectorAll('.kpi-card[data-kpi]').forEach(card => {
     card.addEventListener('click', () => _openKpiModal(card.dataset.kpi));
   });
+
+  // Event delegation para .cs-item del Resumen Comercial — el bloque se
+  // re-renderiza con innerHTML cada vez que cambia el período, así que no
+  // alcanza con registrar listeners una sola vez en cada cs-item.
+  const csContainer = document.getElementById('commercial-summary');
+  if (csContainer) {
+    csContainer.addEventListener('click', e => {
+      const item = e.target.closest('.cs-item[data-cs-kpi]');
+      if (item) _openKpiModal(item.dataset.csKpi);
+    });
+    // Soporte teclado: Enter o Space activan el modal
+    csContainer.addEventListener('keydown', e => {
+      if (e.key !== 'Enter' && e.key !== ' ') return;
+      const item = e.target.closest('.cs-item[data-cs-kpi]');
+      if (item) {
+        e.preventDefault();
+        _openKpiModal(item.dataset.csKpi);
+      }
+    });
+  }
 
   const closeBtn = document.getElementById('kpi-modal-close');
   if (closeBtn) closeBtn.addEventListener('click', _closeKpiModal);

@@ -697,32 +697,56 @@ body {
   padding: 0 var(--content-pad);
   height: 100%;
   display: flex;
-  align-items: stretch;
+  align-items: flex-end;
+  gap: 2px;
 }
 
+/* Pestañas estilo Chrome — el tab activo "se conecta" al contenido de abajo */
 .nav-tab {
   font-family: var(--font);
   font-size: 13px;
   font-weight: 500;
-  color: rgba(255, 255, 255, 0.5);
+  color: rgba(255, 255, 255, 0.55);
   background: transparent;
   border: none;
-  border-bottom: 2px solid transparent;
+  border-radius: 10px 10px 0 0;
   padding: 0 var(--sp-5);
+  height: calc(var(--nav-h) - 6px);
+  display: flex;
+  align-items: center;
   cursor: pointer;
-  transition: color 0.15s, border-color 0.15s;
+  transition: color 0.15s, background 0.15s;
   white-space: nowrap;
   letter-spacing: 0.01em;
+  position: relative;
 }
 
-.nav-tab:hover {
-  color: rgba(255, 255, 255, 0.8);
+.nav-tab:hover:not(.active) {
+  background: rgba(255, 255, 255, 0.06);
+  color: rgba(255, 255, 255, 0.9);
 }
 
 .nav-tab.active {
-  color: #fff;
-  border-bottom-color: var(--umoh-accent);
+  background: var(--bg-page);
+  color: var(--text-primary);
   font-weight: 600;
+  /* "Muerde" el borde inferior del nav: el tab activo se ve pegado al contenido */
+  margin-bottom: -1px;
+  padding-bottom: 1px;
+  z-index: 1;
+  box-shadow: 0 -1px 4px rgba(0, 0, 0, 0.05);
+}
+
+/* Sutil acento UMOH arriba del tab activo (top border) */
+.nav-tab.active::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: var(--sp-3);
+  right: var(--sp-3);
+  height: 2px;
+  background: var(--umoh-accent);
+  border-radius: 2px 2px 0 0;
 }
 
 /* ── 5. Main Layout ────────────────────────────────────────── */
@@ -786,7 +810,7 @@ body {
 }
 
 .kpi-grid--5 {
-  grid-template-columns: repeat(6, 1fr);
+  grid-template-columns: repeat(5, 1fr);
 }
 
 .kpi-grid--4 {
@@ -1823,6 +1847,28 @@ body {
   display: flex;
   flex-direction: column;
   gap: var(--sp-1);
+  padding: var(--sp-2) var(--sp-3);
+  border-radius: var(--r-md);
+  transition: background 0.15s, transform 0.15s;
+}
+
+/* Hover + click affordance solo cuando el item es interactivo (data-cs-kpi) */
+.cs-item[data-cs-kpi] {
+  cursor: pointer;
+}
+
+.cs-item[data-cs-kpi]:hover {
+  background: var(--bg-card-hover, rgba(0, 0, 0, 0.04));
+  transform: translateY(-1px);
+}
+
+[data-theme="dark"] .cs-item[data-cs-kpi]:hover {
+  background: rgba(255, 255, 255, 0.05);
+}
+
+.cs-item[data-cs-kpi]:focus-visible {
+  outline: 2px solid var(--umoh-accent);
+  outline-offset: 2px;
 }
 
 .cs-label {
