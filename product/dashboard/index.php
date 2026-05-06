@@ -435,15 +435,15 @@ $_asset_v = defined('ASSET_VERSION') ? ASSET_VERSION : filemtime(__DIR__ . '/ass
         </div>
       </div>
 
-      <!-- Customer Journey — card grande full-width (14 etapas de MeisterTask) -->
+      <!-- Customer Journey — card full-width (13 etapas activas de MeisterTask) -->
       <div class="charts-grid charts-grid--full">
         <div class="chart-card">
           <div class="chart-card-header">
             <h3 class="chart-title">Customer Journey — CRM</h3>
-            <span class="chart-note">Fuente: MeisterTask · 14 etapas en orden del proceso de ventas</span>
+            <span class="chart-note">Fuente: MeisterTask · 13 etapas en orden del proceso de ventas</span>
           </div>
-          <div class="chart-card-body chart-body--tall">
-            <canvas id="chart-status" aria-label="Distribución por estado de lead" style="height: 340px;"></canvas>
+          <div class="chart-card-body" style="padding: 0; overflow: hidden;">
+            <canvas id="chart-status" aria-label="Distribución por estado de lead" style="display:none;"></canvas>
           </div>
         </div>
       </div>

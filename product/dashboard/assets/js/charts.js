@@ -590,6 +590,269 @@ function _renderGeoTable(geoData) {
 function invalidateGeoMap() { /* no-op: geo es tabla, no mapa */ }
 
 /* ══════════════════════════════════════════════════════════
+   CUSTOMER JOURNEY — helper aislado
+   Llamado desde renderMofu(). Función separada para que el
+   return del re-render incremental no corte el render del donut.
+
+   Iteración 5:
+   - "Tareas Finalizadas" filtrado del display (irrelevante para el cliente)
+   - Paleta semántica por label (robusta a reordenamientos del backend)
+   - Barras de 240px de alto, 68px de ancho máximo
+   - Stagger entrance: cada barra crece con delay incremental
+   - Re-render incremental: cambio de período anima alturas in-place
+   - Tooltip flotante: label + valor + porcentaje + sub-fase
+   - Banda de sub-fases debajo del header (Entrada / Seguimiento / ...)
+   - prefers-reduced-motion: sin animaciones si está activo
+══════════════════════════════════════════════════════════ */
+
+// Paleta semántica: color por nombre de etapa (no por posición).
+// Familia azul = entrada/seguimiento, ámbar = alta intención,
+// púrpura = incubando, verde/rojo/gris = resultados.
+const _JOURNEY_COLORS = {
+  'Inbox':           'rgba(99,179,237,0.55)',
+  'Nuevo':           'rgba(99,179,237,0.82)',
+  'Prioritarios':    'rgba(251,191,36,0.78)',
+  'Para Hoy':        'rgba(66,153,225,0.78)',
+  'Procesando':      'rgba(66,153,225,0.92)',
+  'Contactados':     'rgba(49,130,206,1.00)',
+  'Cotizados':       'rgba(251,191,36,0.92)',
+  'En Auditoria':    'rgba(245,158,11,1.00)',
+  'Mes que viene':   'rgba(167,139,250,0.72)',
+  'A futuro':        'rgba(167,139,250,0.94)',
+  'Ventas Ganadas':  'rgba(72,199,142,0.85)',
+  'No prospera':     'rgba(245,101,101,0.88)',
+  'Erroneos':        'rgba(160,174,192,0.68)',
+};
+
+// Sub-fase de cada etapa (para el tooltip y la banda visual)
+const _JOURNEY_PHASE_MAP = {
+  'Inbox':          { name: 'Entrada',        color: '#63b3ed' },
+  'Nuevo':          { name: 'Entrada',        color: '#63b3ed' },
+  'Para Hoy':       { name: 'Seguimiento',    color: '#4299e1' },
+  'Procesando':     { name: 'Seguimiento',    color: '#4299e1' },
+  'Contactados':    { name: 'Seguimiento',    color: '#4299e1' },
+  'Prioritarios':   { name: 'Alta intención', color: '#f6ad55' },
+  'Cotizados':      { name: 'Alta intención', color: '#f6ad55' },
+  'En Auditoria':   { name: 'Alta intención', color: '#f6ad55' },
+  'Mes que viene':  { name: 'Incubando',      color: '#b794f4' },
+  'A futuro':       { name: 'Incubando',      color: '#b794f4' },
+  'Ventas Ganadas': { name: 'Resultado',      color: '#68d391' },
+  'No prospera':    { name: 'Resultado',      color: '#fc8181' },
+  'Erroneos':       { name: 'Resultado',      color: '#a0aec0' },
+};
+
+// Configuración de las bandas de sub-fases (cols = número de columnas del journey en esa fase)
+const _JOURNEY_PHASES_DEF = [
+  { name: 'Entrada',        color: '#63b3ed', cols: 2 },
+  { name: 'Seguimiento',    color: '#4299e1', cols: 3 },
+  { name: 'Alta intención', color: '#f6ad55', cols: 3 },
+  { name: 'Incubando',      color: '#b794f4', cols: 2 },
+  { name: 'Resultado',      color: '#68d391', cols: 3 },
+];
+
+/**
+ * Renderiza el Customer Journey horizontal en la sección MOFU.
+ * Llamado siempre desde renderMofu().
+ * @param {object} data - objeto de datos MOFU completo (necesita data.status)
+ */
+function _renderJourney(data) {
+  _destroyChart('chart-status');
+  const ctxSt = document.getElementById('chart-status');
+  if (!ctxSt || !data.status) return;
+
+  // Limpiar variantes históricas (SVG funnel, funnel tip)
+  const prevSvg = ctxSt.parentElement.querySelector('.umoh-funnel');
+  if (prevSvg) prevSvg.remove();
+  const prevTip = document.getElementById('umoh-funnel-tip');
+  if (prevTip) prevTip.remove();
+  ctxSt.style.display = 'none';
+
+  // Filtrar "Tareas Finalizadas" — columna excluida del display del cliente
+  const filteredPairs = data.status.labels.reduce((acc, lbl, i) => {
+    if (lbl !== 'Tareas Finalizadas') {
+      acc.push({ label: lbl, val: data.status.data[i] || 0 });
+    }
+    return acc;
+  }, []);
+
+  const labels       = filteredPairs.map(p => p.label);
+  const vals         = filteredPairs.map(p => p.val);
+  const total        = vals.reduce((a, b) => a + b, 0);
+  const maxVal       = Math.max(...vals, 1);
+  const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+  /* ── RE-RENDER INCREMENTAL ──────────────────────────────────
+     Si la wrap ya existe (el usuario cambió el período),
+     actualizar alturas y valores sin reconstruir el DOM.
+     Esto permite que las barras transicionen suavemente al nuevo valor. */
+  const existingWrap = ctxSt.parentElement.querySelector('.journey-wrap');
+  if (existingWrap) {
+    const existingBars = existingWrap.querySelectorAll('.journey-bar');
+    const existingCols = existingWrap.querySelectorAll('.journey-col');
+
+    existingCols.forEach((col, i) => {
+      if (i >= labels.length) return;
+      const v     = vals[i];
+      const pct   = total > 0 ? (v / total) * 100 : 0;
+      const barH  = Math.max((v / maxVal) * 100, v > 0 ? 5 : 0);
+      const bar   = existingBars[i];
+      const color = _JOURNEY_COLORS[labels[i]] || 'rgba(143,165,168,0.65)';
+
+      if (bar) {
+        bar.style.background = color;
+        if (reducedMotion) {
+          bar.style.height = barH.toFixed(1) + '%';
+        } else {
+          bar.style.transition = 'height 0.5s cubic-bezier(0.16, 1, 0.3, 1), transform 0.15s ease, box-shadow 0.15s ease';
+          bar.style.height     = barH.toFixed(1) + '%';
+        }
+      }
+
+      const valEl = col.querySelector('.journey-col-value');
+      const pctEl = col.querySelector('.journey-col-pct');
+      if (valEl) valEl.textContent = fmtNumber(v);
+      if (pctEl) pctEl.textContent = pct.toFixed(1) + '%';
+    });
+
+    const headerVal = existingWrap.querySelector('.journey-header-value');
+    if (headerVal) headerVal.textContent = fmtNumber(total);
+    return; // No reconstruir el DOM
+  }
+
+  /* ── PRIMER RENDER: construir el DOM completo ─────────────── */
+
+  // Tooltip flotante global (único, compartido por todas las columnas)
+  let tip = document.getElementById('journey-tooltip');
+  if (!tip) {
+    tip = document.createElement('div');
+    tip.id        = 'journey-tooltip';
+    tip.className = 'journey-tooltip';
+    tip.setAttribute('aria-hidden', 'true');
+    tip.innerHTML =
+      '<span class="journey-tooltip-label"></span>' +
+      '<span class="journey-tooltip-value"></span>' +
+      '<span class="journey-tooltip-pct"></span>' +
+      '<span class="journey-tooltip-phase"></span>';
+    document.body.appendChild(tip);
+  }
+
+  function showTip(col, label, val, pctFmt) {
+    const phase  = _JOURNEY_PHASE_MAP[label] || { name: '', color: '#8FA5A8' };
+    const rect   = col.getBoundingClientRect();
+    const tipW   = 200;
+    let   left   = rect.left + rect.width / 2 - tipW / 2;
+    const top    = rect.top - 10;
+    left = Math.max(8, Math.min(left, window.innerWidth - tipW - 8));
+
+    tip.querySelector('.journey-tooltip-label').textContent = label;
+    tip.querySelector('.journey-tooltip-value').textContent = fmtNumber(val);
+    tip.querySelector('.journey-tooltip-pct').textContent   = pctFmt + ' del total';
+    const phaseEl = tip.querySelector('.journey-tooltip-phase');
+    phaseEl.textContent = phase.name;
+    phaseEl.style.color = phase.color;
+
+    tip.style.position = 'absolute';
+    tip.style.left     = left + 'px';
+    tip.style.top      = (top + window.scrollY) + 'px';
+    tip.classList.add('is-visible');
+  }
+
+  function hideTip() {
+    tip.classList.remove('is-visible');
+  }
+
+  // Contenedor principal
+  const wrap = document.createElement('div');
+  wrap.className = 'journey-wrap';
+
+  // Header: Total leads
+  const header = document.createElement('div');
+  header.className = 'journey-header';
+  header.innerHTML =
+    '<span class="journey-header-label">Total leads</span>' +
+    '<span class="journey-header-value">' + fmtNumber(total) + '</span>' +
+    '<span class="journey-header-pct">100%</span>';
+  wrap.appendChild(header);
+
+  // Banda de sub-fases
+  const phasesEl = document.createElement('div');
+  phasesEl.className = 'journey-phases';
+  _JOURNEY_PHASES_DEF.forEach(function(phase) {
+    const band = document.createElement('div');
+    band.className = 'journey-phase-band';
+    band.style.setProperty('--phase-cols', phase.cols);
+    band.style.setProperty('--phase-color', phase.color);
+    band.innerHTML =
+      '<div class="journey-phase-bar"></div>' +
+      '<span class="journey-phase-label">' + phase.name + '</span>';
+    phasesEl.appendChild(band);
+  });
+  wrap.appendChild(phasesEl);
+
+  // Fila de columnas (13 etapas, "Tareas Finalizadas" ya filtrada)
+  const row = document.createElement('div');
+  row.className = 'journey-row';
+
+  labels.forEach(function(label, i) {
+    const v      = vals[i];
+    const pct    = total > 0 ? (v / total) * 100 : 0;
+    const pctFmt = pct.toFixed(1) + '%';
+    const barH   = Math.max((v / maxVal) * 100, v > 0 ? 5 : 0);
+    const color  = _JOURNEY_COLORS[label] || 'rgba(143,165,168,0.65)';
+    const isLast = i === labels.length - 1;
+
+    const col = document.createElement('div');
+    col.className = 'journey-col';
+    col.setAttribute('aria-label', label + ': ' + fmtNumber(v) + ' leads (' + pctFmt + ')');
+
+    const initialH = reducedMotion ? barH.toFixed(1) + '%' : '0%';
+
+    col.innerHTML =
+      '<div class="journey-col-inner">' +
+        '<div class="journey-bar-wrap">' +
+          '<div class="journey-bar"' +
+            ' data-target-h="' + barH.toFixed(1) + '"' +
+            ' style="height:' + initialH + ';background:' + color + ';transform-origin:bottom center;">' +
+          '</div>' +
+        '</div>' +
+        '<div class="journey-col-footer">' +
+          '<span class="journey-col-value">' + fmtNumber(v) + '</span>' +
+          '<span class="journey-col-pct">' + pctFmt + '</span>' +
+          '<span class="journey-col-label">' + label + '</span>' +
+        '</div>' +
+      '</div>';
+
+    col.addEventListener('mouseenter', function() { showTip(col, label, v, pctFmt); });
+    col.addEventListener('mouseleave', hideTip);
+
+    row.appendChild(col);
+
+    if (!isLast) {
+      const arrow = document.createElement('div');
+      arrow.className = 'journey-arrow';
+      arrow.setAttribute('aria-hidden', 'true');
+      row.appendChild(arrow);
+    }
+  });
+
+  wrap.appendChild(row);
+  ctxSt.parentElement.appendChild(wrap);
+
+  // Stagger entrance: barras crecen con delay incremental
+  if (!reducedMotion) {
+    const bars = wrap.querySelectorAll('.journey-bar');
+    bars.forEach(function(bar, i) {
+      const targetH = bar.getAttribute('data-target-h') + '%';
+      const delay   = 40 + i * 55; // barra 1 a 40ms, última (~barra 13) a ~750ms
+      setTimeout(function() {
+        bar.style.transition = 'height 0.55s cubic-bezier(0.16, 1, 0.3, 1), transform 0.15s ease, box-shadow 0.15s ease, filter 0.15s ease';
+        bar.style.height     = targetH;
+      }, delay);
+    });
+  }
+}
+
+/* ══════════════════════════════════════════════════════════
    MOFU
 ══════════════════════════════════════════════════════════ */
 function renderMofu(data) {
@@ -688,115 +951,8 @@ function renderMofu(data) {
     });
   }
 
-  /* ── Status: Customer Journey horizontal ──────────────────────────────────
-     Visualiza las etapas del proceso de ventas de izquierda a derecha,
-     respetando el orden semántico del journey tal como viene en data.status.labels.
-     Cada etapa es una columna con barra vertical cuya altura es proporcional al
-     valor. No se ordena por cantidad — el orden del backend es el orden del negocio.
-     El header "Total leads" aparece como título del bloque, fuera de las columnas. */
-  _destroyChart('chart-status');
-  const ctxSt = document.getElementById('chart-status');
-  if (ctxSt && data.status) {
-    // Limpiar cualquier render anterior (todas las variantes históricas)
-    const prevSvg = ctxSt.parentElement.querySelector('.umoh-funnel');
-    if (prevSvg) prevSvg.remove();
-    const prevTip = document.getElementById('umoh-funnel-tip');
-    if (prevTip) prevTip.remove();
-    const prevJourney = ctxSt.parentElement.querySelector('.journey-wrap');
-    if (prevJourney) prevJourney.remove();
-    ctxSt.style.display = 'none';
-
-    const labels = data.status.labels;
-    const vals   = data.status.data;
-    const total  = vals.reduce((a, b) => a + b, 0);
-    const maxVal = Math.max(...vals);
-
-    // Paleta semántica de 14 posiciones — sigue el orden del customer journey:
-    //   1-2  Inbox / Nuevo             → azul entrada (suave)
-    //   3    Prioritarios              → ámbar alta intención
-    //   4-6  Para Hoy / Procesando / Contactados → azul medio (tipificados activos)
-    //   7-8  Cotizados / En Auditoria  → ámbar intensa (listos para cerrar)
-    //   9-10 Mes que viene / A futuro  → púrpura incubando
-    //   11   Ventas Ganadas            → verde cierre
-    //   12   No prospera               → rojo pérdida
-    //   13   Erroneos                  → gris excluido
-    //   14   Tareas Finalizadas        → gris claro limpieza CRM
-    const statusColors = [
-      'rgba(99,179,237,0.55)',    // 1  Inbox
-      'rgba(99,179,237,0.80)',    // 2  Nuevo
-      'rgba(251,191,36,0.70)',    // 3  Prioritarios
-      'rgba(66,153,225,0.75)',    // 4  Para Hoy
-      'rgba(66,153,225,0.90)',    // 5  Procesando
-      'rgba(49,130,206,1.00)',    // 6  Contactados
-      'rgba(251,191,36,0.88)',    // 7  Cotizados
-      'rgba(245,158,11,1.00)',    // 8  En Auditoria
-      'rgba(159,122,234,0.70)',   // 9  Mes que viene
-      'rgba(159,122,234,0.92)',   // 10 A futuro
-      CHART_PALETTE.green.solid, // 11 Ventas Ganadas
-      'rgba(245,101,101,0.85)',   // 12 No prospera
-      'rgba(160,174,192,0.65)',   // 13 Erroneos
-      'rgba(160,174,192,0.38)',   // 14 Tareas Finalizadas
-    ];
-
-    // Contenedor principal del journey
-    const wrap = document.createElement('div');
-    wrap.className = 'journey-wrap';
-
-    // Header: Total leads como título flotante del bloque
-    const header = document.createElement('div');
-    header.className = 'journey-header';
-    header.innerHTML = `
-      <span class="journey-header-label">Total leads</span>
-      <span class="journey-header-value">${fmtNumber(total)}</span>
-      <span class="journey-header-pct">100%</span>
-    `;
-    wrap.appendChild(header);
-
-    // Fila de columnas: una por etapa del journey
-    const row = document.createElement('div');
-    row.className = 'journey-row';
-
-    labels.forEach((label, i) => {
-      const v       = vals[i] || 0;
-      const pct     = total > 0 ? ((v / total) * 100) : 0;
-      const pctFmt  = pct.toFixed(1) + '%';
-      // Altura relativa al valor máximo de la serie (no al total)
-      // Mínimo 6% para que etapas con cero valor tengan presencia visual
-      const barH    = maxVal > 0 ? Math.max((v / maxVal) * 100, v > 0 ? 6 : 0) : 0;
-      const color   = statusColors[i % statusColors.length];
-      const isLast  = i === labels.length - 1;
-
-      const col = document.createElement('div');
-      col.className = 'journey-col';
-      col.setAttribute('title', `${label}: ${fmtNumber(v)} leads (${pctFmt})`);
-
-      col.innerHTML = `
-        <div class="journey-col-inner">
-          <div class="journey-bar-wrap">
-            <div class="journey-bar" style="height:${barH.toFixed(1)}%;background:${color};"></div>
-          </div>
-          <div class="journey-col-footer">
-            <span class="journey-col-value">${fmtNumber(v)}</span>
-            <span class="journey-col-pct">${pctFmt}</span>
-            <span class="journey-col-label">${label}</span>
-          </div>
-        </div>
-      `;
-
-      row.appendChild(col);
-
-      // Flecha conectora entre etapas (no después de la última)
-      if (!isLast) {
-        const arrow = document.createElement('div');
-        arrow.className = 'journey-arrow';
-        arrow.setAttribute('aria-hidden', 'true');
-        row.appendChild(arrow);
-      }
-    });
-
-    wrap.appendChild(row);
-    ctxSt.parentElement.appendChild(wrap);
-  }
+  /* ── Status: Customer Journey → delegado a _renderJourney() ── */
+  _renderJourney(data);
 
   /* ── Segments donut ── */
   _destroyChart('chart-segments');
