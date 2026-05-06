@@ -276,10 +276,19 @@ TOFU_FACTS_SHEET_NAME = "tofu_facts"
 MOFU_FACTS_SHEET_NAME = "mofu_facts"
 BOFU_FACTS_SHEET_NAME = "bofu_facts"
 
+# Cada lista COLUMNS es el orden técnico (matchea Supabase). HEADERS es la lista
+# paralela que se escribe en la fila 1 de la Sheet — nombres legibles en español
+# para que el cliente entienda cada columna sin tener que decodificar snake_case.
+
 TOFU_FACTS_COLUMNS = [
     "client_slug", "date", "campaign_id", "platform", "campaign_name",
     "impressions", "clicks", "spend", "ctr", "cpc", "cpm",
     "last_computed_at",
+]
+TOFU_FACTS_HEADERS = [
+    "Cliente", "Fecha", "ID Campaña", "Plataforma", "Nombre Campaña",
+    "Impresiones", "Clicks", "Inversión (ARS)", "CTR (%)", "CPC (ARS)", "CPM (ARS)",
+    "Última actualización",
 ]
 TOFU_FACTS_KEY = ["date", "campaign_id", "platform"]
 
@@ -295,6 +304,18 @@ MOFU_FACTS_COLUMNS = [
     "section_ventas_ganadas", "section_no_prospera",
     "last_computed_at",
 ]
+MOFU_FACTS_HEADERS = [
+    "Cliente", "Fecha", "ID Campaña", "Nombre Campaña",
+    "Leads Totales", "Leads Alta Intención", "Leads Tipificados",
+    "Ventas Ganadas", "Leads Perdidos", "Leads Incubando",
+    "Tasa Tipificación (%)",
+    "Sección: Inbox", "Sección: Nuevo", "Sección: Prioritarios",
+    "Sección: Para Hoy", "Sección: Procesando", "Sección: Contactados",
+    "Sección: Cotizados", "Sección: En Auditoría",
+    "Sección: Mes Que Viene", "Sección: A Futuro",
+    "Sección: Ventas Ganadas", "Sección: No Prospera",
+    "Última actualización",
+]
 MOFU_FACTS_KEY = ["date", "campaign_id"]
 
 BOFU_FACTS_COLUMNS = [
@@ -307,6 +328,17 @@ BOFU_FACTS_COLUMNS = [
     "sales_obligatorio", "revenue_obligatorio",
     "sales_sin_segmento", "revenue_sin_segmento",
     "last_computed_at",
+]
+BOFU_FACTS_HEADERS = [
+    "Cliente", "Fecha", "ID Campaña", "Nombre Campaña",
+    "Cantidad Ventas", "Ingresos (ARS)", "Ticket Promedio (ARS)", "Cápitas Cerradas",
+    "Ticket Promedio por Cápita (ARS)",
+    "Tasa Conv. Acumulada (%)", "Tasa Conv. Mes (%)", "Tasa Conv. 30d (%)",
+    "Ventas Voluntario", "Ingresos Voluntario (ARS)",
+    "Ventas Monotributista", "Ingresos Monotributista (ARS)",
+    "Ventas Obligatorio", "Ingresos Obligatorio (ARS)",
+    "Ventas Sin Segmento", "Ingresos Sin Segmento (ARS)",
+    "Última actualización",
 ]
 BOFU_FACTS_KEY = ["date", "campaign_id"]
 
@@ -328,24 +360,83 @@ def _ensure_sheet_with_columns(
     spreadsheet_id: str,
     tab_name: str,
     columns: list[str],
+    headers: list[str] | None = None,
 ) -> None:
-    """Crea la pestaña + headers si no existe. Idempotente."""
+    """Crea la pestaña si no existe, y siempre sincroniza la fila 1 con los headers.
+
+    Si la pestaña no existe: la crea + congela fila 1 (frozen header) + bold + escribe headers.
+    Si ya existe: solo sobreescribe los headers (idempotente — la fila 1 es nuestra zona).
+
+    Args:
+        sheets: Recurso spreadsheets() de la Sheets API.
+        spreadsheet_id: ID de la Google Sheet.
+        tab_name: Nombre de la pestaña.
+        columns: Lista canónica de columnas (orden técnico que matchea Supabase).
+        headers: Nombres legibles a mostrar en la fila 1. Si es None, usa `columns`.
+    """
+    if headers is None:
+        headers = columns
+    if len(headers) != len(columns):
+        raise ValueError(
+            f"len(headers)={len(headers)} != len(columns)={len(columns)} para tab '{tab_name}'"
+        )
+
     metadata = sheets.get(spreadsheetId=spreadsheet_id).execute()
-    existing = [s["properties"]["title"] for s in metadata.get("sheets", [])]
+    existing_sheets = metadata.get("sheets", [])
+    existing_titles = [s["properties"]["title"] for s in existing_sheets]
 
-    if tab_name in existing:
-        return
+    if tab_name not in existing_titles:
+        logger.info("Creando pestaña '%s' en sheet=%s.", tab_name, spreadsheet_id)
+        # Crear pestaña con freeze de fila 1 (frozen header al hacer scroll vertical)
+        sheets.batchUpdate(
+            spreadsheetId=spreadsheet_id,
+            body={
+                "requests": [{
+                    "addSheet": {
+                        "properties": {
+                            "title": tab_name,
+                            "gridProperties": {"frozenRowCount": 1},
+                        }
+                    }
+                }]
+            },
+        ).execute()
 
-    logger.info("Creando pestaña '%s' en sheet=%s.", tab_name, spreadsheet_id)
-    sheets.batchUpdate(
-        spreadsheetId=spreadsheet_id,
-        body={"requests": [{"addSheet": {"properties": {"title": tab_name}}}]},
-    ).execute()
+        # Aplicar formato bold al header (solo en creación)
+        # Necesitamos el sheetId recién creado — re-fetch metadata
+        metadata = sheets.get(spreadsheetId=spreadsheet_id).execute()
+        new_sheet = next(
+            s for s in metadata.get("sheets", [])
+            if s["properties"]["title"] == tab_name
+        )
+        new_sheet_id = new_sheet["properties"]["sheetId"]
+
+        sheets.batchUpdate(
+            spreadsheetId=spreadsheet_id,
+            body={"requests": [{
+                "repeatCell": {
+                    "range": {
+                        "sheetId": new_sheet_id,
+                        "startRowIndex": 0, "endRowIndex": 1,
+                    },
+                    "cell": {
+                        "userEnteredFormat": {
+                            "textFormat": {"bold": True},
+                            "backgroundColor": {"red": 0.93, "green": 0.93, "blue": 0.95},
+                        }
+                    },
+                    "fields": "userEnteredFormat(textFormat,backgroundColor)",
+                }
+            }]},
+        ).execute()
+
+    # Sincronizar headers (siempre — idempotente)
+    last_col = _col_letter(len(headers) - 1)
     sheets.values().update(
         spreadsheetId=spreadsheet_id,
-        range=f"{tab_name}!A1",
+        range=f"{tab_name}!A1:{last_col}1",
         valueInputOption="RAW",
-        body={"values": [columns]},
+        body={"values": [headers]},
     ).execute()
 
 
@@ -395,6 +486,7 @@ def write_facts_to_sheet(
     tab_name: str,
     columns: list[str],
     key_columns: list[str],
+    headers: list[str] | None = None,
 ) -> dict[str, int]:
     """
     Upsert genérico de filas (lista de dicts) en una pestaña, usando un
@@ -405,8 +497,9 @@ def write_facts_to_sheet(
         rows: Lista de dicts con las columnas de la fact table (las extra se ignoran).
         spreadsheet_id: ID de la Google Sheet del cliente.
         tab_name: Nombre de la pestaña destino.
-        columns: Lista canónica de columnas en orden.
+        columns: Lista canónica de columnas en orden técnico.
         key_columns: Subset de `columns` que forman el composite key.
+        headers: Nombres legibles a mostrar en la fila 1. Si None, usa `columns`.
 
     Returns:
         Dict con counts: {'updates': N, 'appends': M}.
@@ -415,7 +508,7 @@ def write_facts_to_sheet(
         return {"updates": 0, "appends": 0}
 
     sheets = build_sheets_service()
-    _ensure_sheet_with_columns(sheets, spreadsheet_id, tab_name, columns)
+    _ensure_sheet_with_columns(sheets, spreadsheet_id, tab_name, columns, headers=headers)
     existing_keys = _get_existing_keys(sheets, spreadsheet_id, tab_name, columns, key_columns)
 
     updates: list[dict] = []
@@ -461,24 +554,27 @@ def write_facts_to_sheet(
 
 
 def write_tofu_facts(rows: list[dict], spreadsheet_id: str) -> dict[str, int]:
-    """Espeja tofu_facts → pestaña 'tofu_facts' con upsert por (date, campaign_id, platform)."""
+    """Espeja tofu_facts → pestaña 'tofu_facts' con headers en español + freeze fila 1."""
     return write_facts_to_sheet(
         rows, spreadsheet_id,
         TOFU_FACTS_SHEET_NAME, TOFU_FACTS_COLUMNS, TOFU_FACTS_KEY,
+        headers=TOFU_FACTS_HEADERS,
     )
 
 
 def write_mofu_facts(rows: list[dict], spreadsheet_id: str) -> dict[str, int]:
-    """Espeja mofu_facts → pestaña 'mofu_facts' con upsert por (date, campaign_id)."""
+    """Espeja mofu_facts → pestaña 'mofu_facts' con headers en español + freeze fila 1."""
     return write_facts_to_sheet(
         rows, spreadsheet_id,
         MOFU_FACTS_SHEET_NAME, MOFU_FACTS_COLUMNS, MOFU_FACTS_KEY,
+        headers=MOFU_FACTS_HEADERS,
     )
 
 
 def write_bofu_facts(rows: list[dict], spreadsheet_id: str) -> dict[str, int]:
-    """Espeja bofu_facts → pestaña 'bofu_facts' con upsert por (date, campaign_id)."""
+    """Espeja bofu_facts → pestaña 'bofu_facts' con headers en español + freeze fila 1."""
     return write_facts_to_sheet(
         rows, spreadsheet_id,
         BOFU_FACTS_SHEET_NAME, BOFU_FACTS_COLUMNS, BOFU_FACTS_KEY,
+        headers=BOFU_FACTS_HEADERS,
     )
