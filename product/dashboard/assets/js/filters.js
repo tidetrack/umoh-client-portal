@@ -644,18 +644,16 @@ function initFilters() {
   if (themeBtn) themeBtn.addEventListener('click', _toggleTheme);
 }
 
-/* ── Auto-hide nav + FAB de navegación flotante ──────────────
-   Cuando el usuario hace scroll para abajo más allá de un umbral,
-   el nav-bar se desvanece hacia arriba y aparece un FAB en la esquina
-   inferior derecha. El FAB despliega un menú con las 4 secciones para
-   cambiar sin volver al top de la página. */
+/* ── Auto-hide nav + FAB scroll-to-top ───────────────────────
+   Cuando el usuario hace scroll para abajo más allá de un umbral, el
+   nav-bar se desvanece hacia arriba y aparece un FAB en la esquina
+   inferior derecha. El FAB es un acceso directo para volver al top
+   de la página (smooth scroll). Al volver al top, el nav reaparece. */
 function initScrollNavBehavior() {
-  const fab        = document.getElementById('nav-fab');
-  const fabMenu    = document.getElementById('nav-fab-menu');
-  if (!fab || !fabMenu) return;
+  const fab = document.getElementById('nav-fab');
+  if (!fab) return;
 
   const SCROLL_THRESHOLD = 180;  // px desde el top antes de ocultar el nav
-  let lastY  = 0;
   let ticking = false;
 
   function onScroll() {
@@ -664,11 +662,7 @@ function initScrollNavBehavior() {
       document.body.classList.add('nav-hidden');
     } else {
       document.body.classList.remove('nav-hidden');
-      // Si el nav vuelve, también cierra el menú del FAB para no quedar
-      // con un menú flotante huérfano
-      _closeFabMenu();
     }
-    lastY = y;
     ticking = false;
   }
 
@@ -679,46 +673,8 @@ function initScrollNavBehavior() {
     }
   }, { passive: true });
 
-  function _openFabMenu() {
-    fabMenu.classList.add('open');
-    fab.setAttribute('aria-expanded', 'true');
-    _highlightActiveFabItem();
-  }
-  function _closeFabMenu() {
-    fabMenu.classList.remove('open');
-    fab.setAttribute('aria-expanded', 'false');
-  }
-  function _highlightActiveFabItem() {
-    fabMenu.querySelectorAll('.nav-fab-item').forEach(item => {
-      item.classList.toggle('active', item.dataset.section === _currentSection);
-    });
-  }
-
-  fab.addEventListener('click', e => {
-    e.stopPropagation();
-    if (fabMenu.classList.contains('open')) _closeFabMenu();
-    else _openFabMenu();
-  });
-
-  fabMenu.querySelectorAll('.nav-fab-item').forEach(item => {
-    item.addEventListener('click', () => {
-      const section = item.dataset.section;
-      _closeFabMenu();
-      if (section === _currentSection) return;
-      // Reusa la lógica de los nav-tab — un solo flujo de cambio de sección
-      const tab = document.querySelector(`.nav-tab[data-section="${section}"]`);
-      if (tab) tab.click();
-    });
-  });
-
-  // Cerrar el menú al click fuera
-  document.addEventListener('click', e => {
-    if (!fabMenu.contains(e.target) && e.target !== fab) _closeFabMenu();
-  });
-
-  // Cerrar el menú con Escape
-  document.addEventListener('keydown', e => {
-    if (e.key === 'Escape' && fabMenu.classList.contains('open')) _closeFabMenu();
+  fab.addEventListener('click', () => {
+    window.scrollTo({ top: 0, behavior: 'smooth' });
   });
 }
 

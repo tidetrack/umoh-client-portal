@@ -687,8 +687,24 @@ body {
   z-index: 90;
   background: var(--bg-nav);
   height: var(--nav-h);
-  /* Sin border-bottom: el tab activo "come" la línea para verse continuo */
   transition: background 0.25s, transform 0.25s ease, opacity 0.25s ease;
+}
+
+/* Línea roja UMOH que separa el "hero" (header + nav) del body — atraviesa
+   todo el ancho del nav. La pestaña activa la "interrumpe" visualmente
+   porque su bg se extiende hacia abajo y tapa la línea solo en su porción.
+   ::after en lugar de border-bottom para que el tab activo (con margin-bottom
+   negativo + box-shadow) pueda cubrirla. */
+.dashboard-nav::after {
+  content: "";
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 3px;
+  background: var(--umoh-accent);
+  z-index: 0;
+  pointer-events: none;
 }
 
 /* Auto-hide: cuando el usuario hace scroll para abajo, el nav se desvanece
@@ -739,36 +755,27 @@ body.nav-hidden .dashboard-nav {
   background: var(--bg-page);
   color: var(--text-primary);
   font-weight: 600;
-  /* Doble truco para que la pestaña se sienta pegada al contenido:
-     1. margin-bottom -2px para que el tab "muerda" el final del nav
-     2. box-shadow extiende el bg del tab 6px hacia abajo (cubre el padding
-        del dashboard-main y se conecta visualmente con el primer elemento
-        del contenido) */
-  margin-bottom: -2px;
-  padding-bottom: 2px;
-  z-index: 1;
+  /* La pestaña se conecta al contenido y a la vez tapa la línea roja del
+     nav (::after de .dashboard-nav) en su porción:
+     - margin-bottom -3px: el tab "sale" 3px abajo del nav, cubriendo
+       exactamente la altura de la línea roja
+     - padding-bottom 3px: compensa para que el texto siga centrado
+     - z-index 2: queda encima de la línea (que está en z-index 0)
+     - box-shadow 0 6px 0 bg-page: extiende el bg del tab 6px más hacia
+       abajo cubriendo el padding superior del contenido */
+  margin-bottom: -3px;
+  padding-bottom: 3px;
+  z-index: 2;
   box-shadow: 0 6px 0 var(--bg-page);
 }
 
-/* Sutil acento UMOH arriba del tab activo (top border) */
-.nav-tab.active::before {
-  content: "";
-  position: absolute;
-  top: 0;
-  left: var(--sp-4);
-  right: var(--sp-4);
-  height: 3px;
-  background: var(--umoh-accent);
-  border-radius: 3px 3px 0 0;
-}
-
-/* ── FAB de navegación — aparece cuando el nav está oculto ─── */
+/* ── FAB scroll-to-top — aparece cuando el nav está oculto ─── */
 .nav-fab {
   position: fixed;
   bottom: 28px;
   right: 28px;
-  width: 56px;
-  height: 56px;
+  width: 52px;
+  height: 52px;
   border-radius: 50%;
   background: var(--umoh-accent);
   color: #fff;
@@ -782,7 +789,8 @@ body.nav-hidden .dashboard-nav {
   opacity: 0;
   transform: scale(0.6) translateY(20px);
   pointer-events: none;
-  transition: opacity 0.25s, transform 0.25s cubic-bezier(0.34, 1.56, 0.64, 1);
+  transition: opacity 0.25s, transform 0.25s cubic-bezier(0.34, 1.56, 0.64, 1),
+              background 0.15s, box-shadow 0.15s;
 }
 
 body.nav-hidden .nav-fab {
@@ -794,70 +802,20 @@ body.nav-hidden .nav-fab {
 .nav-fab:hover {
   background: #d6002f;
   box-shadow: 0 8px 20px rgba(0, 0, 0, 0.25), 0 2px 6px rgba(0, 0, 0, 0.15);
-  transform: scale(1.05);
+  transform: scale(1.06);
+}
+
+.nav-fab:active {
+  transform: scale(0.96);
 }
 
 .nav-fab svg {
-  width: 24px;
-  height: 24px;
-}
-
-/* Menú flotante que despliega el FAB */
-.nav-fab-menu {
-  position: fixed;
-  bottom: 96px;
-  right: 28px;
-  background: var(--bg-card);
-  border: 1px solid var(--border-subtle);
-  border-radius: 12px;
-  box-shadow: 0 12px 28px rgba(0, 0, 0, 0.18), 0 4px 8px rgba(0, 0, 0, 0.08);
-  padding: var(--sp-2);
-  z-index: 109;
-  min-width: 200px;
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-  opacity: 0;
-  transform: scale(0.85) translateY(10px);
-  transform-origin: bottom right;
-  pointer-events: none;
-  transition: opacity 0.2s, transform 0.2s cubic-bezier(0.34, 1.56, 0.64, 1);
-}
-
-.nav-fab-menu.open {
-  opacity: 1;
-  transform: scale(1) translateY(0);
-  pointer-events: auto;
-}
-
-.nav-fab-item {
-  background: transparent;
-  border: none;
-  text-align: left;
-  padding: var(--sp-3) var(--sp-4);
-  border-radius: 8px;
-  font-family: var(--font);
-  font-size: 14px;
-  font-weight: 500;
-  color: var(--text-primary);
-  cursor: pointer;
-  transition: background 0.15s;
-  white-space: nowrap;
-}
-
-.nav-fab-item:hover {
-  background: rgba(255, 0, 64, 0.08);
-}
-
-.nav-fab-item.active {
-  background: rgba(255, 0, 64, 0.12);
-  color: var(--umoh-accent);
-  font-weight: 600;
+  width: 22px;
+  height: 22px;
 }
 
 @media (max-width: 768px) {
-  .nav-fab { bottom: 20px; right: 20px; width: 52px; height: 52px; }
-  .nav-fab-menu { bottom: 84px; right: 20px; min-width: 180px; }
+  .nav-fab { bottom: 20px; right: 20px; width: 48px; height: 48px; }
 }
 
 /* ── 5. Main Layout ────────────────────────────────────────── */

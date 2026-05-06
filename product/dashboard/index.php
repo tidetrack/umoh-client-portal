@@ -671,20 +671,13 @@ $_asset_v = defined('ASSET_VERSION') ? ASSET_VERSION : filemtime(__DIR__ . '/ass
     </div>
   </div>
 
-  <!-- FAB de navegación: aparece cuando el nav se oculta al scrollear -->
-  <button id="nav-fab" class="nav-fab" aria-label="Cambiar de sección" aria-haspopup="menu" aria-expanded="false">
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-      <line x1="3" y1="6"  x2="21" y2="6"/>
-      <line x1="3" y1="12" x2="21" y2="12"/>
-      <line x1="3" y1="18" x2="21" y2="18"/>
+  <!-- FAB scroll-to-top: aparece cuando el nav se oculta al scrollear -->
+  <button id="nav-fab" class="nav-fab" aria-label="Volver arriba" title="Volver arriba">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+      <line x1="12" y1="19" x2="12" y2="5"/>
+      <polyline points="5 12 12 5 19 12"/>
     </svg>
   </button>
-  <div id="nav-fab-menu" class="nav-fab-menu" role="menu" aria-label="Secciones del dashboard">
-    <button class="nav-fab-item" data-section="performance" role="menuitem">Performance</button>
-    <button class="nav-fab-item" data-section="tofu" role="menuitem">Awareness / TOFU</button>
-    <button class="nav-fab-item" data-section="mofu" role="menuitem">Interest / MOFU</button>
-    <button class="nav-fab-item" data-section="bofu" role="menuitem">Sales / BOFU</button>
-  </div>
 
   <!-- Theme toggle pill switch (position: fixed top-right) -->
   <button id="theme-toggle" class="theme-toggle-switch" title="Cambiar tema" aria-label="Cambiar modo claro/oscuro">
