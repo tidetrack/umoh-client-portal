@@ -690,19 +690,19 @@ body {
   transition: background 0.25s, transform 0.25s ease, opacity 0.25s ease;
 }
 
-/* Línea roja UMOH que separa el "hero" (header + nav) del body — atraviesa
-   todo el ancho del nav. La pestaña activa la "interrumpe" visualmente
-   porque su bg se extiende hacia abajo y tapa la línea solo en su porción.
-   ::after en lugar de border-bottom para que el tab activo (con margin-bottom
-   negativo + box-shadow) pueda cubrirla. */
+/* Línea sutil UMOH como separador del "hero" (header + nav) y el body —
+   atraviesa todo el ancho del nav. La pestaña activa la "interrumpe"
+   visualmente porque su bg se extiende hacia abajo y tapa la línea solo
+   en su porción. 1px con opacidad reducida para que se sienta como una
+   sombra/separador y no compita visualmente con el contenido. */
 .dashboard-nav::after {
   content: "";
   position: absolute;
   left: 0;
   right: 0;
   bottom: 0;
-  height: 3px;
-  background: var(--umoh-accent);
+  height: 1px;
+  background: rgba(255, 0, 64, 0.45);
   z-index: 0;
   pointer-events: none;
 }
@@ -755,22 +755,22 @@ body.nav-hidden .dashboard-nav {
   background: var(--bg-page);
   color: var(--text-primary);
   font-weight: 600;
-  /* Borde rojo UMOH en TOP + LEFT + RIGHT — los bordes laterales aterrizan
-     justo donde está la línea horizontal del nav (.dashboard-nav::after),
-     formando un contorno continuo en U invertida alrededor de la pestaña.
-     El bottom no tiene border porque la pestaña se conecta al contenido. */
-  border-top:    3px solid var(--umoh-accent);
-  border-left:   3px solid var(--umoh-accent);
-  border-right:  3px solid var(--umoh-accent);
+  /* Borde sutil UMOH en TOP + LEFT + RIGHT (1px, baja opacidad). Los
+     bordes laterales descienden y se conectan con la línea horizontal
+     del nav formando un contorno continuo en U invertida. El bottom no
+     tiene border porque la pestaña se conecta al contenido. */
+  border-top:    1px solid rgba(255, 0, 64, 0.45);
+  border-left:   1px solid rgba(255, 0, 64, 0.45);
+  border-right:  1px solid rgba(255, 0, 64, 0.45);
   border-bottom: none;
-  /* La pestaña activa es 3px más alta que las inactivas (el border-top
-     extra "sobresale" del nav, efecto pestaña levantada). */
-  height: calc(var(--nav-h) - 1px);
-  /* margin-bottom -3px: el tab muerde 3px del bottom del nav, cubriendo
+  /* La pestaña activa es 1px más alta que las inactivas (el border-top
+     extra hace de "elevación" mínima). */
+  height: calc(var(--nav-h) - 3px);
+  /* margin-bottom -1px: el tab muerde 1px del bottom del nav, cubriendo
      la línea horizontal en su porción y conectando los bordes laterales
      con la línea continua del nav. */
-  margin-bottom: -3px;
-  padding-bottom: 3px;
+  margin-bottom: -1px;
+  padding-bottom: 1px;
   z-index: 2;
   box-shadow: 0 6px 0 var(--bg-page);
 }
