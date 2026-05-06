@@ -27,6 +27,13 @@ if (empty($_SESSION['umoh_user'])) api_error('No autenticado', 401);
 const CLIENT_SLUG = 'prepagas';
 
 try {
+    // Filtro global de campaña (Fase 4 — sprint 1.8). Para Prepagas hoy con
+    // una sola campaña activa, "all" y el ID real producen el mismo dataset
+    // (todas las filas de leads/lead_monetary pertenecen a esa campaña). Cuando
+    // haya multi-campaña, las queries directas a `leads` deberán cambiar a usar
+    // las facts tables que ya están filtradas por campaign_id. Por ahora el
+    // único bloque que sí filtra realmente es sellers (via seller_facts).
+    $campaign_filter = $_GET['campaign_id'] ?? '';
     // 1. Ventas cerradas: lead_monetary con is_closed=true
     $closed = supabase_query('lead_monetary', [
         'client_slug' => 'eq.' . CLIENT_SLUG,
@@ -192,13 +199,17 @@ try {
     // Helper interno: lee seller_facts en un rango y agrega por seller_name.
     // avg_cycle_days se calcula como weighted avg por sales_count (matemática-
     // mente correcto cuando se promedian días de ciclo de varios cierres).
-    $aggregate_sellers = function(string $rs, string $re) {
-        $rows = supabase_query('seller_facts', [
+    $aggregate_sellers = function(string $rs, string $re) use ($campaign_filter) {
+        $q = [
             'client_slug' => 'eq.' . CLIENT_SLUG,
             'date'        => 'gte.' . $rs,
             'select'      => 'seller_name,leads_assigned,sales_count,revenue,capitas_closed,avg_cycle_days,date',
             'limit'       => '5000',
-        ]);
+        ];
+        if ($campaign_filter !== '' && $campaign_filter !== 'all') {
+            $q['campaign_id'] = 'eq.' . $campaign_filter;
+        }
+        $rows = supabase_query('seller_facts', $q);
         // Filtrar manualmente la cota superior (PostgREST no permite 2x date= en una sola query).
         $rows = array_filter($rows, fn($r) => ($r['date'] ?? '') <= $re);
 

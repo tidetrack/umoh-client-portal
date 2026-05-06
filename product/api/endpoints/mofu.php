@@ -27,6 +27,13 @@ if (empty($_SESSION['umoh_user'])) api_error('No autenticado', 401);
 const CLIENT_SLUG = 'prepagas';
 
 try {
+    // Filtro global de campaña (Fase 4 — sprint 1.8). Aceptamos el parámetro
+    // por contrato del frontend, pero las queries de MOFU leen directamente de
+    // `leads` que no tiene campaign_id (los leads de MeisterTask no traen ese
+    // campo). Para Prepagas hoy con una sola campaña activa, todos los
+    // is_campaign_lead=true son de esa campaña — sin diferencia funcional.
+    // TODO multi-campaña: refactor a leer de mofu_facts con filtro campaign_id.
+    $campaign_filter = $_GET['campaign_id'] ?? '';
     // 1. Funnel stages config: section_name → flags (high_intent, lost, incubating, etc.)
     //    Incluye display_order para construir el journey en el mismo orden que el CRM.
     $stages = supabase_query('funnel_stages', [

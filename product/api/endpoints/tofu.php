@@ -34,11 +34,19 @@ if (empty($_SESSION['umoh_user'])) {
 const CLIENT_SLUG = 'prepagas';
 
 try {
-    $rows = supabase_query('tofu_ads_daily', [
+    // Filtro de campaña activa: si viene ?campaign_id=X, agregamos el filtro
+    // a la query. Si está vacío o "all", no se filtra (vista agregada de
+    // todas las campañas activas del cliente).
+    $campaign_filter = $_GET['campaign_id'] ?? '';
+    $tofu_query_params = [
         'client_slug' => 'eq.' . CLIENT_SLUG,
         'order'       => 'date.asc',
         'limit'       => '1000',
-    ]);
+    ];
+    if ($campaign_filter !== '' && $campaign_filter !== 'all') {
+        $tofu_query_params['campaign_id'] = 'eq.' . $campaign_filter;
+    }
+    $rows = supabase_query('tofu_ads_daily', $tofu_query_params);
 
     if (empty($rows)) api_error('Sin datos en tofu_ads_daily para ' . CLIENT_SLUG, 404);
 

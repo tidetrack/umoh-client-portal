@@ -15,10 +15,11 @@
  */
 
 const USE_MOCK = {
-  summary: false,
-  tofu:    false,
-  mofu:    false,
-  bofu:    false,
+  summary:   false,
+  tofu:      false,
+  mofu:      false,
+  bofu:      false,
+  campaigns: false,  // siempre real (la lista de campañas viene de Supabase)
 };
 const API_BASE = 'api/endpoints';
 

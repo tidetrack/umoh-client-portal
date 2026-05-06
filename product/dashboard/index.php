@@ -75,6 +75,33 @@ $_asset_v = defined('ASSET_VERSION') ? ASSET_VERSION : filemtime(__DIR__ . '/ass
       <!-- Controls -->
       <div class="header-controls">
 
+        <!-- Selector de campaña activa (Fase 4 — sprint 1.8). Visible en
+             todas las secciones porque vive en el header. -->
+        <div class="campaign-selector-wrap">
+          <button class="campaign-selector-btn" id="campaign-selector-btn" type="button"
+                  aria-haspopup="listbox" aria-expanded="false">
+            <svg class="cs-btn-icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <circle cx="12" cy="12" r="10"/>
+              <circle cx="12" cy="12" r="6"/>
+              <circle cx="12" cy="12" r="2"/>
+            </svg>
+            <span class="cs-btn-text">
+              <span class="cs-btn-name" id="cs-btn-name">Todas las campañas</span>
+              <span class="cs-btn-id" id="cs-btn-id"></span>
+            </span>
+            <svg class="cs-btn-chevron" width="12" height="12" viewBox="0 0 12 12" fill="none" aria-hidden="true">
+              <path d="M2 4l4 4 4-4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+            </svg>
+          </button>
+          <div class="campaign-selector-popover" id="campaign-selector-popover" role="listbox" hidden aria-hidden="true">
+            <button class="campaign-option active" data-campaign-id="all" role="option" aria-selected="true">
+              <span class="cs-opt-name">Todas las campañas</span>
+              <span class="cs-opt-id">vista agregada</span>
+            </button>
+            <!-- el resto se popula dinámicamente desde GET /api/campaigns -->
+          </div>
+        </div>
+
         <!-- Period selector + date picker -->
         <div class="period-selector-wrap">
           <div class="period-selector" role="group" aria-label="Selector de período">

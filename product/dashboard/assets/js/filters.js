@@ -3,9 +3,13 @@
  * Orquesta api.js → charts.js. No tiene lógica de datos propia.
  */
 
-let _currentPeriod  = '30d';
-let _currentSection = 'performance';
-let _loading        = false;
+let _currentPeriod    = '30d';
+let _currentSection   = 'performance';
+let _loading          = false;
+// Filtro global de campaña (Fase 4 — sprint 1.8). 'all' = vista agregada.
+// Se persiste en localStorage para que la selección sobreviva entre reloads.
+let _currentCampaignId   = localStorage.getItem('umoh:campaign_id')   || 'all';
+let _currentCampaignName = localStorage.getItem('umoh:campaign_name') || '';
 
 /* ── Loader visual ──────────────────────────────────────── */
 function _setLoading(on) {
@@ -28,7 +32,10 @@ async function refreshDashboard(section, period, extraParams = {}) {
   const endpointMap = { performance: 'summary', tofu: 'tofu', mofu: 'mofu', bofu: 'bofu' };
 
   try {
-    const data = await fetchData(endpointMap[section], { period, ...extraParams });
+    // Filtro de campaña activa siempre se inyecta (los endpoints lo aceptan
+    // y filtran si != 'all'). Permite que extraParams sobreescriba si hace falta.
+    const params = { period, campaign_id: _currentCampaignId, ...extraParams };
+    const data = await fetchData(endpointMap[section], params);
     renderSection(section, data);
   } catch (err) {
     console.error('[Dashboard] Error al cargar datos:', err);
@@ -678,6 +685,119 @@ function initScrollNavBehavior() {
   });
 }
 
+/* ── Selector de campaña activa (Fase 4 — sprint 1.8) ────────
+   Trae la lista de campañas desde GET /api/campaigns y popula el dropdown.
+   Click en una opción → actualiza el estado global, persiste en localStorage,
+   y dispara refreshDashboard() para que todas las secciones se recalculen
+   con el filtro nuevo. */
+function initCampaignSelector() {
+  const btn      = document.getElementById('campaign-selector-btn');
+  const popover  = document.getElementById('campaign-selector-popover');
+  const btnName  = document.getElementById('cs-btn-name');
+  const btnId    = document.getElementById('cs-btn-id');
+  if (!btn || !popover || !btnName) return;
+
+  function _setSelectedUI(id, name) {
+    btnName.textContent = (id === 'all') ? 'Todas las campañas' : name;
+    btnId.textContent   = (id === 'all') ? '' : 'ID ' + id;
+    popover.querySelectorAll('.campaign-option').forEach(opt => {
+      const isActive = opt.dataset.campaignId === id;
+      opt.classList.toggle('active', isActive);
+      opt.setAttribute('aria-selected', isActive ? 'true' : 'false');
+    });
+  }
+
+  function _selectCampaign(id, name) {
+    _currentCampaignId = id;
+    _currentCampaignName = name || '';
+    localStorage.setItem('umoh:campaign_id', id);
+    localStorage.setItem('umoh:campaign_name', _currentCampaignName);
+    _setSelectedUI(id, _currentCampaignName);
+    _closePopover();
+    // Refresca la sección actual con el filtro nuevo
+    refreshDashboard(_currentSection, _currentPeriod);
+  }
+
+  function _openPopover() {
+    popover.hidden = false;
+    popover.setAttribute('aria-hidden', 'false');
+    btn.setAttribute('aria-expanded', 'true');
+  }
+  function _closePopover() {
+    popover.hidden = true;
+    popover.setAttribute('aria-hidden', 'true');
+    btn.setAttribute('aria-expanded', 'false');
+  }
+
+  btn.addEventListener('click', e => {
+    e.stopPropagation();
+    if (popover.hidden) _openPopover();
+    else _closePopover();
+  });
+
+  // Event delegation para los options (la lista se popula dinámicamente)
+  popover.addEventListener('click', e => {
+    const opt = e.target.closest('.campaign-option');
+    if (!opt) return;
+    _selectCampaign(opt.dataset.campaignId, opt.dataset.campaignName || opt.querySelector('.cs-opt-name')?.textContent || '');
+  });
+
+  document.addEventListener('click', e => {
+    if (!popover.contains(e.target) && e.target !== btn) _closePopover();
+  });
+  document.addEventListener('keydown', e => {
+    if (e.key === 'Escape' && !popover.hidden) _closePopover();
+  });
+
+  // Cargar la lista desde el backend y popular el dropdown
+  fetchData('campaigns', {})
+    .then(resp => {
+      const list = (resp && resp.campaigns) || [];
+      // El option "all" ya está en el HTML; agregamos los demás abajo
+      list.forEach(c => {
+        const opt = document.createElement('button');
+        opt.className = 'campaign-option';
+        opt.type = 'button';
+        opt.dataset.campaignId = c.id;
+        opt.dataset.campaignName = c.name;
+        opt.setAttribute('role', 'option');
+        opt.setAttribute('aria-selected', 'false');
+        opt.innerHTML = `
+          <span class="cs-opt-name">${_escape(c.name)}</span>
+          <span class="cs-opt-id">ID ${_escape(c.id)}</span>
+        `;
+        popover.appendChild(opt);
+      });
+      // Si la persistencia tenía un id que coincide con una campaña real,
+      // refrescamos la UI para reflejarlo. Si no existe (cliente cambió de
+      // campaña, o mock), volvemos a "all".
+      if (_currentCampaignId !== 'all') {
+        const found = list.find(c => c.id === _currentCampaignId);
+        if (!found) {
+          _currentCampaignId = 'all';
+          _currentCampaignName = '';
+          localStorage.setItem('umoh:campaign_id', 'all');
+          localStorage.setItem('umoh:campaign_name', '');
+        } else {
+          _currentCampaignName = found.name;
+          localStorage.setItem('umoh:campaign_name', found.name);
+        }
+      }
+      _setSelectedUI(_currentCampaignId, _currentCampaignName);
+    })
+    .catch(err => {
+      console.warn('[Dashboard] No se pudo cargar la lista de campañas:', err);
+      // Fallback: dejar "Todas las campañas" como única opción
+      _setSelectedUI('all', '');
+    });
+}
+
+function _escape(s) {
+  return String(s).replace(/[&<>"']/g, c => ({
+    '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;',
+  })[c]);
+}
+
 /* ── Bootstrap ──────────────────────────────────────────── */
 document.addEventListener('DOMContentLoaded', () => {
   initTheme();
@@ -685,5 +805,6 @@ document.addEventListener('DOMContentLoaded', () => {
   initFilters();
   initKpiModals();
   initScrollNavBehavior();
+  initCampaignSelector();
   refreshDashboard(_currentSection, _currentPeriod);
 });

@@ -28,6 +28,11 @@ const CLIENT_SLUG = 'prepagas';
 
 try {
     $period = $_GET['period'] ?? '30d';
+    // Filtro global de campaña (Fase 4 — sprint 1.8). Hoy solo aplica al bloque
+    // sellers/seller_summary (via seller_facts). Las métricas TOFU/MOFU/BOFU
+    // del summary leen de tablas crudas que aún no tienen campaign_id —
+    // refactor pendiente cuando haya multi-campaña.
+    $campaign_filter = $_GET['campaign_id'] ?? '';
 
     // 1. TOFU: tofu_ads_daily — impressions y spend por día
     $tofu_rows = supabase_query('tofu_ads_daily', [
@@ -149,13 +154,17 @@ try {
     $prev_start_seller = date('Y-m-d', strtotime($prev_end_seller) - ($period_days_seller - 1) * 86400);
 
     // Helper: lee seller_facts en un rango y agrega por seller_name.
-    $aggregate_sellers = function(string $rs, string $re) {
-        $rows = supabase_query('seller_facts', [
+    $aggregate_sellers = function(string $rs, string $re) use ($campaign_filter) {
+        $q = [
             'client_slug' => 'eq.' . CLIENT_SLUG,
             'date'        => 'gte.' . $rs,
             'select'      => 'seller_name,leads_assigned,sales_count,revenue,capitas_closed,avg_cycle_days,date',
             'limit'       => '5000',
-        ]);
+        ];
+        if ($campaign_filter !== '' && $campaign_filter !== 'all') {
+            $q['campaign_id'] = 'eq.' . $campaign_filter;
+        }
+        $rows = supabase_query('seller_facts', $q);
         $rows = array_filter($rows, fn($r) => ($r['date'] ?? '') <= $re);
 
         $agg = [];
