@@ -47,9 +47,15 @@ jobs:
           mkdir -p build/staging/api/config
           cp -r product/dashboard/. build/staging/
           cp -r product/api/.       build/staging/api/
+          # Sed deja como está si api.js usa USE_MOCK por-endpoint (objeto). Histórico: forzaba mock global.
           sed -i 's/const USE_MOCK = false.*/const USE_MOCK = true;/' build/staging/assets/js/api.js || true
           python3 .github/scripts/inject_credentials.py build/staging
           echo '${{ secrets.GOOGLE_SHEETS_SA_JSON }}' > build/staging/api/config/sa.json
+          # .env con credenciales Supabase para tofu.php (lo lee env.php). Solo lo mínimo: nada de OAuth/Sheets.
+          cat > build/staging/.env <<EOF
+          SUPABASE_URL=${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_KEY=${{ secrets.SUPABASE_SERVICE_KEY }}
+          EOF
 
       - name: Deploy via rsync
         run: |
@@ -90,12 +96,17 @@ jobs:
           mkdir -p build/prepagas/api/config
           cp -r product/dashboard/. build/prepagas/
           cp -r product/api/.       build/prepagas/api/
-          # TEMP (Fase 1): producción usa mock data hasta que los endpoints reales estén listos (Fase 2+).
-          # Cuando Google Ads/Meta/MeisterTask estén conectados, volver este sed a: USE_MOCK = false
-          sed -i 's/const USE_MOCK = false.*/const USE_MOCK = true;/' build/prepagas/assets/js/api.js || true
-          grep -q "USE_MOCK = true" build/prepagas/assets/js/api.js || { echo "ERROR: USE_MOCK no quedó en true"; exit 1; }
+          # USE_MOCK ahora es per-endpoint (objeto). El estado por-endpoint está en api.js
+          # del repo — no se sobreescribe en el deploy. Si querés forzar todo a mock en prod
+          # mientras se valida, hacelo en el commit a main, no acá.
+          grep -q "const USE_MOCK" build/prepagas/assets/js/api.js || { echo "ERROR: const USE_MOCK no encontrado en api.js"; exit 1; }
           python3 .github/scripts/inject_credentials.py build/prepagas
           echo '${{ secrets.GOOGLE_SHEETS_SA_JSON }}' > build/prepagas/api/config/sa.json
+          # .env con credenciales Supabase para los endpoints PHP que leen de Supabase.
+          cat > build/prepagas/.env <<EOF
+          SUPABASE_URL=${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_KEY=${{ secrets.SUPABASE_SERVICE_KEY }}
+          EOF
           # Canario de deploy — Franco accede a prepagas.umohcrew.com/deploy-canary.txt para confirmar path servido
           echo "Deploy SHA: ${GITHUB_SHA:0:7} — $(date -u +%Y-%m-%dT%H:%M:%SZ)" > build/prepagas/deploy-canary.txt
 

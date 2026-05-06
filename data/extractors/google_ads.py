@@ -130,7 +130,6 @@ SELECT
 FROM campaign
 WHERE
   segments.date BETWEEN '{date_start}' AND '{date_end}'
-  AND campaign.status = 'ENABLED'
 ORDER BY segments.date ASC
 """
 
@@ -144,7 +143,31 @@ FROM search_term_view
 WHERE
   segments.date BETWEEN '{date_start}' AND '{date_end}'
 ORDER BY metrics.clicks DESC
-LIMIT 20
+LIMIT 500
+"""
+
+_GEO_QUERY = """
+SELECT
+  segments.date,
+  segments.geo_target_city,
+  metrics.clicks,
+  metrics.impressions
+FROM geographic_view
+WHERE
+  segments.date BETWEEN '{date_start}' AND '{date_end}'
+"""
+
+# La query de geo_target_constant no soporta filtrar por una lista grande
+# con BETWEEN. Filtramos por resource_name (Google acepta hasta varios cientos).
+_GEO_NAMES_QUERY = """
+SELECT
+  geo_target_constant.resource_name,
+  geo_target_constant.name,
+  geo_target_constant.canonical_name,
+  geo_target_constant.target_type,
+  geo_target_constant.country_code
+FROM geo_target_constant
+WHERE geo_target_constant.resource_name IN ({resource_names})
 """
 
 
@@ -230,6 +253,11 @@ def extract_search_terms(
     ga_service = client.get_service("GoogleAdsService")
     query = _SEARCH_TERMS_QUERY.format(date_start=date_start, date_end=date_end)
 
+    logger.info(
+        "Ejecutando query de search_term_view para customer_id=%s rango=%s a %s",
+        customer_id, date_start, date_end,
+    )
+
     terms = []
     try:
         response = ga_service.search_stream(customer_id=customer_id, query=query)
@@ -250,8 +278,145 @@ def extract_search_terms(
             "Se continua sin este campo.",
             customer_id,
         )
+        return terms
+
+    if not terms:
+        logger.warning(
+            "search_term_view devolvió 0 filas para customer_id=%s. "
+            "Posibles causas: (1) developer token en BASIC sin acceso a search_term_view, "
+            "(2) anonimización de Google por bajo volumen, (3) campañas sin Search activas. "
+            "Verificar nivel del developer token en https://ads.google.com/aw/apicenter",
+            customer_id,
+        )
+    else:
+        logger.info(
+            "search_term_view: %d filas crudas extraídas (algunos términos pueden repetirse por día).",
+            len(terms),
+        )
 
     return terms
+
+
+def extract_geographic(
+    client: GoogleAdsClient,
+    customer_id: str,
+    date_start: str,
+    date_end: str,
+) -> list[dict[str, Any]]:
+    """
+    Extrae métricas por ciudad (geographic_view) para el período indicado.
+
+    Estrategia en dos pasos:
+      1. Query a geographic_view → trae filas con resource_name de la ciudad
+         (ej: "geoTargetConstants/1010195") y métricas.
+      2. Query a geo_target_constant → mapea resource_name → nombre legible.
+
+    Si la cuenta no tiene targeting geográfico configurado, la query devuelve
+    0 filas y se retorna lista vacía sin error.
+
+    Args:
+        client: GoogleAdsClient autenticado.
+        customer_id: ID de la cuenta del cliente.
+        date_start: Fecha inicio YYYY-MM-DD.
+        date_end: Fecha fin YYYY-MM-DD.
+
+    Returns:
+        Lista de dicts {date, city_name, country_code, clicks, impressions}.
+        Si no se pudieron resolver los nombres, city_name = resource_name crudo.
+    """
+    ga_service = client.get_service("GoogleAdsService")
+    geo_query = _GEO_QUERY.format(date_start=date_start, date_end=date_end)
+
+    geo_rows: list[dict[str, Any]] = []
+    resource_names: set[str] = set()
+
+    try:
+        response = ga_service.search_stream(customer_id=customer_id, query=geo_query)
+        for batch in response:
+            for row in batch.results:
+                resource_name = row.segments.geo_target_city
+                if not resource_name:
+                    continue
+                geo_rows.append({
+                    "date": row.segments.date,
+                    "resource_name": resource_name,
+                    "clicks": row.metrics.clicks,
+                    "impressions": row.metrics.impressions,
+                })
+                resource_names.add(resource_name)
+    except GoogleAdsException as ex:
+        _log_google_ads_exception(ex, customer_id, "metricas geograficas")
+        logger.warning(
+            "No se pudieron extraer datos geograficos para customer_id=%s. Se continua sin geo.",
+            customer_id,
+        )
+        return []
+
+    if not geo_rows:
+        logger.info("Sin datos geograficos en el rango para customer_id=%s.", customer_id)
+        return []
+
+    # Paso 2: resolver resource_names a nombres legibles
+    name_map = _resolve_geo_names(client, customer_id, resource_names)
+
+    # Enriquecer cada fila con el nombre de la ciudad
+    enriched: list[dict[str, Any]] = []
+    for r in geo_rows:
+        info = name_map.get(r["resource_name"], {})
+        enriched.append({
+            "date": r["date"],
+            "city_name":     info.get("name", r["resource_name"]),
+            "country_code":  info.get("country_code", ""),
+            "target_type":   info.get("target_type", ""),
+            "clicks":        r["clicks"],
+            "impressions":   r["impressions"],
+        })
+
+    logger.info(
+        "Geo extraido: %d filas, %d ciudades únicas resueltas.",
+        len(enriched),
+        len(name_map),
+    )
+    return enriched
+
+
+def _resolve_geo_names(
+    client: GoogleAdsClient,
+    customer_id: str,
+    resource_names: set[str],
+) -> dict[str, dict[str, str]]:
+    """
+    Resuelve un set de resource_names de geo_target_constant a {name, country_code, target_type}.
+
+    Procesa en batches de 200 para evitar URLs demasiado largas.
+    """
+    if not resource_names:
+        return {}
+
+    ga_service = client.get_service("GoogleAdsService")
+    name_map: dict[str, dict[str, str]] = {}
+
+    rn_list = sorted(resource_names)
+    for i in range(0, len(rn_list), 200):
+        batch = rn_list[i:i + 200]
+        # GAQL acepta resource_name como string entre comillas simples
+        formatted = ", ".join(f"'{rn}'" for rn in batch)
+        query = _GEO_NAMES_QUERY.format(resource_names=formatted)
+
+        try:
+            response = ga_service.search_stream(customer_id=customer_id, query=query)
+            for response_batch in response:
+                for row in response_batch.results:
+                    name_map[row.geo_target_constant.resource_name] = {
+                        "name":         row.geo_target_constant.name,
+                        "country_code": row.geo_target_constant.country_code,
+                        "target_type":  row.geo_target_constant.target_type,
+                    }
+        except GoogleAdsException as ex:
+            _log_google_ads_exception(ex, customer_id, "nombres de geo_target_constant")
+            # No raise — devolvemos lo que hayamos podido resolver
+
+    return name_map
 
 
 # ---------------------------------------------------------------------------
@@ -294,11 +459,13 @@ def extract_client(
 
     metrics = extract_tofu_metrics(client, customer_id, date_start, date_end)
     terms = extract_search_terms(client, customer_id, date_start, date_end)
+    geo = extract_geographic(client, customer_id, date_start, date_end)
 
     logger.info(
-        "Extraccion completada: %d filas de metricas, %d terminos de busqueda.",
+        "Extraccion completada: %d filas de metricas, %d terminos de busqueda, %d filas geo.",
         len(metrics),
         len(terms),
+        len(geo),
     )
 
     return {
@@ -312,6 +479,7 @@ def extract_client(
         "sheets_output_id": client_config["sheets_output_id"],
         "raw_metrics": metrics,
         "raw_search_terms": terms,
+        "raw_geo": geo,
     }
 
 

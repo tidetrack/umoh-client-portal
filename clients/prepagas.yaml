@@ -34,3 +34,128 @@ reporting:
     - En Emision
     - Erroneo
     - En Blanco
+
+# Configuración del funnel — fuente de verdad para tabla `funnel_stages` en Supabase.
+# Cada run del pipeline sincroniza este bloque a la DB (sync con soft-delete).
+# Para reclasificar una sección: editar acá, el siguiente run actualiza la vista.
+funnel_stages:
+  - section: "Inbox"
+    stage: mofu
+    high_intent: false
+    closed_won: false
+    typified: false
+    lost: false
+    incubating: false
+    order: 1
+  - section: "Nuevo"
+    stage: mofu
+    high_intent: false
+    closed_won: false
+    typified: false
+    lost: false
+    incubating: false
+    order: 2
+  - section: "Prioritarios"
+    stage: mofu
+    high_intent: true
+    closed_won: false
+    typified: true
+    lost: false
+    incubating: false
+    order: 3
+  - section: "Para Hoy"
+    stage: mofu
+    high_intent: false
+    closed_won: false
+    typified: true
+    lost: false
+    incubating: false
+    order: 4
+  - section: "Procesando"
+    stage: mofu
+    high_intent: false
+    closed_won: false
+    typified: true
+    lost: false
+    incubating: false
+    order: 5
+  - section: "Contactados"
+    stage: mofu
+    high_intent: false
+    closed_won: false
+    typified: true
+    lost: false
+    incubating: false
+    order: 6
+  - section: "Cotizados"
+    stage: mofu
+    high_intent: true
+    closed_won: false
+    typified: true
+    lost: false
+    incubating: false
+    order: 7
+  - section: "En Auditoria"
+    stage: mofu
+    high_intent: true
+    closed_won: false
+    typified: true
+    lost: false
+    incubating: false
+    order: 8
+  - section: "Mes que viene"
+    stage: mofu
+    high_intent: false
+    closed_won: false
+    typified: true
+    lost: false
+    incubating: true
+    order: 9
+  - section: "A futuro"
+    stage: mofu
+    high_intent: false
+    closed_won: false
+    typified: true
+    lost: false
+    incubating: true
+    order: 10
+  - section: "Ventas Ganadas"
+    stage: bofu
+    high_intent: false
+    closed_won: true
+    typified: true
+    lost: false
+    incubating: false
+    order: 11
+  - section: "No prospera"
+    stage: mofu
+    high_intent: false
+    closed_won: false
+    typified: true
+    lost: true
+    incubating: false
+    order: 12
+  - section: "Erroneos"
+    stage: excluded
+    high_intent: false
+    closed_won: false
+    typified: false
+    lost: false
+    incubating: false
+    order: 13
+  - section: "Tareas Finalizadas"
+    stage: excluded
+    high_intent: false
+    closed_won: false
+    typified: false
+    lost: false
+    incubating: false
+    order: 14
+
+# Mapping asesor → email para el envío semanal de update_requirements.
+# Placeholder: setup SMTP postergado (memo: project_email_smtp_backlog).
+# Mientras tanto, todo va a la cuenta compartida del equipo de ventas.
+assignee_emails:
+  "Roco Giudice": "prevencionsalud.ventasmendoza@gmail.com"
+  "Cristian Alejandro Giudice": "prevencionsalud.ventasmendoza@gmail.com"
+  "Fernando Giudice": "prevencionsalud.ventasmendoza@gmail.com"

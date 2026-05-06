@@ -1,14 +1,25 @@
 /**
  * api.js — Capa de abstracción de datos.
  *
- * Fase 1: USE_MOCK = true  → sirve desde mockdata.js
- * Fase 2: USE_MOCK = false → llama a los endpoints PHP reales
+ * USE_MOCK es per-endpoint: cada vista del dashboard puede estar mock o real
+ * de forma independiente. Esto permite migrar sección por sección a datos
+ * reales sin romper las que todavía no están integradas.
+ *
+ * Estado MVP (2026-04-29):
+ *   tofu    → REAL (Supabase tabla tofu_ads_daily, vía product/api/endpoints/tofu.php)
+ *   summary → mock (pendiente migración a Supabase)
+ *   mofu    → mock (pendiente endpoint Supabase para tabla leads)
+ *   bofu    → mock (pendiente endpoint Supabase para tabla lead_monetary)
  *
  * charts.js y filters.js siempre llaman a fetchData().
- * Para pasar a producción solo cambiar USE_MOCK a false.
  */
 
-const USE_MOCK = true; // staging: mock data activo — producción usa USE_MOCK=false via workflow
+const USE_MOCK = {
+  summary: false,
+  tofu:    false,
+  mofu:    false,
+  bofu:    false,
+};
 const API_BASE = 'api/endpoints';
 
 /**
@@ -18,15 +29,18 @@ const API_BASE = 'api/endpoints';
  * @returns {Promise<Object>}
  */
 async function fetchData(endpoint, params = {}) {
-  if (USE_MOCK) {
+  if (USE_MOCK[endpoint] !== false) {
     return getMockData(endpoint, params);
   }
 
-  const base = window.location.origin + '/' + API_BASE;
-  const url  = new URL(`${base}/${endpoint}.php`);
+  // URL relativa al documento actual: si el dashboard se sirve desde
+  // prepagas.umohcrew.com/staging/, el fetch va a /staging/api/endpoints/...
+  // Si se sirve desde la raíz (producción), va a /api/endpoints/...
+  const url = new URL(`${API_BASE}/${endpoint}.php`, window.location.href);
   Object.entries(params).forEach(([k, v]) => url.searchParams.set(k, v));
 
   const res = await fetch(url.toString(), {
+    credentials: 'same-origin',
     headers: { 'Accept': 'application/json' }
   });
 
