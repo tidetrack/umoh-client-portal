@@ -3,9 +3,10 @@
  * Orquesta api.js → charts.js. No tiene lógica de datos propia.
  */
 
-let _currentPeriod    = '30d';
-let _currentSection   = 'performance';
-let _loading          = false;
+let _currentPeriod      = '30d';
+let _currentSection     = 'performance';
+let _currentGranularity = 'dias';   // última granularidad activa del historic-section
+let _loading            = false;
 // Filtro global de campaña (Fase 4 — sprint 1.8). 'all' = vista agregada.
 // Se persiste en localStorage para que la selección sobreviva entre reloads.
 let _currentCampaignId   = localStorage.getItem('umoh:campaign_id')   || 'all';
@@ -102,7 +103,12 @@ function _applyCustomRange() {
 
   _closeDatePicker();
   _currentPeriod = 'custom';
-  refreshDashboard(_currentSection, 'custom', { start: startInput.value, end: endInput.value });
+  // Pasa la granularity activa para que build_trend la respete en el backend
+  refreshDashboard(_currentSection, 'custom', {
+    start: startInput.value,
+    end:   endInput.value,
+    granularity: _currentGranularity,
+  });
 }
 
 /* ── Theme toggle ────────────────────────────────────────── */
@@ -436,7 +442,8 @@ function _renderModalChart(kpiKey) {
 
   const isTofuKey = ['tofu-impressions', 'tofu-clicks', 'tofu-cpc'].includes(kpiKey);
   const isMofuKey = ['mofu-leads', 'mofu-cpl', 'mofu-tipif', 'mofu-highintent', 'mofu-closedwon'].includes(kpiKey);
-  const isBofuKey = ['bofu-revenue', 'bofu-sales', 'bofu-ticket', 'bofu-conversion', 'bofu-capitas', 'bofu-ticket-capita', 'revenue', 'sales'].includes(kpiKey);
+  const isBofuKey = kpiKey.startsWith('bofu-') ||
+    (['revenue', 'sales'].includes(kpiKey) && _currentSection === 'bofu');
 
   let data;
   if (isTofuKey) {
@@ -475,9 +482,16 @@ function _renderModalChart(kpiKey) {
     values = revenue.map(r => tot > 0 ? Math.round((r / tot) * data.leads) : 0);
     color = isUp(values) ? '#22C55E' : '#FF0040'; label = 'Leads';
   } else if (kpiKey === 'sales' && !isBofuKey) {
-    // Performance section sales
+    // Performance section sales — usa revenue como proxy de distribución temporal.
+    // Si revenue está todo en 0 (caso sin datos reales), usa distribución uniforme.
     const tot = revenue.reduce((a, b) => a + b, 0);
-    values = revenue.map(r => tot > 0 ? Math.round((r / tot) * data.closed_sales) : 0);
+    if (tot > 0 && data.closed_sales > 0) {
+      values = revenue.map(r => Math.round((r / tot) * data.closed_sales));
+    } else {
+      const pts = labels.length || 2;
+      const perPt = data.closed_sales > 0 ? Math.round(data.closed_sales / pts) : 0;
+      values = Array(pts).fill(perPt);
+    }
     color = isUp(values) ? '#22C55E' : '#FF0040'; label = 'Ventas';
   } else if (kpiKey === 'tofu-impressions') {
     values = data.trend.impressions; color = isUp(data.trend.impressions) ? '#22C55E' : '#FF0040'; label = 'Impresiones';
@@ -612,7 +626,9 @@ function _openKpiModal(kpiKey) {
   // Seleccionar el objeto de datos correcto según la sección del KPI
   const isTofuKpi = ['tofu-impressions', 'tofu-clicks', 'tofu-cpc'].includes(kpiKey);
   const isMofuKpi = kpiKey.startsWith('mofu-');
-  const isBofuKpi = kpiKey.startsWith('bofu-');
+  // bofu-prefixed keys OR ambiguous keys (revenue/sales) opened from BOFU section
+  const isBofuKpi = kpiKey.startsWith('bofu-') ||
+    (['revenue', 'sales'].includes(kpiKey) && _currentSection === 'bofu');
 
   let data;
   if (isTofuKpi)      data = window._tofuData   || window._kpiModalData || {};
@@ -720,6 +736,7 @@ function initFilters() {
       document.querySelectorAll('.historic-btn').forEach(b => b.classList.remove('active'));
       btn.classList.add('active');
       const granularity = btn.dataset.granularity;
+      _currentGranularity = granularity;
       _closeDatePicker();
       _currentPeriod = 'all';
       refreshDashboard(_currentSection, 'all', { granularity });

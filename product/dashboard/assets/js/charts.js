@@ -71,33 +71,42 @@ function _destroyChart(id) {
   if (_charts[id]) { _charts[id].destroy(); delete _charts[id]; }
 }
 
-/* ── Línea de tendencia (regresión lineal simple) ─────────
-   Calcula y = a + bx para la serie y devuelve un array con
-   los valores de la recta de tendencia, mismo largo que el input.
-   Usar como segundo dataset (type: 'line') en bar charts. */
-function _trendLineData(values) {
-  const n = values.length;
-  if (n < 2) return values.slice();
-  const xs = values.map((_, i) => i);
-  const sumX = xs.reduce((a, b) => a + b, 0);
-  const sumY = values.reduce((a, b) => a + Number(b || 0), 0);
-  const sumXY = xs.reduce((s, x, i) => s + x * Number(values[i] || 0), 0);
-  const sumX2 = xs.reduce((s, x) => s + x * x, 0);
-  const meanX = sumX / n;
-  const meanY = sumY / n;
-  const denom = sumX2 - n * meanX * meanX;
-  const slope = denom === 0 ? 0 : (sumXY - n * meanX * meanY) / denom;
-  const intercept = meanY - slope * meanX;
-  return xs.map(x => intercept + slope * x);
+/* ── Media móvil (moving average) ────────────────────────
+   Reemplaza la regresión lineal por una media móvil centrada.
+   La ventana se elige automáticamente según la cantidad de puntos:
+   - ≤ 7 puntos  → ventana 3
+   - ≤ 30 puntos → ventana 7
+   - > 30 puntos → ventana 14
+   Los extremos donde no hay suficientes vecinos usan una ventana
+   parcial (promedio de los puntos disponibles), así la línea
+   siempre cubre todos los datos sin valores nulos. */
+function _movingAverage(values, window) {
+  const n    = values.length;
+  const half = Math.floor(window / 2);
+  return values.map(function(_, i) {
+    const from = Math.max(0, i - half);
+    const to   = Math.min(n - 1, i + half);
+    const slice = values.slice(from, to + 1);
+    const sum   = slice.reduce(function(a, b) { return a + Number(b || 0); }, 0);
+    return sum / slice.length;
+  });
 }
 
-/* Devuelve el dataset Chart.js de la línea de tendencia.
+function _trendWindow(n) {
+  if (n <= 7)  return 3;
+  if (n <= 30) return 7;
+  return 14;
+}
+
+/* Devuelve el dataset Chart.js de la línea de media móvil.
    color: opcional, usa accent UMOH por default. */
-function _trendLineDataset(values, label = 'Tendencia', color = 'rgba(255, 0, 64, 0.85)') {
+function _trendLineDataset(values, label = 'Media móvil', color = 'rgba(255, 0, 64, 0.85)') {
+  const win  = _trendWindow(values.length);
+  const data = _movingAverage(values, win);
   return {
     type:             'line',
     label:            label,
-    data:             _trendLineData(values),
+    data:             data,
     borderColor:      color,
     backgroundColor:  'transparent',
     borderWidth:      2,
@@ -105,7 +114,7 @@ function _trendLineDataset(values, label = 'Tendencia', color = 'rgba(255, 0, 64
     pointRadius:      0,
     pointHoverRadius: 0,
     fill:             false,
-    tension:          0,
+    tension:          0.3,
     order:            0,
     yAxisID:          'y',
   };
@@ -125,10 +134,16 @@ function setKPI(id, value) {
 /**
  * Delta comparativo vs período anterior.
  * lowerIsBetter = true para métricas de costo (CPC, CPL, gasto).
+ * Si prev es 0 o null/undefined, muestra "0%" en vez de quedar vacío.
  */
 function _setDelta(id, current, prev, lowerIsBetter = false) {
   const el = document.getElementById(id);
-  if (!el || !prev) return;
+  if (!el) return;
+  if (prev == null || prev === 0) {
+    el.textContent = '0% vs período anterior';
+    el.className   = 'kpi-delta delta--neutral';
+    return;
+  }
   const pct      = ((current - prev) / Math.abs(prev)) * 100;
   const isPositive = pct >= 0;
   const isGood     = lowerIsBetter ? !isPositive : isPositive;
@@ -236,8 +251,8 @@ function _renderCommercialSummary(s) {
       '</div>' +
       '<div class="cs-item" data-cs-kpi="cs-avg-capitas-per-sale" tabindex="0" role="button" aria-label="Ver detalle de Cápitas por Venta">' +
         '<span class="cs-label">Cápitas / Venta</span>' +
-        '<span class="cs-value">' + (s.avg_capitas_per_sale ? s.avg_capitas_per_sale.toFixed(2) : '—') + '</span>' +
-        (s.avg_capitas_per_sale ? mini(s.avg_capitas_per_sale, p.avg_capitas_per_sale, false) : '') +
+        '<span class="cs-value">' + (s.avg_capitas_per_sale != null && s.avg_capitas_per_sale > 0 ? s.avg_capitas_per_sale.toFixed(2) + ' cap.' : '—') + '</span>' +
+        (s.avg_capitas_per_sale != null && s.avg_capitas_per_sale > 0 ? mini(s.avg_capitas_per_sale, p.avg_capitas_per_sale, false) : '') +
       '</div>' +
     '</div>';
 }
@@ -345,15 +360,21 @@ function renderPerformance(data) {
 function _renderSearchTerms(terms, mode) {
   const tbody = document.getElementById('search-terms-body');
   const colHeader = document.getElementById('terms-col-header');
-  if (!tbody || !terms) return;
+  if (!tbody) return;
+
+  if (colHeader) colHeader.textContent = mode === 'impressions' ? 'Impresiones' : 'Clicks';
+
+  // Estado vacío: sin datos en el período o pendiente de integración
+  if (!terms || terms.length === 0) {
+    tbody.innerHTML = '<tr><td colspan="3" class="terms-empty">Sin datos de términos de búsqueda para el período seleccionado.</td></tr>';
+    return;
+  }
 
   const colors = [
     CHART_PALETTE.blue.solid, CHART_PALETTE.teal.solid, CHART_PALETTE.purple.solid,
     CHART_PALETTE.amber.solid, CHART_PALETTE.coral.solid, CHART_PALETTE.green.solid,
     CHART_PALETTE.blue.solid, CHART_PALETTE.teal.solid
   ];
-
-  if (colHeader) colHeader.textContent = mode === 'impressions' ? 'Impresiones' : 'Clicks';
 
   tbody.innerHTML = terms.map((row, i) => {
     const pct   = mode === 'impressions' ? (row.pct_imp || row.pct) : row.pct;
@@ -605,23 +626,34 @@ function invalidateGeoMap() { /* no-op: geo es tabla, no mapa */ }
    - prefers-reduced-motion: sin animaciones si está activo
 ══════════════════════════════════════════════════════════ */
 
-// Paleta semántica: color por nombre de etapa (no por posición).
-// Familia azul = entrada/seguimiento, ámbar = alta intención,
-// púrpura = incubando, verde/rojo/gris = resultados.
+// Paleta semántica con escala cromática progresiva por sub-fase.
+// Dentro de cada sub-fase los colores van de menor a mayor intensidad
+// (izquierda → derecha), para que la lectura cromática sea progresiva.
+//
+// Entrada    (cyan claro → cyan medio)
+// Seguimiento (azul claro → azul medio → azul intenso)
+// Alta intención (ámbar claro → ámbar → naranja)
+// Incubando  (púrpura claro → púrpura)
+// Resultado  (verde sólido | rojo | gris — terminales distintos, sin escala)
 const _JOURNEY_COLORS = {
-  'Inbox':           'rgba(99,179,237,0.55)',
-  'Nuevo':           'rgba(99,179,237,0.82)',
-  'Prioritarios':    'rgba(251,191,36,0.78)',
-  'Para Hoy':        'rgba(66,153,225,0.78)',
-  'Procesando':      'rgba(66,153,225,0.92)',
-  'Contactados':     'rgba(49,130,206,1.00)',
-  'Cotizados':       'rgba(251,191,36,0.92)',
-  'En Auditoria':    'rgba(245,158,11,1.00)',
-  'Mes que viene':   'rgba(167,139,250,0.72)',
-  'A futuro':        'rgba(167,139,250,0.94)',
-  'Ventas Ganadas':  'rgba(72,199,142,0.85)',
-  'No prospera':     'rgba(245,101,101,0.88)',
-  'Erroneos':        'rgba(160,174,192,0.68)',
+  // Entrada — cyan escala 2 pasos
+  'Inbox':           'rgba(125,211,252,0.70)',   // sky-300 suave
+  'Nuevo':           'rgba(14,165,233,0.85)',    // sky-500 intenso
+  // Seguimiento — azul escala 3 pasos
+  'Para Hoy':        'rgba(147,197,253,0.75)',   // blue-300 claro
+  'Procesando':      'rgba(59,130,246,0.85)',    // blue-500 medio
+  'Contactados':     'rgba(29,78,216,0.95)',     // blue-700 intenso
+  // Alta intención — ámbar→naranja escala 3 pasos
+  'Prioritarios':    'rgba(253,230,138,0.80)',   // amber-200 claro
+  'Cotizados':       'rgba(251,191,36,0.90)',    // amber-400 medio
+  'En Auditoria':    'rgba(217,119,6,1.00)',     // amber-700 naranja intenso
+  // Incubando — púrpura escala 2 pasos
+  'Mes que viene':   'rgba(216,180,254,0.75)',   // purple-300 claro
+  'A futuro':        'rgba(147,51,234,0.90)',    // purple-600 intenso
+  // Resultado — colores terminales independientes (no escala)
+  'Ventas Ganadas':  'rgba(34,197,94,0.90)',     // verde sólido
+  'No prospera':     'rgba(239,68,68,0.85)',     // rojo
+  'Erroneos':        'rgba(148,163,184,0.65)',   // gris neutro
 };
 
 // Sub-fase de cada etapa (para el tooltip y la banda visual)
@@ -855,6 +887,73 @@ function _renderJourney(data) {
   });
 
   wrap.appendChild(row);
+
+  // Texto explicativo del Customer Journey — con datos reales del período
+  // y guías de interpretación para detectar cuellos de botella.
+  function _getVal(lbl) {
+    const idx = labels.indexOf(lbl);
+    return idx !== -1 ? vals[idx] : 0;
+  }
+  const _n = v => Math.round(v).toLocaleString('es-AR');
+
+  const entrada      = _getVal('Inbox') + _getVal('Nuevo');
+  const seguimiento  = _getVal('Para Hoy') + _getVal('Procesando') + _getVal('Contactados');
+  const altaIntencion = _getVal('Prioritarios') + _getVal('Cotizados') + _getVal('En Auditoria');
+  const incubando    = _getVal('Mes que viene') + _getVal('A futuro');
+  const ganadas      = _getVal('Ventas Ganadas');
+  const noProspera   = _getVal('No prospera');
+
+  // Alerta de cuello de botella: cotizados altos con pocas ventas ganadas
+  const cotizados    = _getVal('Cotizados') + _getVal('En Auditoria');
+  const cuellobotella = cotizados > 3 && ganadas < Math.round(cotizados * 0.3)
+    ? `<p class="journey-desc-alert"><strong>Posible cuello de botella:</strong> hay ${_n(cotizados)} leads en Cotizados/En Auditoria pero solo ${_n(ganadas)} ventas ganadas. Revisá qué está frenando el cierre — puede ser precio, documentación o seguimiento tardío.</p>`
+    : '';
+
+  const journeyDesc = document.createElement('div');
+  journeyDesc.className = 'journey-description';
+  journeyDesc.innerHTML =
+    '<p class="journey-desc-intro">El Customer Journey conecta cada etapa del proceso comercial, desde el primer contacto hasta el cierre de la venta. Es la visión unificada que UMOH construye cruzando datos de publicidad con el CRM del equipo de ventas — una visibilidad que ninguna agencia del mercado ofrece de forma integrada.</p>' +
+    cuellobotella +
+    '<div class="jd-grid">' +
+      '<div class="jd-item">' +
+        '<span class="jd-dot jd-dot--entry"></span>' +
+        '<div class="jd-text">' +
+          '<strong>Entrada</strong> — ' + _n(entrada) + ' leads' +
+          '<p>Inbox y Nuevo: leads que acaban de llegar desde la campaña y todavía no fueron abiertos por ningún vendedor. Si este número crece semana a semana sin que baje, hay un problema de velocidad de respuesta.</p>' +
+        '</div>' +
+      '</div>' +
+      '<div class="jd-item">' +
+        '<span class="jd-dot jd-dot--seguimiento"></span>' +
+        '<div class="jd-text">' +
+          '<strong>Seguimiento</strong> — ' + _n(seguimiento) + ' leads' +
+          '<p>Para Hoy, Procesando, Contactados: el equipo ya los tomó y está trabajándolos. Un volumen alto aquí es saludable. Si "Para Hoy" tiene muchos leads pero "Contactados" tiene pocos, el equipo demora en avanzar.</p>' +
+        '</div>' +
+      '</div>' +
+      '<div class="jd-item">' +
+        '<span class="jd-dot jd-dot--alta"></span>' +
+        '<div class="jd-text">' +
+          '<strong>Alta intención</strong> — ' + _n(altaIntencion) + ' leads' +
+          '<p>Prioritarios, Cotizados, En Auditoria: las oportunidades más cercanas al cierre. Cada lead aquí tiene alto potencial de convertirse en venta esta semana. Priorizá el seguimiento diario en este bloque.</p>' +
+        '</div>' +
+      '</div>' +
+      '<div class="jd-item">' +
+        '<span class="jd-dot jd-dot--incub"></span>' +
+        '<div class="jd-text">' +
+          '<strong>Incubando</strong> — ' + _n(incubando) + ' leads' +
+          '<p>Mes que viene, A futuro: leads que mostraron interés pero no están listos todavía. Son el pipeline de los próximos ciclos. Un volumen bajo acá puede indicar que falta trabajo de seguimiento a largo plazo.</p>' +
+        '</div>' +
+      '</div>' +
+      '<div class="jd-item">' +
+        '<span class="jd-dot jd-dot--result"></span>' +
+        '<div class="jd-text">' +
+          '<strong>Resultado</strong> — ' + _n(ganadas) + ' ganadas · ' + _n(noProspera) + ' no prospera' +
+          '<p>Ventas Ganadas, No prospera, Erroneos: el desenlace final. La proporción de Ventas Ganadas sobre el total es la métrica más crítica del funnel. Si "No prospera" supera a "Ventas Ganadas", revisá la calidad del lead o el proceso de seguimiento.</p>' +
+        '</div>' +
+      '</div>' +
+    '</div>' +
+    '<p class="journey-desc-tip"><strong>Cómo leer el gráfico:</strong> cada barra es un estado del CRM, su altura es proporcional al estado con mayor volumen. El número bajo cada barra indica leads en ese estado; el porcentaje, su peso en el total del funnel. Un journey saludable concentra la mayor parte en Seguimiento y Alta intención, con un porcentaje creciente en Ventas Ganadas.</p>';
+  wrap.appendChild(journeyDesc);
+
   ctxSt.parentElement.appendChild(wrap);
 
   // Stagger entrance: barras crecen con delay incremental
@@ -879,27 +978,36 @@ function renderMofu(data) {
 
   const prev = data.prev || {};
 
+  // Ventas Ganadas: tomar de data.status si está disponible, o del campo directo
+  const closedWonFromStatus = (function() {
+    if (!data.status) return data.closed_won_leads || 0;
+    const idx = data.status.labels.indexOf('Ventas Ganadas');
+    return idx !== -1 ? (data.status.data[idx] || 0) : (data.closed_won_leads || 0);
+  })();
+  const prevClosedWon = prev.closed_won_leads || 0;
+
   setKPI('mofu-leads',      fmtNumber(data.total_leads));
   setKPI('mofu-cpl',        fmtCurrency(data.cpl));
   setKPI('mofu-tipif',      fmtPercent(data.tipification_rate));
   setKPI('mofu-highintent', fmtNumber(data.high_intent_leads));
-  setKPI('mofu-closedwon',  fmtNumber(data.closed_won_leads || 0));
+  setKPI('mofu-closedwon',  fmtNumber(closedWonFromStatus));
 
   _setDelta('delta-mofu-leads',      data.total_leads,       prev.total_leads);
   _setDelta('delta-mofu-cpl',        data.cpl,               prev.cpl,               true);
   _setDelta('delta-mofu-tipif',      data.tipification_rate, prev.tipification_rate);
   _setDelta('delta-mofu-highintent', data.high_intent_leads, prev.high_intent_leads);
-  _setDelta('delta-mofu-closedwon',  data.closed_won_leads,  prev.closed_won_leads);
+  _setDelta('delta-mofu-closedwon',  closedWonFromStatus,    prevClosedWon);
 
   /* ── MOFU sparklines ── */
   if (data.trend) {
-    const src = data.trend.sparkline || data.trend;
+    const src  = data.trend.sparkline || data.trend;
     const isUp = arr => arr[arr.length - 1] >= arr[0];
-    _renderSparkline('sparkline-mofu-leads',     src.leads, isUp(src.leads),     src.labels || []);
-    _renderSparkline('sparkline-mofu-cpl',       src.cpl,   !isUp(src.cpl),      src.labels || []);
-    _renderSparkline('sparkline-mofu-tipif',     src.leads, isUp(src.leads),     src.labels || []);
-    _renderSparkline('sparkline-mofu-highintent',src.leads, isUp(src.leads),     src.labels || []);
-    _renderSparkline('sparkline-mofu-closedwon', src.leads, isUp(src.leads),     src.labels || []);
+    _renderSparkline('sparkline-mofu-leads',      src.leads, isUp(src.leads),  src.labels || []);
+    _renderSparkline('sparkline-mofu-cpl',        src.cpl,   !isUp(src.cpl),   src.labels || []);
+    _renderSparkline('sparkline-mofu-tipif',      src.leads, isUp(src.leads),  src.labels || []);
+    _renderSparkline('sparkline-mofu-highintent', src.leads, isUp(src.leads),  src.labels || []);
+    /* closedwon: usa la misma forma que leads — proxy directo */
+    _renderSparkline('sparkline-mofu-closedwon',  src.leads, isUp(src.leads),  src.labels || []);
   }
 
   /* ── Trend: separate bar charts for Leads and CPL ── */
@@ -1090,6 +1198,7 @@ function _renderSellersTable(sellers) {
    BOFU
 ══════════════════════════════════════════════════════════ */
 function renderBofu(data) {
+  window._bofuData = data;
   const prev = data.prev || {};
 
   setKPI('bofu-revenue',       fmtCurrency(data.total_revenue));

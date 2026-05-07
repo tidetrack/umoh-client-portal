@@ -1134,6 +1134,10 @@ body.nav-hidden .nav-fab {
   color: var(--umoh-accent);
 }
 
+.delta--neutral {
+  color: var(--text-muted);
+}
+
 /* KPI formula hint */
 .kpi-formula {
   font-size: 10px;
@@ -1378,6 +1382,14 @@ body.nav-hidden .nav-fab {
   color: var(--text-secondary);
   font-weight: 500;
   white-space: nowrap;
+}
+
+.terms-empty {
+  text-align: center;
+  color: var(--text-muted);
+  padding: var(--sp-6) var(--sp-4);
+  font-style: italic;
+  font-size: 13px;
 }
 
 /* ── 9. Geo: tabla ranking (reemplaza al mapa Leaflet) ────────── */
@@ -2439,6 +2451,26 @@ body.nav-hidden .nav-fab {
 .journey-description {
   border-top: 1px solid var(--border-subtle);
   padding: var(--sp-5) var(--sp-6);
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-4);
+}
+
+.journey-desc-intro {
+  margin: 0;
+  font-size: 13px;
+  line-height: 1.6;
+  color: var(--text-secondary);
+  max-width: 860px;
+}
+
+.journey-desc-tip {
+  margin: 0;
+  font-size: 12px;
+  line-height: 1.5;
+  color: var(--text-muted);
+  border-top: 1px solid var(--border-subtle);
+  padding-top: var(--sp-3);
 }
 
 .jd-grid {
@@ -2490,6 +2522,25 @@ body.nav-hidden .nav-fab {
   font-size: 11px;
   line-height: 1.4;
   color: var(--text-secondary);
+}
+
+/* Alerta de cuello de botella en el journey */
+.journey-desc-alert {
+  background: rgba(251, 191, 36, 0.10);
+  border-left: 3px solid rgba(245, 158, 11, 0.70);
+  border-radius: 6px;
+  padding: 10px 14px;
+  margin: 0 0 var(--sp-3) 0;
+  font-size: 12px;
+  line-height: 1.5;
+  color: var(--text-secondary);
+}
+.journey-desc-alert strong {
+  color: #b45309;
+  font-weight: 700;
+}
+[data-theme="dark"] .journey-desc-alert strong {
+  color: #fbbf24;
 }
 
 @media (max-width: 1024px) {
@@ -2551,7 +2602,7 @@ body.nav-hidden .nav-fab {
 .pending-table {
   width: 100%;
   border-collapse: separate;
-  border-spacing: 0 4px;
+  border-spacing: 0 6px;
   font-family: var(--font);
   font-size: 13px;
 }
@@ -2561,7 +2612,7 @@ body.nav-hidden .nav-fab {
   letter-spacing: 0.06em;
   text-transform: uppercase;
   color: var(--text-muted);
-  padding: 8px 10px;
+  padding: 8px 12px;
   text-align: left;
 }
 
@@ -2570,15 +2621,43 @@ body.nav-hidden .nav-fab {
 .pending-table thead th.th-num {
   text-align: right;
 }
+
+/* Cada fila como tarjeta con relieve sutil */
+.pending-table tbody tr {
+  background: var(--bg-card);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.06), 0 0 0 1px rgba(0, 0, 0, 0.04);
+  border-radius: 10px;
+  transition: box-shadow 0.15s ease, transform 0.15s ease;
+}
+.pending-table tbody tr:hover {
+  box-shadow: 0 3px 8px rgba(0, 0, 0, 0.10), 0 0 0 1px rgba(0, 0, 0, 0.06);
+  transform: translateY(-1px);
+}
+[data-theme="dark"] .pending-table tbody tr {
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.20), 0 0 0 1px rgba(255, 255, 255, 0.05);
+}
+[data-theme="dark"] .pending-table tbody tr:hover {
+  box-shadow: 0 3px 8px rgba(0, 0, 0, 0.35), 0 0 0 1px rgba(255, 255, 255, 0.08);
+}
+
 .pending-table tbody td {
-  padding: 10px;
+  padding: 12px;
   vertical-align: middle;
-  background: var(--card-bg, transparent);
+  background: transparent;
+}
+
+/* Redondear solo las celdas de los extremos para que coincidan con el tr */
+.pending-table tbody td:first-child {
+  border-radius: 10px 0 0 10px;
+}
+.pending-table tbody td:last-child {
+  border-radius: 0 10px 10px 0;
 }
 .pending-table .pending-name { font-weight: 500; color: var(--text-primary); }
 .pending-table .pending-asesor { color: var(--text-secondary); }
 .pending-table .pending-tip { color: var(--text-secondary); }
 .pending-table .pending-tip .muted { color: var(--text-muted); font-style: italic; }
+.pending-table .th-num       { text-align: right; }
 .pending-table .pending-date { color: var(--text-muted); font-variant-numeric: tabular-nums; text-align: right; }
 .pending-empty {
   text-align: center;
