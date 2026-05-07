@@ -1,8 +1,8 @@
 # BACKLOG — UMOH Client Portal
 
-**Última actualización:** 2026-05-05
+**Última actualización:** 2026-05-07
 **Cliente activo:** Prevención Salud (`prepagas.umohcrew.com`)
-**Estado general:** Dashboard EN PRODUCCIÓN con TOFU/MOFU/BOFU/SUMMARY desde Supabase. Customer journey CRM de 13 etapas con motion. Pendiente: validar datos en vivo, mapa geo real, filtro de campaña, mobile responsive y entrega de credenciales al cliente.
+**Estado general:** Dashboard EN PRODUCCIÓN con las 4 facts tables (TOFU/MOFU/BOFU/SELLER) en Supabase + Sheets espejo del cliente. Customer journey CRM de 13 etapas con motion. Filtro global de campaña funcionando. Pendiente: validar BOFU/SUMMARY en vivo, mapa geo real, canal/dispositivo (en 0), Node.js update, líneas de tendencia, mobile responsive y entrega de credenciales al cliente.
 
 ---
 
@@ -94,7 +94,8 @@ Estas tareas bloquean el lanzamiento. Sin ellas el cliente no puede usar el prod
 
 ### 1.8 — Filtro global de campaña activa
 
-- [ ] **1.8** Agregar un selector de campaña visible en todas las pestañas, que filtre los datos del dashboard por la campaña elegida.
+- [x] **1.8** Agregar un selector de campaña visible en todas las pestañas, que filtre los datos del dashboard por la campaña elegida.
+  **Hecho:** 2026-05-07 — selector dropdown en el header con campaign_id + name. Persistencia en localStorage. Endpoint nuevo `/api/campaigns`. TOFU filtra por campaign_id; sellers via seller_facts; MOFU/BOFU para multi-campaña en futuro (TODO documentado).
   **Complejidad:** Media-Alta
   **Qué es:** Hoy el dashboard muestra los datos de TODAS las campañas mezcladas. La idea es agregar un selector (un menú desplegable) en la parte superior del dashboard donde el usuario pueda elegir qué campaña ver. Una vez elegida, todos los gráficos, números y tablas (TOFU, MOFU, BOFU, SUMMARY) se actualizan para mostrar SOLO los datos de esa campaña.
   **Requisitos del selector:**
@@ -263,6 +264,12 @@ Estas tareas mejoran el producto pero no bloquean el lanzamiento. Se trabajan de
 
 | Fecha | Hito |
 |-------|------|
+| 2026-05-07 | **Tarea 1.8 cerrada:** filtro global de campaña en el header (TOFU + sellers ya filtran; MOFU/BOFU pendiente multi-campaña) |
+| 2026-05-07 | UX: modales explicativos en cards comerciales, tabs estilo Chrome con línea sutil UMOH, FAB scroll-to-top con auto-hide del nav |
+| 2026-05-07 | **Sellers integrado:** tabla `seller_facts` (mig 012/013) + procedure + mirror Sheets + bofu/summary ahora leen sellers de facts (capitas y cycle_days reales) |
+| 2026-05-06 | Backfill histórico unificado a `campaign_id = '23534226120'` (real Google Ads). 167 filas migradas, 102 placeholder borradas |
+| 2026-05-05 | **Tarea 1.7 cerrada:** Sheets espejo TOFU/MOFU/BOFU/SELLER + headers en español + freeze pane |
+| 2026-05-05 | **Tarea 1.2 cerrada:** auditoría MOFU + 2 fixes (tipification rate real + KPI Ventas Ganadas) |
 | 2026-05-05 | **Tarea 1.1 cerrada:** deploy a producción exitoso (`prepagas.umohcrew.com`). MVP TOFU/MOFU/BOFU/SUMMARY desde Supabase visible al público (con login activo) |
 | 2026-05-05 | **Tarea 1.9 cerrada:** customer journey del MOFU rediseñado con 13 etapas literales del CRM, paleta cromática semántica, motion y banda de sub-fases agrupadora |
 | 2026-05-05 | BACKLOG.md vivo creado con 14 tareas categorizadas MVP / Post-MVP y trazabilidad de decisiones |
