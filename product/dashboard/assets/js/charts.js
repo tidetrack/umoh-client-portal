@@ -1750,9 +1750,47 @@ function _openLeadDetailModal(mid) {
     }
   }
 
+  /* Actividad y seguimientos: viene de leads.comments — el textarea de
+     MeisterTask donde el vendedor escribe notas, llamadas, observaciones.
+     Cada bloque suele venir separado por saltos de línea o con prefijos
+     tipo "DD/MM:" — los detectamos para formatear como timeline. */
+  const actEl   = document.getElementById('lead-modal-activity');
+  const actSect = document.getElementById('lead-modal-activity-section');
+  if (actEl && actSect) {
+    const raw = (row.comments || '').trim();
+    if (!raw) {
+      actEl.innerHTML = '<p class="lead-modal-empty">Sin actividad registrada por el vendedor todavía.</p>';
+    } else {
+      // Cortar por línea/párrafo y filtrar vacíos. Cada bloque es una "entrada"
+      // del vendedor. Si el bloque arranca con un patrón fecha (DD/MM o DD-MM),
+      // lo extraemos como header del item.
+      const blocks = raw.split(/\n\s*\n|\r\n\s*\r\n/).map(b => b.trim()).filter(Boolean);
+      const entries = blocks.length ? blocks : raw.split(/\n+/).map(l => l.trim()).filter(Boolean);
+      actEl.innerHTML = '<ol class="lead-modal-activity-list">' + entries.map(text => {
+        const dateMatch = text.match(/^([0-9]{1,2}[/\-][0-9]{1,2}(?:[/\-][0-9]{2,4})?)[:\s.\-]+(.+)$/s);
+        if (dateMatch) {
+          return `<li class="lead-modal-activity-item">
+            <span class="lead-modal-activity-date">${dateMatch[1]}</span>
+            <p class="lead-modal-activity-text">${_escapeHtml(dateMatch[2].trim())}</p>
+          </li>`;
+        }
+        return `<li class="lead-modal-activity-item lead-modal-activity-item--no-date">
+          <p class="lead-modal-activity-text">${_escapeHtml(text)}</p>
+        </li>`;
+      }).join('') + '</ol>';
+    }
+  }
+
   /* Abrir */
   overlay.removeAttribute('hidden');
   overlay.focus();
+}
+
+/* Escape HTML básico para inyectar texto del usuario sin crear XSS surface */
+function _escapeHtml(s) {
+  return String(s).replace(/[&<>"']/g, c => ({
+    '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;',
+  })[c]);
 }
 
 /**

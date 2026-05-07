@@ -3081,6 +3081,56 @@ body.nav-hidden .nav-fab {
   color: var(--umoh-slate);
 }
 
+/* Lista de actividad (leads.comments parseado por bloques) */
+.lead-modal-activity-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-2);
+  max-height: 320px;
+  overflow-y: auto;
+}
+
+.lead-modal-activity-item {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: var(--sp-3) var(--sp-3);
+  background: var(--bg-page);
+  border-radius: var(--r-md);
+  border-left: 3px solid var(--umoh-accent);
+}
+
+.lead-modal-activity-item--no-date {
+  border-left-color: var(--border-subtle);
+}
+
+.lead-modal-activity-date {
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--umoh-accent);
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.lead-modal-activity-text {
+  margin: 0;
+  font-size: 13px;
+  line-height: 1.5;
+  color: var(--text-primary);
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.lead-modal-empty {
+  margin: 0;
+  font-size: 13px;
+  color: var(--text-muted);
+  font-style: italic;
+}
+
 [data-theme="dark"] .lead-modal-history-item {
   background: rgba(255, 255, 255, 0.04);
 }

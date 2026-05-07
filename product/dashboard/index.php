@@ -763,10 +763,13 @@ $_asset_v = defined('ASSET_VERSION') ? ASSET_VERSION : filemtime(__DIR__ . '/ass
         </div>
       </div>
 
-      <!-- Placeholder de seguimiento (pendiente endpoint) -->
-      <div class="lead-modal-section lead-modal-pending-note">
+      <!-- Actividad y seguimientos: viene de leads.comments (donde el vendedor
+           anota interacciones e historial real del lead en MeisterTask) -->
+      <div class="lead-modal-section" id="lead-modal-activity-section">
         <span class="lead-modal-section-label">Actividad y seguimientos</span>
-        <p class="lead-modal-pending-text">Datos detallados disponibles proximamente &mdash; pendiente endpoint <code>/api/lead.php?id=X</code>.</p>
+        <div class="lead-modal-activity" id="lead-modal-activity">
+          <!-- Populated by _openLeadDetailModal() -->
+        </div>
       </div>
     </div>
   </div>
