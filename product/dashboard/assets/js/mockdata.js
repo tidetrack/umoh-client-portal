@@ -913,6 +913,77 @@ const MOCK_DATA = {
       ],
       prev: { total_revenue: 4190000, closed_sales: 36, avg_ticket: 116389, conversion_rate: 22.8, capitas_closed: 108, avg_ticket_per_capita: 38796 }
     }
+  },
+
+  /* ──────────────────────────────────────────
+     INICIO — sección de bienvenida
+     Mock estático (el período no cambia el contenido del resumen
+     en mock — solo en producción el heurístico se recalcula).
+  ────────────────────────────────────────── */
+  inicio: {
+    '7d': {
+      user_name: 'Franco',
+      period_label: 'Últimos 7 días',
+      ai_summary: {
+        headline: 'El período generó $1.240.500 en ingresos con 12 ventas cerradas, a un ticket promedio de $103.375.',
+        highlights: [
+          '124.500 impresiones registradas — CTR de 0,60% (industria aseguradora: 3–6%).',
+          '48 leads captados a un costo por lead de $3.854.',
+          'Tasa de conversión de 25,0% — 12 ventas cerradas de 48 leads.',
+          'ROI positivo de 6,7x: cada peso invertido generó 6,7 pesos en ingresos.'
+        ],
+        recommendation: 'El CTR está por debajo del benchmark de la industria (3–6%). Revisá el copy de los anuncios y la relevancia de las palabras clave para mejorar la tasa de clicks.',
+        generated_by: 'heuristic'
+      },
+      section_kpis: {
+        performance: { label: 'ROI',        value: '6.7x',     delta_pct: 12 },
+        tofu:        { label: 'Impresiones', value: '124.5k',   delta_pct: -3 },
+        mofu:        { label: 'Leads',       value: '48',       delta_pct: 11 },
+        bofu:        { label: 'Ingresos',    value: '$1.2M',    delta_pct: 22 }
+      }
+    },
+    '30d': {
+      user_name: 'Franco',
+      period_label: 'Últimos 30 días',
+      ai_summary: {
+        headline: 'El período generó $4.850.000 en ingresos con 43 ventas cerradas, a un ticket promedio de $112.791.',
+        highlights: [
+          '485.000 impresiones registradas — CTR de 0,55% (industria aseguradora: 3–6%).',
+          '187 leads captados a un costo por lead de $3.850.',
+          'Tasa de conversión de 23,0% — 43 ventas cerradas de 187 leads.',
+          'ROI positivo de 6,7x: cada peso invertido generó 6,7 pesos en ingresos.'
+        ],
+        recommendation: 'El CTR está por debajo del benchmark de la industria (3–6%). Revisá el copy de los anuncios y la relevancia de las palabras clave para mejorar la tasa de clicks.',
+        generated_by: 'heuristic'
+      },
+      section_kpis: {
+        performance: { label: 'ROI',        value: '6.7x',     delta_pct: 8  },
+        tofu:        { label: 'Impresiones', value: '485k',     delta_pct: -5 },
+        mofu:        { label: 'Leads',       value: '187',      delta_pct: 8  },
+        bofu:        { label: 'Ingresos',    value: '$4.85M',   delta_pct: 16 }
+      }
+    },
+    '90d': {
+      user_name: 'Franco',
+      period_label: 'Últimos 90 días',
+      ai_summary: {
+        headline: 'El trimestre generó $14.550.000 en ingresos con 129 ventas cerradas a un ticket promedio de $112.791.',
+        highlights: [
+          '1.455.000 impresiones totales en el trimestre — CTR promedio de 0,58%.',
+          '561 leads captados con un CPL promedio de $3.850.',
+          'Tasa de conversión sostenida del 23% durante los 3 meses.',
+          'ROI trimestral de 6.7x — base sólida para escalar presupuesto.'
+        ],
+        recommendation: 'Con 3 meses de datos consistentes, este es el momento ideal para escalar presupuesto en las campañas con mejor CPC y mantener el mix de palabras clave ganador.',
+        generated_by: 'heuristic'
+      },
+      section_kpis: {
+        performance: { label: 'ROI',        value: '6.7x',     delta_pct: 5  },
+        tofu:        { label: 'Impresiones', value: '1.45M',    delta_pct: 12 },
+        mofu:        { label: 'Leads',       value: '561',      delta_pct: 15 },
+        bofu:        { label: 'Ingresos',    value: '$14.55M',  delta_pct: 18 }
+      }
+    }
   }
 
 };
@@ -1013,6 +1084,10 @@ function generateCustomMockData(endpoint, startStr, endStr) {
         sales:   synth(baseSales / n, 0.15, n).map(v => Math.max(0, Math.round(v)))
       }
     };
+  }
+
+  if (endpoint === 'inicio') {
+    return MOCK_DATA.inicio['30d'];
   }
 
   return MOCK_DATA.performance['30d'];

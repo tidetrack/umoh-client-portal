@@ -20,6 +20,7 @@ const USE_MOCK = {
   mofu:      false,
   bofu:      false,
   campaigns: false,  // siempre real (la lista de campañas viene de Supabase)
+  inicio:    false,  // endpoint nuevo — genera resumen heurístico desde datos reales
 };
 const API_BASE = 'api/endpoints';
 
@@ -77,7 +78,8 @@ function getMockData(endpoint, params) {
     summary: MOCK_DATA.performance,
     tofu:    MOCK_DATA.tofu,
     mofu:    MOCK_DATA.mofu,
-    bofu:    MOCK_DATA.bofu
+    bofu:    MOCK_DATA.bofu,
+    inicio:  MOCK_DATA.inicio,
   };
 
   if (!map[endpoint]) {

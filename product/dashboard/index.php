@@ -39,6 +39,10 @@ $_asset_v = defined('ASSET_VERSION') ? ASSET_VERSION : filemtime(__DIR__ . '/ass
     (function () {
       var t = localStorage.getItem('umoh-theme') || 'light';
       document.documentElement.setAttribute('data-theme', t);
+      /* Sidebar collapsed state: applied early to avoid layout flash */
+      if (localStorage.getItem('umoh:sidebar') === 'collapsed') {
+        document.body.classList.add('sidebar-collapsed');
+      }
     }());
   </script>
 
@@ -48,136 +52,228 @@ $_asset_v = defined('ASSET_VERSION') ? ASSET_VERSION : filemtime(__DIR__ . '/ass
     window.DASHBOARD_ROLE     = <?php echo json_encode($_SESSION['umoh_role'] ?? 'client'); ?>;
   </script>
 </head>
-<body>
+<body class="sidebar-layout">
 
   <!-- ══════════════════════════════════════════════
-       DASHBOARD WRAPPER
+       HAMBURGER — Mobile only
   ══════════════════════════════════════════════ -->
-  <div id="dashboard-wrapper" class="dashboard-wrapper">
+  <button id="sb-hamburger" class="sb-hamburger" aria-label="Abrir menú" aria-expanded="false">
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+      <line x1="3" y1="6"  x2="21" y2="6"/>
+      <line x1="3" y1="12" x2="21" y2="12"/>
+      <line x1="3" y1="18" x2="21" y2="18"/>
+    </svg>
+  </button>
 
   <!-- ══════════════════════════════════════════════
-       HEADER
+       SIDEBAR
   ══════════════════════════════════════════════ -->
-  <header class="site-header">
-    <div class="header-inner">
+  <aside class="dashboard-sidebar" id="dashboard-sidebar" aria-label="Panel de navegación">
 
-      <!-- Brand -->
-      <div class="header-brand">
-        <div class="brand-mark" aria-hidden="true">
+    <!-- A. Header del sidebar: logo + nombre + botón colapsar -->
+    <div class="sb-header">
+      <div class="sb-brand">
+        <div class="sb-brand-mark" aria-hidden="true">
           <img src="assets/img/asterisco.png" alt="" width="22" height="22">
         </div>
-        <div class="brand-info">
-          <span class="brand-agency">umoh</span>
-          <span class="brand-client">Prevención Salud</span>
+        <div class="sb-brand-text sb-label">
+          <span class="sb-brand-agency">umoh</span>
+          <span class="sb-brand-client">Prevención Salud</span>
         </div>
       </div>
+      <button class="sb-collapse-btn" id="sb-collapse-btn" aria-label="Colapsar sidebar" title="Colapsar">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <polyline points="15 18 9 12 15 6"/>
+        </svg>
+      </button>
+    </div>
 
-      <!-- Controls -->
-      <div class="header-controls">
+    <!-- Scrollable body del sidebar -->
+    <div class="sb-body">
 
-        <!-- Selector de campaña activa (Fase 4 — sprint 1.8). Visible en
-             todas las secciones porque vive en el header. -->
-        <div class="campaign-selector-wrap">
-          <button class="campaign-selector-btn" id="campaign-selector-btn" type="button"
-                  aria-haspopup="listbox" aria-expanded="false">
-            <svg class="cs-btn-icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+      <!-- B. Selector de campañas -->
+      <div class="sb-section" id="sb-campaigns-section">
+        <span class="sb-section-label sb-label">Campaña</span>
+        <!-- Búsqueda (visible solo si hay >10 campañas — JS la muestra) -->
+        <div class="sb-campaign-search sb-label" id="sb-campaign-search" style="display:none;">
+          <svg class="sb-campaign-search-icon" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <circle cx="11" cy="11" r="8"/>
+            <line x1="21" y1="21" x2="16.65" y2="16.65"/>
+          </svg>
+          <input type="search" class="sb-campaign-search-input" id="sb-campaign-search-input" placeholder="Buscar campaña..." aria-label="Buscar campaña">
+        </div>
+        <!-- Lista de campañas: primer item "Todas" hardcoded, el resto via JS -->
+        <div class="sb-campaign-list" id="sb-campaign-list" role="listbox" aria-label="Campañas disponibles">
+          <button class="sb-campaign-item active" data-campaign-id="all" data-campaign-name="" role="option" aria-selected="true">
+            <svg class="sb-campaign-icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
               <circle cx="12" cy="12" r="10"/>
               <circle cx="12" cy="12" r="6"/>
               <circle cx="12" cy="12" r="2"/>
             </svg>
-            <span class="cs-btn-text">
-              <span class="cs-btn-name" id="cs-btn-name">Todas las campañas</span>
-              <span class="cs-btn-id" id="cs-btn-id"></span>
-            </span>
-            <svg class="cs-btn-chevron" width="12" height="12" viewBox="0 0 12 12" fill="none" aria-hidden="true">
-              <path d="M2 4l4 4 4-4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
-            </svg>
+            <div class="sb-campaign-info sb-label">
+              <span class="sb-campaign-name">Todas las campañas</span>
+              <span class="sb-campaign-id">vista agregada</span>
+            </div>
+            <span class="sb-campaign-dot" aria-hidden="true"></span>
           </button>
-          <div class="campaign-selector-popover" id="campaign-selector-popover" role="listbox" hidden aria-hidden="true">
-            <button class="campaign-option active" data-campaign-id="all" role="option" aria-selected="true">
-              <span class="cs-opt-name">Todas las campañas</span>
-              <span class="cs-opt-id">vista agregada</span>
-            </button>
-            <!-- el resto se popula dinámicamente desde GET /api/campaigns -->
+          <!-- Campañas adicionales se inyectan por JS -->
+        </div>
+      </div>
+
+      <!-- C. Navegación de secciones -->
+      <div class="sb-section sb-section--nav">
+        <nav class="sb-nav-list" role="navigation" aria-label="Secciones del dashboard">
+          <button class="sb-nav-item active" data-section="inicio" aria-current="page">
+            <svg class="sb-nav-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/>
+              <polyline points="9 22 9 12 15 12 15 22"/>
+            </svg>
+            <span class="sb-label">Inicio</span>
+            <span class="sb-tooltip" aria-hidden="true">Inicio</span>
+          </button>
+          <button class="sb-nav-item" data-section="performance" aria-current="false">
+            <svg class="sb-nav-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <rect x="18" y="3" width="4" height="18"/>
+              <rect x="10" y="8" width="4" height="13"/>
+              <rect x="2"  y="13" width="4" height="8"/>
+            </svg>
+            <span class="sb-label">Performance</span>
+            <span class="sb-tooltip" aria-hidden="true">Performance</span>
+          </button>
+          <button class="sb-nav-item" data-section="tofu" aria-current="false">
+            <svg class="sb-nav-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/>
+              <path d="M15.54 8.46a5 5 0 0 1 0 7.07"/>
+              <path d="M19.07 4.93a10 10 0 0 1 0 14.14"/>
+            </svg>
+            <span class="sb-label">Awareness / TOFU</span>
+            <span class="sb-tooltip" aria-hidden="true">Awareness</span>
+          </button>
+          <button class="sb-nav-item" data-section="mofu" aria-current="false">
+            <svg class="sb-nav-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/>
+              <circle cx="9" cy="7" r="4"/>
+              <path d="M23 21v-2a4 4 0 0 0-3-3.87"/>
+              <path d="M16 3.13a4 4 0 0 1 0 7.75"/>
+            </svg>
+            <span class="sb-label">Interest / MOFU</span>
+            <span class="sb-tooltip" aria-hidden="true">Interest</span>
+          </button>
+          <button class="sb-nav-item" data-section="bofu" aria-current="false">
+            <svg class="sb-nav-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <rect x="2" y="7" width="20" height="14" rx="2" ry="2"/>
+              <path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16"/>
+            </svg>
+            <span class="sb-label">Sales / BOFU</span>
+            <span class="sb-tooltip" aria-hidden="true">Sales</span>
+          </button>
+        </nav>
+      </div>
+
+      <!-- D. Selector de período -->
+      <div class="sb-period-wrap" id="sb-period-wrap">
+        <span class="sb-period-label">Período</span>
+        <div class="sb-period-selector" role="group" aria-label="Selector de período">
+          <button class="sb-period-btn" data-period="7d">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+            7 días
+          </button>
+          <button class="sb-period-btn active" data-period="30d">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+            30 días
+          </button>
+          <button class="sb-period-btn" data-period="90d">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+            90 días
+          </button>
+          <button class="sb-period-btn" data-period="custom">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+            Personalizado
+          </button>
+        </div>
+
+        <!-- Date picker (reutiliza el existente, reposicionado por CSS) -->
+        <div id="date-picker-popover" class="date-picker-popover" hidden aria-hidden="true">
+          <div class="date-picker-inner">
+            <div id="historic-section" class="historic-section">
+              <span class="historic-label">Histórico total</span>
+              <div class="historic-granularity" role="group" aria-label="Granularidad del histórico">
+                <button class="historic-btn" data-granularity="dias">Días</button>
+                <button class="historic-btn" data-granularity="semanas">Semanas</button>
+                <button class="historic-btn active" data-granularity="meses">Meses</button>
+              </div>
+            </div>
+            <div class="date-picker-divider"></div>
+            <div class="date-picker-row">
+              <label class="date-picker-label" for="date-start">Desde</label>
+              <input type="date" id="date-start" class="date-picker-input">
+            </div>
+            <div class="date-picker-row">
+              <label class="date-picker-label" for="date-end">Hasta</label>
+              <input type="date" id="date-end" class="date-picker-input">
+            </div>
+            <button id="date-apply-btn" class="date-apply-btn">Aplicar</button>
           </div>
         </div>
 
-        <!-- Period selector + date picker -->
-        <div class="period-selector-wrap">
-          <div class="period-selector" role="group" aria-label="Selector de período">
-            <button class="period-btn" data-period="7d">7 días</button>
-            <button class="period-btn active" data-period="30d">30 días</button>
-            <button class="period-btn" data-period="90d">90 días</button>
-            <button class="period-btn" data-period="custom">Personalizado</button>
-          </div>
-          <div id="date-picker-popover" class="date-picker-popover" hidden aria-hidden="true">
-            <div class="date-picker-inner">
-              <div id="historic-section" class="historic-section">
-                <span class="historic-label">Histórico total</span>
-                <div class="historic-granularity" role="group" aria-label="Granularidad del histórico">
-                  <button class="historic-btn" data-granularity="dias">Días</button>
-                  <button class="historic-btn" data-granularity="semanas">Semanas</button>
-                  <button class="historic-btn active" data-granularity="meses">Meses</button>
-                </div>
-              </div>
-              <div class="date-picker-divider"></div>
-              <div class="date-picker-row">
-                <label class="date-picker-label" for="date-start">Desde</label>
-                <input type="date" id="date-start" class="date-picker-input">
-              </div>
-              <div class="date-picker-row">
-                <label class="date-picker-label" for="date-end">Hasta</label>
-                <input type="date" id="date-end" class="date-picker-input">
-              </div>
-              <button id="date-apply-btn" class="date-apply-btn">Aplicar</button>
+        <!-- Ícono compacto visible solo en modo colapsado -->
+        <div class="sb-period-compact" id="sb-period-compact">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color:var(--umoh-accent)" aria-hidden="true">
+            <rect x="3" y="4" width="18" height="18" rx="2" ry="2"/>
+            <line x1="16" y1="2" x2="16" y2="6"/>
+            <line x1="8" y1="2" x2="8" y2="6"/>
+            <line x1="3" y1="10" x2="21" y2="10"/>
+          </svg>
+          <span class="sb-period-compact-label" id="sb-period-compact-label">30d</span>
+        </div>
+      </div>
+
+    </div><!-- /.sb-body -->
+
+    <!-- E. Perfil de usuario al fondo -->
+    <div class="sb-user" id="sb-user">
+      <div style="position:relative;">
+        <!-- Dropdown: sale hacia arriba -->
+        <div class="sb-user-dropdown" id="sb-user-dropdown" role="menu">
+          <div class="user-menu-header">
+            <div class="user-menu-avatar-lg"><img src="assets/img/icon-asterisco-1.png" alt=""></div>
+            <div>
+              <div class="user-menu-fullname" id="sb-user-fullname">Usuario</div>
+              <div class="user-menu-role">Administrador</div>
             </div>
           </div>
-        </div>
-
-        <!-- User menu -->
-        <div class="user-menu" id="user-menu">
-          <button class="user-menu-trigger" aria-haspopup="true" aria-expanded="false">
-            <div class="user-avatar" id="user-avatar"><img src="assets/img/icon-asterisco-1.png" alt=""></div>
-            <span class="user-greeting">Hola, <strong id="user-display-name">Usuario</strong></span>
-            <svg class="user-chevron" width="12" height="12" viewBox="0 0 12 12" fill="none">
-              <path d="M2 4l4 4 4-4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+          <div class="user-menu-divider"></div>
+          <a href="logout.php" class="user-menu-item user-menu-item--danger" role="menuitem">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/>
+              <polyline points="16 17 21 12 16 7"/>
+              <line x1="21" y1="12" x2="9" y2="12"/>
             </svg>
-          </button>
-          <div class="user-menu-dropdown" role="menu">
-            <div class="user-menu-header">
-              <div class="user-menu-avatar-lg" id="user-avatar-lg"><img src="assets/img/icon-asterisco-1.png" alt=""></div>
-              <div>
-                <div class="user-menu-fullname" id="user-menu-fullname">Usuario</div>
-                <div class="user-menu-role">Administrador</div>
-              </div>
-            </div>
-            <div class="user-menu-divider"></div>
-            <a href="logout.php" class="user-menu-item user-menu-item--danger" role="menuitem">
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/>
-                <polyline points="16 17 21 12 16 7"/>
-                <line x1="21" y1="12" x2="9" y2="12"/>
-              </svg>
-              Cerrar sesión
-            </a>
-          </div>
+            Cerrar sesión
+          </a>
         </div>
-
+        <!-- Trigger -->
+        <button class="sb-user-trigger" id="sb-user-trigger" aria-haspopup="true" aria-expanded="false">
+          <div class="sb-user-avatar">
+            <img src="assets/img/icon-asterisco-1.png" alt="">
+          </div>
+          <div class="sb-user-info sb-label">
+            <span class="sb-user-name" id="sb-user-name">Usuario</span>
+            <span class="sb-user-role">Administrador</span>
+          </div>
+          <svg class="sb-label" style="flex-shrink:0;opacity:0.5;margin-left:auto;" width="12" height="12" viewBox="0 0 12 12" fill="none" aria-hidden="true">
+            <path d="M2 8l4-4 4 4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+          </svg>
+        </button>
       </div>
     </div>
-  </header>
+
+  </aside><!-- /#dashboard-sidebar -->
 
   <!-- ══════════════════════════════════════════════
-       NAVIGATION
+       CONTENT AREA
   ══════════════════════════════════════════════ -->
-  <nav class="dashboard-nav" role="navigation" aria-label="Secciones del dashboard">
-    <div class="nav-inner">
-      <button class="nav-tab active" data-section="performance">Performance</button>
-      <button class="nav-tab" data-section="tofu">Awareness / TOFU</button>
-      <button class="nav-tab" data-section="mofu">Interest / MOFU</button>
-      <button class="nav-tab" data-section="bofu">Sales / BOFU</button>
-    </div>
-  </nav>
+  <div class="dashboard-content" id="dashboard-content">
 
   <!-- ══════════════════════════════════════════════
        MAIN
@@ -185,9 +281,65 @@ $_asset_v = defined('ASSET_VERSION') ? ASSET_VERSION : filemtime(__DIR__ . '/ass
   <main class="dashboard-main">
 
     <!-- ────────────────────────────────────────
+         INICIO — nueva sección default
+    ──────────────────────────────────────────── -->
+    <section id="section-inicio" class="dashboard-section active" aria-label="Inicio">
+
+      <!-- Header con saludo -->
+      <div class="inicio-header">
+        <div class="inicio-avatar" aria-hidden="true">
+          <img src="assets/img/icon-asterisco-1.png" alt="">
+        </div>
+        <div class="inicio-greeting-block">
+          <h1 class="inicio-saludo">Hola, <span id="inicio-user-name">Franco</span></h1>
+          <p class="inicio-subtitle" id="inicio-subtitle">Esto es lo que pasó con tus campañas en los últimos 30 días</p>
+        </div>
+      </div>
+
+      <!-- Resumen AI -->
+      <div class="inicio-ai-card" id="inicio-ai-card">
+        <div class="inicio-ai-header">
+          <span class="inicio-ai-badge">
+            <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/>
+            </svg>
+            Resumen de campaña
+          </span>
+        </div>
+        <!-- Skeleton mientras carga -->
+        <div class="inicio-ai-skeleton" id="inicio-ai-skeleton">
+          <div class="sk-line sk-line--title"></div>
+          <div class="sk-line sk-line--long"></div>
+          <div class="sk-line sk-line--medium"></div>
+          <div class="sk-line sk-line--long"></div>
+          <div class="sk-line sk-line--short"></div>
+        </div>
+        <!-- Contenido real (oculto hasta que carga) -->
+        <div id="inicio-ai-content" hidden>
+          <p class="inicio-ai-headline" id="inicio-ai-headline"></p>
+          <ul class="inicio-ai-highlights" id="inicio-ai-highlights"></ul>
+          <div class="inicio-ai-recommendation">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--umoh-accent)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink:0;margin-top:2px;" aria-hidden="true">
+              <circle cx="12" cy="12" r="10"/>
+              <line x1="12" y1="8" x2="12" y2="12"/>
+              <line x1="12" y1="16" x2="12.01" y2="16"/>
+            </svg>
+            <p id="inicio-ai-recommendation"></p>
+          </div>
+        </div>
+      </div>
+
+      <!-- Cards de acceso rápido -->
+      <div class="inicio-quick-grid" id="inicio-quick-grid">
+        <!-- Generadas dinámicamente por renderInicio() -->
+      </div>
+
+    </section>
+
+    <!-- ────────────────────────────────────────
          PERFORMANCE
     ──────────────────────────────────────────── -->
-    <section id="section-performance" class="dashboard-section active" aria-label="Performance">
+    <section id="section-performance" class="dashboard-section" aria-label="Performance">
 
       <div class="section-header">
         <h2 class="section-title">Performance</h2>
@@ -302,7 +454,6 @@ $_asset_v = defined('ASSET_VERSION') ? ASSET_VERSION : filemtime(__DIR__ . '/ass
         </div>
       </div>
 
-      <!-- Trend charts: split into 2 bar charts side by side -->
       <div class="charts-grid charts-grid--2col">
         <div class="chart-card">
           <div class="chart-card-header">
@@ -326,7 +477,6 @@ $_asset_v = defined('ASSET_VERSION') ? ASSET_VERSION : filemtime(__DIR__ . '/ass
 
       <div class="charts-grid charts-grid--2col">
 
-        <!-- Search terms — spans 2 cols -->
         <div class="chart-card chart-card--wide">
           <div class="chart-card-header">
             <h3 class="chart-title">Top Términos de Búsqueda</h3>
@@ -351,7 +501,6 @@ $_asset_v = defined('ASSET_VERSION') ? ASSET_VERSION : filemtime(__DIR__ . '/ass
           </div>
         </div>
 
-        <!-- Channels donut -->
         <div class="chart-card">
           <div class="chart-card-header">
             <h3 class="chart-title">Canal</h3>
@@ -365,7 +514,6 @@ $_asset_v = defined('ASSET_VERSION') ? ASSET_VERSION : filemtime(__DIR__ . '/ass
           </div>
         </div>
 
-        <!-- Devices donut -->
         <div class="chart-card">
           <div class="chart-card-header">
             <h3 class="chart-title">Dispositivos</h3>
@@ -379,7 +527,6 @@ $_asset_v = defined('ASSET_VERSION') ? ASSET_VERSION : filemtime(__DIR__ . '/ass
           </div>
         </div>
 
-        <!-- Geo: tabla ranking de ciudades por clicks -->
         <div class="chart-card chart-card--wide">
           <div class="chart-card-header">
             <h3 class="chart-title">Clicks por Ciudad</h3>
@@ -446,7 +593,6 @@ $_asset_v = defined('ASSET_VERSION') ? ASSET_VERSION : filemtime(__DIR__ . '/ass
         </div>
       </div>
 
-      <!-- Trend charts: split into 2 bar charts side by side -->
       <div class="charts-grid charts-grid--2col">
         <div class="chart-card">
           <div class="chart-card-header">
@@ -468,7 +614,6 @@ $_asset_v = defined('ASSET_VERSION') ? ASSET_VERSION : filemtime(__DIR__ . '/ass
         </div>
       </div>
 
-      <!-- Customer Journey — card full-width (13 etapas activas de MeisterTask) -->
       <div class="charts-grid charts-grid--full">
         <div class="chart-card">
           <div class="chart-card-header">
@@ -478,11 +623,9 @@ $_asset_v = defined('ASSET_VERSION') ? ASSET_VERSION : filemtime(__DIR__ . '/ass
           <div class="chart-card-body" style="padding: 0; overflow: hidden;">
             <canvas id="chart-status" aria-label="Distribución por estado de lead" style="display:none;"></canvas>
           </div>
-          <!-- Insights del Journey: inyectado por _renderJourney() en charts.js -->
         </div>
       </div>
 
-      <!-- Distribución por Segmento — donut centrado, fila propia -->
       <div class="charts-grid charts-grid--donut-solo">
         <div class="chart-card">
           <div class="chart-card-header">
@@ -547,7 +690,6 @@ $_asset_v = defined('ASSET_VERSION') ? ASSET_VERSION : filemtime(__DIR__ . '/ass
         </div>
       </div>
 
-      <!-- Trend charts — split into 2 independent charts -->
       <div class="charts-grid charts-grid--2col">
         <div class="chart-card">
           <div class="chart-card-header">
@@ -600,7 +742,6 @@ $_asset_v = defined('ASSET_VERSION') ? ASSET_VERSION : filemtime(__DIR__ . '/ass
         </div>
       </div>
 
-      <!-- Ranking de vendedores -->
       <div class="charts-grid charts-grid--full">
         <div class="chart-card">
           <div class="chart-card-header">
@@ -629,7 +770,6 @@ $_asset_v = defined('ASSET_VERSION') ? ASSET_VERSION : filemtime(__DIR__ . '/ass
         </div>
       </div>
 
-      <!-- Ventas pendientes de cargar monto -->
       <div class="charts-grid charts-grid--full">
         <div class="chart-card">
           <div class="chart-card-header">
@@ -670,20 +810,13 @@ $_asset_v = defined('ASSET_VERSION') ? ASSET_VERSION : filemtime(__DIR__ . '/ass
     </div>
   </footer>
 
-  <!-- ══════════════════════════════════════════════
-       /DASHBOARD WRAPPER
-  ══════════════════════════════════════════════ -->
-  </div><!-- /#dashboard-wrapper -->
+  </div><!-- /.dashboard-content -->
 
   <!-- ══════════════════════════════════════════════
-       SCRIPTS — order matters
+       MODALES (fuera del content para evitar z-index issues)
   ══════════════════════════════════════════════ -->
-  <!-- Chart.js -->
-  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.3/dist/chart.umd.min.js"></script>
-  <!-- Leaflet JS -->
-  <script src="https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.js" crossorigin=""></script>
 
-  <!-- Journey Stage Modal: popup didáctico al click en columna del journey -->
+  <!-- Journey Stage Modal -->
   <div id="journey-stage-modal" class="journey-modal-overlay" role="dialog" aria-modal="true" aria-labelledby="journey-modal-title" hidden>
     <div class="journey-modal">
       <button class="journey-modal-close" id="journey-modal-close" aria-label="Cerrar">&times;</button>
@@ -733,48 +866,35 @@ $_asset_v = defined('ASSET_VERSION') ? ASSET_VERSION : filemtime(__DIR__ . '/ass
     </div>
   </div>
 
-  <!-- Lead Detail Modal — abre al hacer click en una fila de ventas pendientes -->
+  <!-- Lead Detail Modal -->
   <div id="lead-detail-modal" class="kpi-modal-overlay" role="dialog" aria-modal="true" aria-labelledby="lead-modal-title" tabindex="-1" hidden>
     <div class="kpi-modal lead-modal">
       <button class="kpi-modal-close" id="lead-modal-close" aria-label="Cerrar">&times;</button>
       <h2 class="kpi-modal-title" id="lead-modal-title">—</h2>
 
-      <!-- Datos básicos -->
       <div class="lead-modal-section">
         <span class="lead-modal-section-label">Datos del lead</span>
-        <div class="lead-modal-basics-grid" id="lead-modal-basics">
-          <!-- Populated by _openLeadDetailModal() -->
-        </div>
+        <div class="lead-modal-basics-grid" id="lead-modal-basics"></div>
       </div>
 
-      <!-- Historial de etapas -->
       <div class="lead-modal-section">
         <span class="lead-modal-section-label">Historial de etapas</span>
-        <ul class="lead-modal-history-list" id="lead-modal-history">
-          <!-- Populated by _openLeadDetailModal() -->
-        </ul>
+        <ul class="lead-modal-history-list" id="lead-modal-history"></ul>
       </div>
 
-      <!-- Datos monetarios (oculto si lead_monetary es null) -->
       <div class="lead-modal-section" id="lead-modal-monetary-section" hidden>
         <span class="lead-modal-section-label">Datos monetarios</span>
-        <div class="lead-modal-basics-grid" id="lead-modal-monetary">
-          <!-- Populated by _openLeadDetailModal() -->
-        </div>
+        <div class="lead-modal-basics-grid" id="lead-modal-monetary"></div>
       </div>
 
-      <!-- Actividad y seguimientos: viene de leads.comments (donde el vendedor
-           anota interacciones e historial real del lead en MeisterTask) -->
       <div class="lead-modal-section" id="lead-modal-activity-section">
         <span class="lead-modal-section-label">Actividad y seguimientos</span>
-        <div class="lead-modal-activity" id="lead-modal-activity">
-          <!-- Populated by _openLeadDetailModal() -->
-        </div>
+        <div class="lead-modal-activity" id="lead-modal-activity"></div>
       </div>
     </div>
   </div>
 
-  <!-- FAB scroll-to-top: aparece cuando el nav se oculta al scrollear -->
+  <!-- FAB scroll-to-top -->
   <button id="nav-fab" class="nav-fab" aria-label="Volver arriba" title="Volver arriba">
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
       <line x1="12" y1="19" x2="12" y2="5"/>
@@ -782,7 +902,7 @@ $_asset_v = defined('ASSET_VERSION') ? ASSET_VERSION : filemtime(__DIR__ . '/ass
     </svg>
   </button>
 
-  <!-- Theme toggle pill switch (position: fixed top-right) -->
+  <!-- Theme toggle pill switch -->
   <button id="theme-toggle" class="theme-toggle-switch" title="Cambiar tema" aria-label="Cambiar modo claro/oscuro">
     <span class="theme-switch-track">
       <span class="theme-switch-thumb">
@@ -796,30 +916,31 @@ $_asset_v = defined('ASSET_VERSION') ? ASSET_VERSION : filemtime(__DIR__ . '/ass
     </span>
   </button>
 
-  <!-- Dashboard scripts -->
+  <!-- ══════════════════════════════════════════════
+       SCRIPTS — order matters
+  ══════════════════════════════════════════════ -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.3/dist/chart.umd.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.js" crossorigin=""></script>
+
   <script src="assets/js/mockdata.js?v=<?php echo $_asset_v; ?>"></script>
   <script src="assets/js/api.js?v=<?php echo $_asset_v; ?>"></script>
   <script src="assets/js/charts.js?v=<?php echo $_asset_v; ?>"></script>
   <script src="assets/js/filters.js?v=<?php echo $_asset_v; ?>"></script>
 
-  <!-- Lead Detail Modal — wiring de cierre (close btn, click outside, Escape) -->
+  <!-- Lead Detail Modal wiring -->
   <script>
   (function() {
-    var overlay = document.getElementById('lead-detail-modal');
+    var overlay  = document.getElementById('lead-detail-modal');
     var closeBtn = document.getElementById('lead-modal-close');
 
     function closeLead() { if (overlay) overlay.setAttribute('hidden', ''); }
 
     if (closeBtn) closeBtn.addEventListener('click', closeLead);
-
     if (overlay) {
-      /* Click fuera del modal inner */
       overlay.addEventListener('click', function(e) {
         if (e.target === overlay) closeLead();
       });
     }
-
-    /* Escape global */
     document.addEventListener('keydown', function(e) {
       if (e.key === 'Escape' && overlay && !overlay.hasAttribute('hidden')) closeLead();
     });

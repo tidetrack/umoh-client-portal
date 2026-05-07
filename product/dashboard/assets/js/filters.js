@@ -1,10 +1,15 @@
 /**
- * filters.js — Navegación, selector de período, tema y menú de usuario.
+ * filters.js — Navegación, sidebar, selector de período, tema y menú de usuario.
  * Orquesta api.js → charts.js. No tiene lógica de datos propia.
+ *
+ * Sprint UX 2.0: sidebar lateral colapsable reemplaza al header/nav viejos.
+ * La sección "inicio" se convierte en la pantalla de entrada (default).
  */
 
 let _currentPeriod      = '30d';
-let _currentSection     = 'performance';
+// Default a "inicio" — el cliente entra al dashboard y ve el saludo + resumen
+// IA primero, después navega a las secciones específicas (Performance/TOFU/etc.)
+let _currentSection     = 'inicio';
 let _currentGranularity = 'dias';   // última granularidad activa del historic-section
 let _loading            = false;
 // Filtro global de campaña (Fase 4 — sprint 1.8). 'all' = vista agregada.
@@ -28,39 +33,45 @@ function _setSkeletons(on) {
 async function refreshDashboard(section, period, extraParams = {}) {
   if (_loading) return;
   _setLoading(true);
-  _setSkeletons(true);
 
-  const endpointMap = { performance: 'summary', tofu: 'tofu', mofu: 'mofu', bofu: 'bofu' };
+  // Inicio tiene su propio flujo de datos — no usa los KPI skeletons
+  if (section !== 'inicio') _setSkeletons(true);
+
+  const endpointMap = { performance: 'summary', tofu: 'tofu', mofu: 'mofu', bofu: 'bofu', inicio: 'inicio' };
 
   try {
-    // Filtro de campaña activa siempre se inyecta (los endpoints lo aceptan
-    // y filtran si != 'all'). Permite que extraParams sobreescriba si hace falta.
     const params = { period, campaign_id: _currentCampaignId, ...extraParams };
-    const data = await fetchData(endpointMap[section], params);
+    const data = await fetchData(endpointMap[section] || section, params);
     renderSection(section, data);
   } catch (err) {
-    console.error('[Dashboard] Error al cargar datos:', err);
+    // Error silencioso en producción (no se loga en consola)
   } finally {
     _setLoading(false);
-    _setSkeletons(false);
+    if (section !== 'inicio') _setSkeletons(false);
   }
 }
 
-/* ── Activar sección / tab / período ────────────────────── */
+/* ── Activar sección / nav-item / período ───────────────── */
 function _activateSection(section) {
   document.querySelectorAll('.dashboard-section').forEach(el => el.classList.remove('active'));
   const target = document.getElementById(`section-${section}`);
   if (target) target.classList.add('active');
 }
 
-function _activateTab(btn) {
-  document.querySelectorAll('.nav-tab').forEach(t => t.classList.remove('active'));
-  btn.classList.add('active');
+function _activateSidebarNavItem(section) {
+  document.querySelectorAll('.sb-nav-item').forEach(item => {
+    const active = item.dataset.section === section;
+    item.classList.toggle('active', active);
+    item.setAttribute('aria-current', active ? 'page' : 'false');
+  });
 }
 
 function _activatePeriod(btn) {
-  document.querySelectorAll('.period-btn').forEach(b => b.classList.remove('active'));
+  document.querySelectorAll('.period-btn, .sb-period-btn').forEach(b => b.classList.remove('active'));
   btn.classList.add('active');
+  // Sincronizar el label compacto del sidebar colapsado
+  const compact = document.getElementById('sb-period-compact-label');
+  if (compact) compact.textContent = btn.dataset.period || '30d';
 }
 
 /* ── Date picker ────────────────────────────────────────── */
@@ -126,30 +137,35 @@ function _toggleTheme() {
   refreshDashboard(_currentSection, _currentPeriod);
 }
 
-/* ── User menu ───────────────────────────────────────────── */
+/* ── User menu (sidebar) ─────────────────────────────────── */
 function initUserMenu() {
   const name      = window.DASHBOARD_USERNAME || 'Usuario';
   const firstName = name.split(' ')[0];
 
   const setTextEl = (id, val) => { const el = document.getElementById(id); if (el) el.textContent = val; };
-  setTextEl('user-display-name', firstName);
-  setTextEl('user-menu-fullname', name);
-  /* Avatars already contain <img> tags in HTML — no text override needed */
 
-  // Click toggle (hover is handled by CSS + bridge pseudo-element)
-  const trigger  = document.querySelector('.user-menu-trigger');
-  const dropdown = document.querySelector('.user-menu-dropdown');
+  // Sidebar user elements
+  setTextEl('sb-user-name',     firstName);
+  setTextEl('sb-user-fullname', name);
+
+  // Sección Inicio: saludo personalizado
+  setTextEl('inicio-user-name', firstName);
+
+  // Sidebar user dropdown
+  const trigger  = document.getElementById('sb-user-trigger');
+  const dropdown = document.getElementById('sb-user-dropdown');
   if (!trigger || !dropdown) return;
 
-  trigger.addEventListener('click', () => {
+  trigger.addEventListener('click', e => {
+    e.stopPropagation();
     const expanded = trigger.getAttribute('aria-expanded') === 'true';
     dropdown.classList.toggle('is-open', !expanded);
     trigger.setAttribute('aria-expanded', String(!expanded));
   });
 
   document.addEventListener('click', e => {
-    const menu = document.getElementById('user-menu');
-    if (menu && !menu.contains(e.target)) {
+    const userSection = document.getElementById('sb-user');
+    if (userSection && !userSection.contains(e.target)) {
       dropdown.classList.remove('is-open');
       trigger.setAttribute('aria-expanded', 'false');
     }
@@ -716,8 +732,8 @@ function initKpiModals() {
 /* ── Init all listeners ─────────────────────────────────── */
 function initFilters() {
 
-  /* Period selector */
-  document.querySelectorAll('.period-btn').forEach(btn => {
+  /* Period selector — sidebar buttons (.sb-period-btn) */
+  document.querySelectorAll('.sb-period-btn').forEach(btn => {
     btn.addEventListener('click', () => {
       const period = btn.dataset.period;
       if (period === 'custom') {
@@ -728,6 +744,8 @@ function initFilters() {
       _closeDatePicker();
       _activatePeriod(btn);
       _currentPeriod = period;
+      // Actualizar el subtitle de Inicio si aplica
+      _updateInicioSubtitle(period);
       refreshDashboard(_currentSection, _currentPeriod);
     });
   });
@@ -752,26 +770,34 @@ function initFilters() {
   /* Close date picker on outside click */
   document.addEventListener('click', e => {
     const popover = document.getElementById('date-picker-popover');
-    const wrap    = document.querySelector('.period-selector-wrap');
+    const wrap    = document.getElementById('sb-period-wrap');
     if (popover && !popover.hidden && wrap && !wrap.contains(e.target)) {
       _closeDatePicker();
       if (_currentPeriod !== 'custom' && _currentPeriod !== 'all') {
-        const activeBtn = document.querySelector(`.period-btn[data-period="${_currentPeriod}"]`);
+        const activeBtn = document.querySelector(`.sb-period-btn[data-period="${_currentPeriod}"]`);
         if (activeBtn) _activatePeriod(activeBtn);
       }
     }
   });
 
-  /* Section navigation */
-  document.querySelectorAll('.nav-tab').forEach(tab => {
-    tab.addEventListener('click', () => {
-      const section = tab.dataset.section;
-      if (section === _currentSection) return;
-      _activateTab(tab);
+  /* Section navigation — sidebar items (.sb-nav-item) */
+  document.querySelectorAll('.sb-nav-item').forEach(item => {
+    item.addEventListener('click', () => {
+      const section = item.dataset.section;
+      if (section === _currentSection) {
+        // En mobile: cerrar el drawer al hacer click en la sección ya activa
+        _closeMobileDrawer();
+        return;
+      }
+      _activateSidebarNavItem(section);
       _activateSection(section);
       _currentSection = section;
       refreshDashboard(_currentSection, _currentPeriod);
-      if (section === 'tofu') setTimeout(() => { if (typeof invalidateGeoMap === 'function') invalidateGeoMap(); }, 350);
+      if (section === 'tofu') {
+        setTimeout(() => { if (typeof invalidateGeoMap === 'function') invalidateGeoMap(); }, 350);
+      }
+      // En mobile: cerrar drawer al navegar
+      _closeMobileDrawer();
     });
   });
 
@@ -780,16 +806,27 @@ function initFilters() {
   if (themeBtn) themeBtn.addEventListener('click', _toggleTheme);
 }
 
-/* ── Auto-hide nav + FAB scroll-to-top ───────────────────────
-   Cuando el usuario hace scroll para abajo más allá de un umbral, el
-   nav-bar se desvanece hacia arriba y aparece un FAB en la esquina
-   inferior derecha. El FAB es un acceso directo para volver al top
-   de la página (smooth scroll). Al volver al top, el nav reaparece. */
+/* Actualiza el subtitle de la sección Inicio según el período activo */
+function _updateInicioSubtitle(period) {
+  const el = document.getElementById('inicio-subtitle');
+  if (!el) return;
+  const labels = {
+    '7d':  'Esto es lo que pasó con tus campañas en los últimos 7 días',
+    '30d': 'Esto es lo que pasó con tus campañas en los últimos 30 días',
+    '90d': 'Esto es lo que pasó con tus campañas en los últimos 90 días',
+    'custom': 'Esto es lo que pasó con tus campañas en el período seleccionado',
+  };
+  el.textContent = labels[period] || labels['30d'];
+}
+
+/* ── FAB scroll-to-top ──────────────────────────────────────
+   En layout de sidebar, el nav-bar ya no existe — el FAB solo
+   actúa como scroll-to-top. Aparece al superar el umbral. */
 function initScrollNavBehavior() {
   const fab = document.getElementById('nav-fab');
   if (!fab) return;
 
-  const SCROLL_THRESHOLD = 180;  // px desde el top antes de ocultar el nav
+  const SCROLL_THRESHOLD = 300;
   let ticking = false;
 
   function onScroll() {
@@ -814,113 +851,162 @@ function initScrollNavBehavior() {
   });
 }
 
-/* ── Selector de campaña activa (Fase 4 — sprint 1.8) ────────
-   Trae la lista de campañas desde GET /api/campaigns y popula el dropdown.
-   Click en una opción → actualiza el estado global, persiste en localStorage,
-   y dispara refreshDashboard() para que todas las secciones se recalculen
-   con el filtro nuevo. */
-function initCampaignSelector() {
-  const btn      = document.getElementById('campaign-selector-btn');
-  const popover  = document.getElementById('campaign-selector-popover');
-  const btnName  = document.getElementById('cs-btn-name');
-  const btnId    = document.getElementById('cs-btn-id');
-  if (!btn || !popover || !btnName) return;
+/* ── Sidebar: toggle expandido / colapsado ───────────────────
+   Estado persiste en localStorage('umoh:sidebar').
+   Default: expandido ('expanded'). */
+function initSidebar() {
+  const collapseBtn = document.getElementById('sb-collapse-btn');
+  const hamburger   = document.getElementById('sb-hamburger');
 
-  function _setSelectedUI(id, name) {
-    btnName.textContent = (id === 'all') ? 'Todas las campañas' : name;
-    btnId.textContent   = (id === 'all') ? '' : 'ID ' + id;
-    popover.querySelectorAll('.campaign-option').forEach(opt => {
-      const isActive = opt.dataset.campaignId === id;
-      opt.classList.toggle('active', isActive);
-      opt.setAttribute('aria-selected', isActive ? 'true' : 'false');
+  // Restaurar estado (el .sidebar-collapsed ya fue aplicado en <head>
+  // antes de que el DOM cargara, para evitar flash — solo sincronizamos
+  // el aria-label del botón).
+  _syncCollapseBtn();
+
+  if (collapseBtn) {
+    collapseBtn.addEventListener('click', () => {
+      const isCollapsed = document.body.classList.toggle('sidebar-collapsed');
+      localStorage.setItem('umoh:sidebar', isCollapsed ? 'collapsed' : 'expanded');
+      _syncCollapseBtn();
+    });
+  }
+
+  // Mobile hamburger: abre/cierra el drawer
+  if (hamburger) {
+    hamburger.addEventListener('click', e => {
+      e.stopPropagation();
+      const isOpen = document.body.classList.toggle('sidebar-mobile-open');
+      hamburger.setAttribute('aria-expanded', String(isOpen));
+    });
+  }
+
+  // Click en el overlay (::before del body) cierra el drawer en mobile
+  document.addEventListener('click', e => {
+    if (!document.body.classList.contains('sidebar-mobile-open')) return;
+    const sidebar = document.getElementById('dashboard-sidebar');
+    const hamburgerEl = document.getElementById('sb-hamburger');
+    if (sidebar && !sidebar.contains(e.target) && e.target !== hamburgerEl) {
+      _closeMobileDrawer();
+    }
+  });
+
+  // Escape cierra el drawer en mobile
+  document.addEventListener('keydown', e => {
+    if (e.key === 'Escape') _closeMobileDrawer();
+  });
+}
+
+function _syncCollapseBtn() {
+  const btn = document.getElementById('sb-collapse-btn');
+  if (!btn) return;
+  const isCollapsed = document.body.classList.contains('sidebar-collapsed');
+  btn.setAttribute('aria-label', isCollapsed ? 'Expandir sidebar' : 'Colapsar sidebar');
+  btn.setAttribute('title',      isCollapsed ? 'Expandir'         : 'Colapsar');
+}
+
+function _closeMobileDrawer() {
+  document.body.classList.remove('sidebar-mobile-open');
+  const hamburger = document.getElementById('sb-hamburger');
+  if (hamburger) hamburger.setAttribute('aria-expanded', 'false');
+}
+
+/* ── Selector de campaña en sidebar (Sprint UX 2.0) ─────────
+   Reemplaza el dropdown del header por una lista vertical en el sidebar.
+   Reutiliza _currentCampaignId / _currentCampaignName y localStorage.
+   Búsqueda integrada aparece automáticamente si hay >10 campañas. */
+function initCampaignSelector() {
+  const list       = document.getElementById('sb-campaign-list');
+  const searchWrap = document.getElementById('sb-campaign-search');
+  const searchInput= document.getElementById('sb-campaign-search-input');
+  if (!list) return;
+
+  function _setSelectedUI(id) {
+    list.querySelectorAll('.sb-campaign-item').forEach(item => {
+      const active = item.dataset.campaignId === id;
+      item.classList.toggle('active', active);
+      item.setAttribute('aria-selected', active ? 'true' : 'false');
     });
   }
 
   function _selectCampaign(id, name) {
-    _currentCampaignId = id;
+    _currentCampaignId   = id;
     _currentCampaignName = name || '';
-    localStorage.setItem('umoh:campaign_id', id);
+    localStorage.setItem('umoh:campaign_id',   id);
     localStorage.setItem('umoh:campaign_name', _currentCampaignName);
-    _setSelectedUI(id, _currentCampaignName);
-    _closePopover();
-    // Refresca la sección actual con el filtro nuevo
+    _setSelectedUI(id);
     refreshDashboard(_currentSection, _currentPeriod);
+    // En mobile: cerrar el drawer al seleccionar campaña
+    _closeMobileDrawer();
   }
 
-  function _openPopover() {
-    popover.hidden = false;
-    popover.setAttribute('aria-hidden', 'false');
-    btn.setAttribute('aria-expanded', 'true');
+  // Event delegation sobre la lista de campañas
+  list.addEventListener('click', e => {
+    const item = e.target.closest('.sb-campaign-item');
+    if (!item) return;
+    const id   = item.dataset.campaignId;
+    const name = item.dataset.campaignName || item.querySelector('.sb-campaign-name')?.textContent || '';
+    _selectCampaign(id, name);
+  });
+
+  // Búsqueda: filtra las opciones en tiempo real
+  if (searchInput) {
+    searchInput.addEventListener('input', () => {
+      const q = searchInput.value.toLowerCase().trim();
+      list.querySelectorAll('.sb-campaign-item').forEach(item => {
+        const n = (item.querySelector('.sb-campaign-name')?.textContent || '').toLowerCase();
+        item.style.display = (!q || n.includes(q)) ? '' : 'none';
+      });
+    });
   }
-  function _closePopover() {
-    popover.hidden = true;
-    popover.setAttribute('aria-hidden', 'true');
-    btn.setAttribute('aria-expanded', 'false');
-  }
 
-  btn.addEventListener('click', e => {
-    e.stopPropagation();
-    if (popover.hidden) _openPopover();
-    else _closePopover();
-  });
-
-  // Event delegation para los options (la lista se popula dinámicamente)
-  popover.addEventListener('click', e => {
-    const opt = e.target.closest('.campaign-option');
-    if (!opt) return;
-    _selectCampaign(opt.dataset.campaignId, opt.dataset.campaignName || opt.querySelector('.cs-opt-name')?.textContent || '');
-  });
-
-  // Click outside cierra el popover. Usamos contains() en btn (no ===) porque
-  // si el click cae en un descendiente del btn (svg chevron, span name), e.target
-  // sería ese descendiente y un === fallaría incorrectamente.
-  document.addEventListener('click', e => {
-    if (!popover.contains(e.target) && !btn.contains(e.target)) _closePopover();
-  });
-  document.addEventListener('keydown', e => {
-    if (e.key === 'Escape' && !popover.hidden) _closePopover();
-  });
-
-  // Cargar la lista desde el backend y popular el dropdown
+  // Cargar la lista desde el backend y popular la lista del sidebar
   fetchData('campaigns', {})
     .then(resp => {
-      const list = (resp && resp.campaigns) || [];
-      // El option "all" ya está en el HTML; agregamos los demás abajo
-      list.forEach(c => {
-        const opt = document.createElement('button');
-        opt.className = 'campaign-option';
-        opt.type = 'button';
-        opt.dataset.campaignId = c.id;
-        opt.dataset.campaignName = c.name;
-        opt.setAttribute('role', 'option');
-        opt.setAttribute('aria-selected', 'false');
-        opt.innerHTML = `
-          <span class="cs-opt-name">${_escape(c.name)}</span>
-          <span class="cs-opt-id">ID ${_escape(c.id)}</span>
+      const campaigns = (resp && resp.campaigns) || [];
+      // Mostrar búsqueda si hay muchas campañas
+      if (searchWrap && campaigns.length > 10) searchWrap.style.display = '';
+
+      campaigns.forEach(c => {
+        const item = document.createElement('button');
+        item.className = 'sb-campaign-item';
+        item.type = 'button';
+        item.dataset.campaignId   = c.id;
+        item.dataset.campaignName = c.name;
+        item.setAttribute('role', 'option');
+        item.setAttribute('aria-selected', 'false');
+        item.innerHTML = `
+          <svg class="sb-campaign-icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <circle cx="12" cy="12" r="10"/>
+            <circle cx="12" cy="12" r="6"/>
+            <circle cx="12" cy="12" r="2"/>
+          </svg>
+          <div class="sb-campaign-info sb-label">
+            <span class="sb-campaign-name">${_escape(c.name)}</span>
+            <span class="sb-campaign-id">ID ${_escape(c.id)}</span>
+          </div>
+          <span class="sb-campaign-dot" aria-hidden="true"></span>
         `;
-        popover.appendChild(opt);
+        list.appendChild(item);
       });
-      // Si la persistencia tenía un id que coincide con una campaña real,
-      // refrescamos la UI para reflejarlo. Si no existe (cliente cambió de
-      // campaña, o mock), volvemos a "all".
+
+      // Reconciliar persistencia con la lista recibida
       if (_currentCampaignId !== 'all') {
-        const found = list.find(c => c.id === _currentCampaignId);
+        const found = campaigns.find(c => c.id === _currentCampaignId);
         if (!found) {
-          _currentCampaignId = 'all';
+          _currentCampaignId   = 'all';
           _currentCampaignName = '';
-          localStorage.setItem('umoh:campaign_id', 'all');
+          localStorage.setItem('umoh:campaign_id',   'all');
           localStorage.setItem('umoh:campaign_name', '');
         } else {
           _currentCampaignName = found.name;
           localStorage.setItem('umoh:campaign_name', found.name);
         }
       }
-      _setSelectedUI(_currentCampaignId, _currentCampaignName);
+      _setSelectedUI(_currentCampaignId);
     })
-    .catch(err => {
-      console.warn('[Dashboard] No se pudo cargar la lista de campañas:', err);
-      // Fallback: dejar "Todas las campañas" como única opción
-      _setSelectedUI('all', '');
+    .catch(() => {
+      // Fallback silencioso: solo "Todas las campañas" queda activa
+      _setSelectedUI('all');
     });
 }
 
@@ -933,10 +1019,15 @@ function _escape(s) {
 /* ── Bootstrap ──────────────────────────────────────────── */
 document.addEventListener('DOMContentLoaded', () => {
   initTheme();
+  initSidebar();
   initUserMenu();
   initFilters();
   initKpiModals();
   initScrollNavBehavior();
   initCampaignSelector();
+
+  // La sección activa al cargar es "performance" (el HTML tiene active en
+  // ese section). El sidebar nav-item "performance" también tiene .active.
+  // Cargamos los datos de Performance como primera sección.
   refreshDashboard(_currentSection, _currentPeriod);
 });
