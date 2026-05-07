@@ -74,17 +74,23 @@ function _activatePeriod(btn) {
   if (compact) compact.textContent = btn.dataset.period || '30d';
 }
 
-/* ── Date picker ────────────────────────────────────────── */
+/* ── Date picker (inline panel en sidebar) ───────────────── */
+
+/**
+ * Abre el panel inline de fechas personalizadas dentro del sidebar.
+ * Pre-rellena los inputs con valores por defecto si están vacíos.
+ */
 function _openDatePicker() {
-  const popover    = document.getElementById('date-picker-popover');
+  const panel      = document.getElementById('sb-custom-date-panel');
+  const customBtn  = document.getElementById('sb-period-custom-btn');
   const startInput = document.getElementById('date-start');
   const endInput   = document.getElementById('date-end');
-  if (!popover || !startInput || !endInput) return;
+  if (!panel || !startInput || !endInput) return;
 
-  const today    = new Date();
-  const maxDate  = new Date(today); maxDate.setDate(today.getDate() - 1);
-  const minDate  = new Date(today); minDate.setDate(today.getDate() - 90);
-  const fmt      = d => d.toISOString().split('T')[0];
+  const today   = new Date();
+  const maxDate = new Date(today); maxDate.setDate(today.getDate() - 1);
+  const minDate = new Date(today); minDate.setDate(today.getDate() - 90);
+  const fmt     = d => d.toISOString().split('T')[0];
 
   startInput.min = endInput.min = fmt(minDate);
   startInput.max = endInput.max = fmt(maxDate);
@@ -95,15 +101,36 @@ function _openDatePicker() {
   }
   if (!endInput.value) endInput.value = fmt(maxDate);
 
-  popover.hidden = false;
-  popover.setAttribute('aria-hidden', 'false');
+  panel.classList.add('is-open');
+  if (customBtn) {
+    customBtn.classList.add('is-open');
+    customBtn.setAttribute('aria-expanded', 'true');
+  }
 }
 
+/**
+ * Cierra el panel inline de fechas personalizadas.
+ */
 function _closeDatePicker() {
-  const popover = document.getElementById('date-picker-popover');
-  if (!popover) return;
-  popover.hidden = true;
-  popover.setAttribute('aria-hidden', 'true');
+  const panel     = document.getElementById('sb-custom-date-panel');
+  const customBtn = document.getElementById('sb-period-custom-btn');
+  if (panel) panel.classList.remove('is-open');
+  if (customBtn) {
+    customBtn.classList.remove('is-open');
+    customBtn.setAttribute('aria-expanded', 'false');
+  }
+}
+
+/**
+ * Alterna el panel inline de fecha personalizada.
+ */
+function _toggleDatePicker() {
+  const panel = document.getElementById('sb-custom-date-panel');
+  if (panel && panel.classList.contains('is-open')) {
+    _closeDatePicker();
+  } else {
+    _openDatePicker();
+  }
 }
 
 function _applyCustomRange() {
@@ -133,20 +160,47 @@ function _toggleTheme() {
   const next    = current === 'dark' ? 'light' : 'dark';
   document.documentElement.setAttribute('data-theme', next);
   localStorage.setItem('umoh-theme', next);
+  _syncThemeLabel();
   // Redraw charts to pick up new CSS variable colors
   refreshDashboard(_currentSection, _currentPeriod);
 }
 
 /* ── User menu (sidebar) ─────────────────────────────────── */
+
+/**
+ * Genera la inicial del nombre de usuario para el avatar.
+ * Usa la primera letra del nombre en mayúscula.
+ */
+function _getUserInitial(name) {
+  return (name || 'U').trim().charAt(0).toUpperCase();
+}
+
+/**
+ * Actualiza el label del botón de tema en el sidebar
+ * según el tema activo actual.
+ */
+function _syncThemeLabel() {
+  const label = document.getElementById('sb-theme-label');
+  if (!label) return;
+  const isDark = document.documentElement.getAttribute('data-theme') === 'dark';
+  label.textContent = isDark ? 'Modo claro' : 'Modo oscuro';
+}
+
 function initUserMenu() {
   const name      = window.DASHBOARD_USERNAME || 'Usuario';
   const firstName = name.split(' ')[0];
+  const initial   = _getUserInitial(firstName);
 
   const setTextEl = (id, val) => { const el = document.getElementById(id); if (el) el.textContent = val; };
 
   // Sidebar user elements
   setTextEl('sb-user-name',     firstName);
   setTextEl('sb-user-fullname', name);
+
+  // Avatares de inicial: trigger + menú expandido + sección inicio
+  setTextEl('sb-user-initial-trigger', initial);
+  setTextEl('sb-user-initial-menu',    initial);
+  setTextEl('inicio-avatar-initial',   initial);
 
   // Sección Inicio: saludo personalizado
   setTextEl('inicio-user-name', firstName);
@@ -737,14 +791,15 @@ function initFilters() {
     btn.addEventListener('click', () => {
       const period = btn.dataset.period;
       if (period === 'custom') {
+        // Personalizado: toggle del panel inline (no activa período hasta que se aplica)
         _activatePeriod(btn);
-        _openDatePicker();
+        _toggleDatePicker();
         return;
       }
+      // Al seleccionar otro período, cerrar el panel de fechas si estaba abierto
       _closeDatePicker();
       _activatePeriod(btn);
       _currentPeriod = period;
-      // Actualizar el subtitle de Inicio si aplica
       _updateInicioSubtitle(period);
       refreshDashboard(_currentSection, _currentPeriod);
     });
@@ -767,25 +822,18 @@ function initFilters() {
   const applyBtn = document.getElementById('date-apply-btn');
   if (applyBtn) applyBtn.addEventListener('click', _applyCustomRange);
 
-  /* Close date picker on outside click */
-  document.addEventListener('click', e => {
-    const popover = document.getElementById('date-picker-popover');
-    const wrap    = document.getElementById('sb-period-wrap');
-    if (popover && !popover.hidden && wrap && !wrap.contains(e.target)) {
-      _closeDatePicker();
-      if (_currentPeriod !== 'custom' && _currentPeriod !== 'all') {
-        const activeBtn = document.querySelector(`.sb-period-btn[data-period="${_currentPeriod}"]`);
-        if (activeBtn) _activatePeriod(activeBtn);
-      }
-    }
-  });
-
   /* Section navigation — sidebar items (.sb-nav-item) */
   document.querySelectorAll('.sb-nav-item').forEach(item => {
     item.addEventListener('click', () => {
       const section = item.dataset.section;
+
+      // Actualizar el trigger del dropdown de secciones con el ítem activo
+      _updateSectionsTrigger(section);
+
+      // Cerrar el panel de secciones al navegar
+      _closeSectionsPanel();
+
       if (section === _currentSection) {
-        // En mobile: cerrar el drawer al hacer click en la sección ya activa
         _closeMobileDrawer();
         return;
       }
@@ -796,14 +844,146 @@ function initFilters() {
       if (section === 'tofu') {
         setTimeout(() => { if (typeof invalidateGeoMap === 'function') invalidateGeoMap(); }, 350);
       }
-      // En mobile: cerrar drawer al navegar
       _closeMobileDrawer();
     });
   });
 
-  /* Theme toggle */
+  /* Theme toggle — botón flotante (mantenido por compatibilidad, ahora oculto en sidebar layout) */
   const themeBtn = document.getElementById('theme-toggle');
   if (themeBtn) themeBtn.addEventListener('click', _toggleTheme);
+
+  /* Theme toggle — botón en sidebar */
+  const sbThemeBtn = document.getElementById('sb-theme-toggle');
+  if (sbThemeBtn) sbThemeBtn.addEventListener('click', _toggleTheme);
+
+  /* Dropdown de campañas */
+  _initCampaignsDropdown();
+
+  /* Dropdown de secciones */
+  _initSectionsDropdown();
+}
+
+/* ── Dropdown de campañas — trigger expandir/colapsar ────── */
+function _initCampaignsDropdown() {
+  const trigger = document.getElementById('sb-campaigns-trigger');
+  const panel   = document.getElementById('sb-campaigns-panel');
+  if (!trigger || !panel) return;
+
+  trigger.addEventListener('click', e => {
+    e.stopPropagation();
+    const isOpen = trigger.classList.contains('is-open');
+    trigger.classList.toggle('is-open', !isOpen);
+    panel.classList.toggle('is-open', !isOpen);
+    trigger.setAttribute('aria-expanded', String(!isOpen));
+  });
+
+  // Click fuera cierra el dropdown
+  document.addEventListener('click', e => {
+    const section = document.getElementById('sb-campaigns-section');
+    if (section && !section.contains(e.target)) {
+      trigger.classList.remove('is-open');
+      panel.classList.remove('is-open');
+      trigger.setAttribute('aria-expanded', 'false');
+    }
+  });
+}
+
+/* ── Dropdown de secciones — trigger expandir/colapsar ────── */
+function _initSectionsDropdown() {
+  const trigger = document.getElementById('sb-sections-trigger');
+  const panel   = document.getElementById('sb-sections-panel');
+  if (!trigger || !panel) return;
+
+  trigger.addEventListener('click', e => {
+    e.stopPropagation();
+    const isOpen = trigger.classList.contains('is-open');
+    trigger.classList.toggle('is-open', !isOpen);
+    panel.classList.toggle('is-open', !isOpen);
+    trigger.setAttribute('aria-expanded', String(!isOpen));
+  });
+
+  // Click fuera cierra el dropdown
+  document.addEventListener('click', e => {
+    const section = document.querySelector('.sb-section--nav');
+    if (section && !section.contains(e.target)) {
+      _closeSectionsPanel();
+    }
+  });
+}
+
+function _closeSectionsPanel() {
+  const trigger = document.getElementById('sb-sections-trigger');
+  const panel   = document.getElementById('sb-sections-panel');
+  if (trigger) {
+    trigger.classList.remove('is-open');
+    trigger.setAttribute('aria-expanded', 'false');
+  }
+  if (panel) panel.classList.remove('is-open');
+}
+
+/**
+ * Actualiza el trigger del dropdown de secciones para reflejar la sección activa.
+ * Copia el ícono SVG del nav-item seleccionado al trigger, y actualiza el nombre.
+ */
+function _updateSectionsTrigger(section) {
+  const nameEl  = document.getElementById('sb-sections-active-name');
+  const iconEl  = document.getElementById('sb-sections-active-icon');
+
+  // Buscar el nav-item con data-section correspondiente
+  const navItem = document.querySelector(`.sb-nav-item[data-section="${section}"]`);
+  if (!navItem) return;
+
+  const labelEl = navItem.querySelector('.sb-label');
+  if (nameEl && labelEl) nameEl.textContent = labelEl.textContent;
+
+  // Clonar el SVG del nav-item al trigger
+  if (iconEl) {
+    const srcIcon = navItem.querySelector('.sb-nav-icon');
+    if (srcIcon) {
+      const cloned = srcIcon.cloneNode(true);
+      cloned.id = 'sb-sections-active-icon';
+      cloned.classList.remove('sb-nav-icon');
+      cloned.classList.add('sb-dt-icon', 'sb-sections-active-icon');
+      iconEl.replaceWith(cloned);
+    }
+  }
+}
+
+/**
+ * Actualiza el trigger del dropdown de campañas para reflejar la campaña activa.
+ * Muestra nombre + meta (ID · Plataforma).
+ */
+function _updateCampaignsTrigger(id, name, platform) {
+  const nameEl = document.getElementById('sb-campaigns-active-name');
+  const metaEl = document.getElementById('sb-campaigns-active-meta');
+
+  if (id === 'all') {
+    if (nameEl) nameEl.textContent = 'Todas las campañas';
+    if (metaEl) metaEl.textContent = 'vista agregada';
+  } else {
+    if (nameEl) nameEl.textContent = name || id;
+    // Plataforma: usar fallback 'Google Ads' si no viene del backend
+    const platformLabel = _platformLabel(platform || 'google_ads');
+    if (metaEl) metaEl.textContent = `${id} · ${platformLabel}`;
+  }
+}
+
+/**
+ * Convierte el valor raw de plataforma a un label legible.
+ * Fallback: 'google_ads' → 'Google Ads'.
+ * NOTA: El endpoint /api/campaigns.php no incluye `platform` en el SELECT
+ * actualmente — se necesita extender la query para incluir el campo desde
+ * tofu_facts. Mientras tanto, se usa 'google_ads' como fallback.
+ */
+function _platformLabel(raw) {
+  const map = {
+    google_ads:  'Google Ads',
+    google:      'Google Ads',
+    meta:        'Meta Ads',
+    meta_ads:    'Meta Ads',
+    facebook:    'Meta Ads',
+  };
+  return map[String(raw).toLowerCase()] || 'Google Ads';
 }
 
 /* Actualiza el subtitle de la sección Inicio según el período activo */

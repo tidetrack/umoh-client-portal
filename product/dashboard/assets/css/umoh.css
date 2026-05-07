@@ -3950,26 +3950,17 @@ body.sidebar-collapsed .dashboard-content {
   width:           52px;
   height:          52px;
   border-radius:   50%;
-  background:      var(--umoh-primary);
+  background:      rgba(255, 0, 64, 0.10);
   border:          3px solid var(--border-subtle);
   display:         flex;
   align-items:     center;
   justify-content: center;
   flex-shrink:     0;
   overflow:        hidden;
-  padding:         6px;
 }
 
-.inicio-avatar img {
-  width:        100%;
-  height:       100%;
-  object-fit:   contain;
-  border-radius: 50%;
-  filter:       invert(1);
-}
-
-[data-theme="dark"] .inicio-avatar img {
-  filter: none;
+[data-theme="dark"] .inicio-avatar {
+  background: rgba(255, 0, 64, 0.15);
 }
 
 .inicio-greeting-block {
@@ -4250,6 +4241,436 @@ body.sidebar-layout .nav-fab {
 /* ── Ocultar header y nav viejos cuando sidebar está activo ─── */
 body.sidebar-layout .site-header,
 body.sidebar-layout .dashboard-nav {
+  display: none;
+}
+
+/* ══════════════════════════════════════════════════════════════
+   SPRINT UX 2.1 — Sidebar polished dropdowns + theme toggle
+   ══════════════════════════════════════════════════════════════ */
+
+/* ── Transición estándar de motion ─────────────────────────── */
+:root {
+  --sb-motion: 200ms cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* ── Secciones dropdown (Campañas + Secciones) ──────────────── */
+
+/* Botón header de cada dropdown */
+.sb-dropdown-trigger {
+  display:         flex;
+  align-items:     center;
+  gap:             var(--sp-2);
+  width:           100%;
+  padding:         10px var(--sp-3);
+  border:          none;
+  border-radius:   var(--r-md);
+  background:      transparent;
+  color:           var(--text-secondary);
+  font-family:     var(--font);
+  font-size:       13px;
+  font-weight:     500;
+  cursor:          pointer;
+  text-align:      left;
+  transition:      background var(--sb-motion), color var(--sb-motion);
+  white-space:     nowrap;
+  position:        relative;
+}
+
+.sb-dropdown-trigger:hover {
+  background: rgba(0, 0, 0, 0.04);
+  color:      var(--text-primary);
+}
+
+[data-theme="dark"] .sb-dropdown-trigger:hover {
+  background: rgba(255, 255, 255, 0.05);
+}
+
+.sb-dropdown-trigger.is-open {
+  color:      var(--text-primary);
+  background: rgba(0, 0, 0, 0.03);
+}
+
+[data-theme="dark"] .sb-dropdown-trigger.is-open {
+  background: rgba(255, 255, 255, 0.04);
+}
+
+/* Icono de la campaña activa en el trigger */
+.sb-dt-icon {
+  flex-shrink: 0;
+  color:       var(--umoh-accent);
+}
+
+/* Bloque de texto (nombre + meta info) */
+.sb-dt-text {
+  flex:        1;
+  min-width:   0;
+  overflow:    hidden;
+}
+
+.sb-dt-name {
+  font-size:     13px;
+  font-weight:   600;
+  color:         var(--text-primary);
+  white-space:   nowrap;
+  overflow:      hidden;
+  text-overflow: ellipsis;
+  line-height:   1.3;
+}
+
+.sb-dt-meta {
+  font-size:   11px;
+  color:       var(--text-muted);
+  white-space: nowrap;
+  overflow:    hidden;
+  text-overflow: ellipsis;
+  line-height: 1.2;
+  margin-top:  1px;
+  font-variant-numeric: tabular-nums;
+}
+
+/* Chevron */
+.sb-dt-chevron {
+  flex-shrink: 0;
+  color:       var(--text-muted);
+  transition:  transform var(--sb-motion);
+  /* Cerrado: apunta hacia abajo (↓ = click para abrir) */
+  transform:   rotate(0deg);
+}
+
+/* Abierto: chevron rota hacia arriba (↑ = click para cerrar) */
+.sb-dropdown-trigger.is-open .sb-dt-chevron {
+  transform: rotate(180deg);
+}
+
+/* Panel expandible */
+.sb-dropdown-panel {
+  overflow:      hidden;
+  max-height:    0;
+  transition:    max-height var(--sb-motion);
+}
+
+.sb-dropdown-panel.is-open {
+  max-height:    600px;
+}
+
+/* ── Items dentro del panel ─────────────────────────────────── */
+
+/* Upgrade: padding más generoso, border-radius 8-10px, transición suave */
+.sb-campaign-item {
+  padding:       10px var(--sp-3);
+  border-radius: var(--r-md);
+  gap:           var(--sp-2);
+  transition:    background var(--sb-motion), color var(--sb-motion);
+}
+
+.sb-campaign-item:hover {
+  background: rgba(0, 0, 0, 0.04);
+  color:      var(--text-primary);
+}
+
+[data-theme="dark"] .sb-campaign-item:hover {
+  background: rgba(255, 255, 255, 0.05);
+}
+
+.sb-campaign-item.active {
+  background: rgba(255, 0, 64, 0.08);
+  color:      var(--umoh-accent);
+}
+
+[data-theme="dark"] .sb-campaign-item.active {
+  background: rgba(255, 0, 64, 0.12);
+}
+
+.sb-nav-item {
+  padding:       12px var(--sp-3);
+  border-radius: var(--r-md);
+  transition:    background var(--sb-motion), color var(--sb-motion), border-left-color var(--sb-motion);
+}
+
+.sb-nav-item:hover {
+  background: rgba(0, 0, 0, 0.04);
+  color:      var(--text-primary);
+}
+
+[data-theme="dark"] .sb-nav-item:hover {
+  background: rgba(255, 255, 255, 0.05);
+}
+
+.sb-nav-item.active {
+  background:        rgba(255, 0, 64, 0.08);
+  color:             var(--umoh-accent);
+  border-left-color: var(--umoh-accent);
+}
+
+[data-theme="dark"] .sb-nav-item.active {
+  background: rgba(255, 0, 64, 0.12);
+}
+
+/* Secciones nav: mismo dropdown expandible */
+.sb-nav-dropdown-panel {
+  overflow:   hidden;
+  max-height: 0;
+  transition: max-height var(--sb-motion);
+}
+
+.sb-nav-dropdown-panel.is-open {
+  max-height: 400px;
+}
+
+/* ── Período — panel inline expandible ──────────────────────── */
+
+/* El botón "Personalizado" tiene un chevron integrado */
+.sb-period-btn--custom .sb-period-chevron {
+  margin-left: auto;
+  flex-shrink: 0;
+  color:       var(--text-muted);
+  transition:  transform var(--sb-motion);
+  transform:   rotate(0deg); /* cerrado → apunta abajo */
+}
+
+.sb-period-btn--custom.is-open .sb-period-chevron {
+  transform: rotate(180deg); /* abierto → apunta arriba */
+}
+
+/* Panel inline del date picker dentro del sidebar */
+.sb-custom-date-panel {
+  overflow:      hidden;
+  max-height:    0;
+  transition:    max-height var(--sb-motion);
+}
+
+.sb-custom-date-panel.is-open {
+  max-height:    400px;
+}
+
+/* Cuando se usa el inline panel, el popover flotante no aplica al sidebar */
+.sb-period-wrap .date-picker-popover.sb-inline-hidden {
+  display: none !important;
+}
+
+/* El date-picker-inner dentro del inline panel usa colores del tema correctamente */
+.sb-custom-date-panel .date-picker-inner {
+  padding: var(--sp-3) var(--sp-2) var(--sp-2);
+}
+
+.sb-custom-date-panel .date-picker-input {
+  background:   var(--bg-page);
+  border-color: var(--border-subtle);
+  color:        var(--text-primary);
+  color-scheme: auto;
+}
+
+[data-theme="dark"] .sb-custom-date-panel .date-picker-input {
+  background:   rgba(255, 255, 255, 0.06);
+  border-color: rgba(255, 255, 255, 0.15);
+  color:        #fff;
+  color-scheme: dark;
+}
+
+.sb-custom-date-panel .date-picker-label {
+  color: var(--text-secondary);
+}
+
+.sb-custom-date-panel .historic-label {
+  color: var(--text-muted);
+}
+
+.sb-custom-date-panel .historic-btn {
+  background:   var(--bg-page);
+  color:        var(--text-secondary);
+  border-color: var(--border-subtle);
+}
+
+[data-theme="dark"] .sb-custom-date-panel .historic-btn {
+  background:   rgba(255, 255, 255, 0.06);
+  color:        rgba(255, 255, 255, 0.7);
+  border-color: rgba(255, 255, 255, 0.15);
+}
+
+.sb-custom-date-panel .historic-btn:hover,
+.sb-custom-date-panel .historic-btn.active {
+  background:   var(--umoh-accent);
+  color:        #fff;
+  border-color: var(--umoh-accent);
+}
+
+.sb-custom-date-panel .date-picker-divider {
+  background: var(--border-subtle);
+}
+
+.sb-custom-date-panel .date-apply-btn {
+  width: 100%;
+}
+
+/* ── sb-period-btn upgrade ──────────────────────────────────── */
+.sb-period-btn {
+  padding:       10px var(--sp-3);
+  border-radius: var(--r-md);
+  transition:    background var(--sb-motion), color var(--sb-motion);
+}
+
+.sb-period-btn:hover {
+  background: rgba(0, 0, 0, 0.04);
+  color:      var(--text-primary);
+}
+
+[data-theme="dark"] .sb-period-btn:hover {
+  background: rgba(255, 255, 255, 0.05);
+}
+
+.sb-period-btn.active {
+  background: rgba(255, 0, 64, 0.08);
+  color:      var(--umoh-accent);
+  font-weight: 600;
+}
+
+[data-theme="dark"] .sb-period-btn.active {
+  background: rgba(255, 0, 64, 0.12);
+}
+
+/* ── Perfil: chevron apunta hacia abajo cerrado ─────────────── */
+.sb-user-trigger .sb-user-chevron {
+  flex-shrink: 0;
+  color:       var(--text-muted);
+  margin-left: auto;
+  opacity:     0.5;
+  transition:  transform var(--sb-motion);
+  transform:   rotate(0deg); /* cerrado → apunta abajo */
+}
+
+/* Cuando el dropdown está abierto, el chevron rota 180° (apunta arriba) */
+.sb-user-trigger[aria-expanded="true"] .sb-user-chevron {
+  transform: rotate(180deg);
+}
+
+/* ── Logo brand-mark: SVG inline (punto 6) ──────────────────── */
+.sb-brand-mark {
+  background: var(--umoh-accent);
+}
+
+/* Cuando hay SVG inline, no necesitamos el <img> */
+.sb-brand-mark .sb-brand-svg {
+  width:  18px;
+  height: 18px;
+  display: block;
+  fill: #ffffff;
+}
+
+/* En modo claro el brand-mark tiene fondo rojo, SVG blanco → perfecto */
+/* En modo oscuro igual — el rojo UMOH es invariante entre temas */
+[data-theme="dark"] .sb-brand-mark {
+  background: var(--umoh-accent);
+}
+
+/* Ocultar img si sigue existiendo en el DOM — la nueva versión es SVG inline */
+.sb-brand-mark img {
+  display: none;
+}
+
+/* ── Avatar del usuario: inicial en circle ──────────────────── */
+.sb-user-avatar {
+  background:    var(--bg-card);
+  border:        2px solid var(--border-subtle);
+  /* Sin padding ya que ahora muestra una letra */
+  padding:       0;
+}
+
+/* Si contiene una letra como avatar */
+.sb-user-avatar-initial {
+  width:           100%;
+  height:          100%;
+  display:         flex;
+  align-items:     center;
+  justify-content: center;
+  font-size:       13px;
+  font-weight:     700;
+  color:           var(--umoh-accent);
+  line-height:     1;
+  font-family:     var(--font);
+  background:      rgba(255, 0, 64, 0.10);
+  border-radius:   50%;
+}
+
+[data-theme="dark"] .sb-user-avatar-initial {
+  color:      var(--umoh-accent);
+  background: rgba(255, 0, 64, 0.15);
+}
+
+/* Ocultar img del avatar si hay initial */
+.sb-user-avatar.has-initial img {
+  display: none;
+}
+
+/* Avatar grande en el menú de usuario */
+.user-menu-avatar-lg .sb-user-avatar-initial {
+  font-size:  20px;
+  font-weight: 700;
+}
+
+/* ── Theme toggle en sidebar (punto 8) ──────────────────────── */
+.sb-theme-row {
+  display:     flex;
+  align-items: center;
+  gap:         var(--sp-2);
+  width:       100%;
+  padding:     10px var(--sp-3);
+  border:      none;
+  border-radius: var(--r-md);
+  background:  transparent;
+  color:       var(--text-secondary);
+  font-family: var(--font);
+  font-size:   13px;
+  font-weight: 500;
+  cursor:      pointer;
+  text-align:  left;
+  transition:  background var(--sb-motion), color var(--sb-motion);
+  white-space: nowrap;
+}
+
+.sb-theme-row:hover {
+  background: rgba(0, 0, 0, 0.04);
+  color:      var(--text-primary);
+}
+
+[data-theme="dark"] .sb-theme-row:hover {
+  background: rgba(255, 255, 255, 0.05);
+}
+
+.sb-theme-icon {
+  flex-shrink: 0;
+  width:       16px;
+  height:      16px;
+  color:       var(--text-muted);
+}
+
+.sb-theme-label {
+  /* sb-label: oculto en colapsado */
+}
+
+/* Icono sol/luna según tema */
+[data-theme="light"] .sb-theme-icon--sun  { display: block; }
+[data-theme="light"] .sb-theme-icon--moon { display: none; }
+[data-theme="dark"]  .sb-theme-icon--sun  { display: none; }
+[data-theme="dark"]  .sb-theme-icon--moon { display: block; }
+
+/* ── Section-label upgrade: más espacio ─────────────────────── */
+.sb-section-label {
+  padding-top: var(--sp-1);
+}
+
+/* ── sb-user dentro del sidebar layout: sin posición relativa rota ─ */
+.sb-user > div {
+  position: static !important;
+}
+
+/* El dropdown sale hacia arriba gracias a position:absolute bottom:100% */
+/* Pero necesita un ancestor con position:relative */
+.sb-user {
+  position: relative;
+}
+
+/* ── Ocultar el theme-toggle flotante cuando hay sidebar ────── */
+body.sidebar-layout .theme-toggle-switch {
   display: none;
 }
 

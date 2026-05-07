@@ -255,10 +255,63 @@ $section_kpis = [
 ];
 
 // ── Resumen heurístico ────────────────────────────────────────────────────────
-// Genera texto en lenguaje natural a partir de los datos disponibles.
-// PLACEHOLDER: cuando se conecte Claude API, este bloque se reemplaza por
-// una llamada a POST https://api.anthropic.com/v1/messages con los mismos
-// datos como contexto, y el resultado se cachea en ai_summaries.
+// ── Intentar leer del cache `ai_summaries` ───────────────────────────────────
+// Decisión de Franco (2026-05-07): NO se usa Claude API. El resumen lo genera
+// el script `scripts/run_inicio_summary.py` con reglas heurísticas y se guarda
+// en la tabla `ai_summaries`. Acá leemos esa tabla. Si no hay row (porque el
+// script todavía no se corrió o la tabla no existe), seguimos al fallback
+// heurístico inline de abajo.
+
+$cached_summary = null;
+if ($supabase_url && $supabase_key) {
+    $url = $supabase_url . '/rest/v1/ai_summaries'
+        . '?client_slug=eq.prepagas'
+        . '&period=eq.' . urlencode($period)
+        . '&select=headline,highlights,recommendation,generated_at'
+        . '&limit=1';
+    $ch = curl_init($url);
+    curl_setopt_array($ch, [
+        CURLOPT_RETURNTRANSFER => true,
+        CURLOPT_HTTPHEADER     => [
+            'apikey: ' . $supabase_key,
+            'Authorization: Bearer ' . $supabase_key,
+        ],
+        CURLOPT_TIMEOUT => 4,
+    ]);
+    $resp = curl_exec($ch);
+    curl_close($ch);
+    if (is_string($resp)) {
+        $data = json_decode($resp, true);
+        if (is_array($data) && !empty($data) && isset($data[0]['headline'])) {
+            $cached_summary = $data[0];
+        }
+    }
+}
+
+if ($cached_summary !== null) {
+    $headline       = (string)($cached_summary['headline'] ?? '');
+    $highlights     = is_array($cached_summary['highlights'] ?? null)
+                      ? $cached_summary['highlights'] : [];
+    $recommendation = (string)($cached_summary['recommendation'] ?? '');
+
+    _json_ok([
+        'user_name'    => $user_name,
+        'period_label' => $period_label,
+        'ai_summary'   => [
+            'headline'       => $headline,
+            'highlights'     => $highlights,
+            'recommendation' => $recommendation,
+            'generated_at'   => $cached_summary['generated_at'] ?? null,
+            'source'         => 'cache',
+        ],
+        'section_kpis' => $section_kpis,
+    ]);
+}
+
+// ── Fallback: generar resumen heurístico on-the-fly ─────────────────────────
+// Si la tabla ai_summaries no existe todavía o no tiene row para este período,
+// generamos el resumen acá con las mismas heurísticas que el script Python.
+// El cliente verá el resumen actualizado al instante; no hay degradación.
 
 $impressions  = $tofu_data['impressions'];
 $clicks       = $tofu_data['clicks'];
