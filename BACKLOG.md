@@ -1,6 +1,6 @@
 # BACKLOG — UMOH Client Portal
 
-**Última actualización:** 2026-05-07
+**Última actualización:** 2026-05-07 (sprint fixes en curso)
 **Cliente activo:** Prevención Salud (`prepagas.umohcrew.com`)
 **Estado general:** Dashboard EN PRODUCCIÓN con las 4 facts tables (TOFU/MOFU/BOFU/SELLER) en Supabase + Sheets espejo del cliente. Customer journey CRM de 13 etapas con motion. Filtro global de campaña funcionando. Pendiente: validar BOFU/SUMMARY en vivo, mapa geo real, canal/dispositivo (en 0), Node.js update, líneas de tendencia, mobile responsive y entrega de credenciales al cliente.
 
@@ -141,6 +141,32 @@ Estas tareas bloquean el lanzamiento. Sin ellas el cliente no puede usar el prod
 
 ---
 
+### 1.13 — Rediseño layout: sidebar navegación + sección "Inicio"
+
+- [ ] **1.13** Reemplazar el header superior por un **sidebar lateral** colapsable + agregar una sección nueva "Inicio" con resumen IA del estado del cliente.
+  **Complejidad:** Alta
+  **Qué es (en 3 partes):**
+
+  **Parte A — Sidebar lateral.** Hoy toda la navegación está en un header arriba (logo, selector de campaña, selector de período, perfil de usuario). Franco quiere migrarlo a un **sidebar lateral** estilo apps modernas (Notion, Linear, Vercel) con dos modos:
+  - **Expandido (fijo):** ancho ~240px, muestra ícono + texto en cada item.
+  - **Colapsado:** ancho ~60px, solo íconos. Toggle para alternar.
+  - El sidebar contiene: navegación entre **secciones** (Inicio / Performance / TOFU / MOFU / BOFU), navegación entre **campañas** (más prolija que el dropdown actual — ej. lista expandible con búsqueda si hay muchas), y al fondo el **perfil de usuario** (avatar + nombre + dropdown con logout/config).
+  - El selector de período (7d / 30d / 90d / Personalizado) puede quedar en el header del contenido principal o también moverse al sidebar — decisión de diseño.
+
+  **Parte B — Sección nueva "Inicio".** Vista nueva que aparece al entrar al dashboard (default antes de Performance). Contiene:
+  - Saludo personalizado ("Hola, Franco" o el nombre del usuario).
+  - Resumen IA del estado del cliente — un párrafo o serie de bullets en lenguaje natural que destaca: variaciones importantes del período, cuellos de botella detectados, leads de alta intención sin mover, comparación con el período anterior, recomendación accionable.
+  - Posiblemente cards con accesos rápidos a las 4 secciones existentes con un dato destacado de cada una.
+  - Implementación del resumen IA: usar el agente `ai-integrator` con Claude API + cache en Supabase para no llamar al LLM en cada request.
+
+  **Parte C — Mejorar selector de campaña.** El selector actual es un dropdown chico. Con el sidebar, se puede mostrar la lista de campañas como elementos navegables (con icon de target, nombre, ID) — el cliente cambia de campaña como cambia de proyecto en Notion.
+
+  **Por qué importa:** mejora la UX significativa, da espacio para más contenido (más campañas, más secciones futuras), y la sección "Inicio" cumple una función comunicativa fuerte (el cliente abre el dashboard y entiende inmediatamente qué pasa, sin tener que navegar y leer números).
+
+  **Cuándo se hace:** **después** de cerrar el sprint de fixes en curso (CEO agente trabajando) para no chocar con cambios al header/selector. Probablemente arranca como un sprint dedicado tipo "Sprint UX 2.0".
+
+---
+
 ### 6.1 — Diseño responsivo (mobile) — *anteúltimo paso del MVP*
 
 - [ ] **6.1** Adaptar todo el dashboard para que se vea y funcione bien en celulares y tablets.
@@ -257,6 +283,39 @@ Estas tareas mejoran el producto pero no bloquean el lanzamiento. Se trabajan de
 | F | Desglose por segmento BOFU: ¿usar campo `operatoria` o `tipification`? | `tipification` (Voluntario / Monotributista / Obligatorio). `operatoria` no es indicador relevante — 2026-05-05 |
 | G | Conversion rate: ¿qué denominador? | Las 3 versiones (acumulado, mes mismo, 30d móviles). La principal es **B (mes mismo)** para comparar mes a mes — 2026-05-05 |
 | H | Tarea 1.12 (calidad de atribución): ¿MVP o Post-MVP? | Post-MVP — 2026-05-05 |
+
+---
+
+## Sprint en curso (2026-05-07)
+
+Sprint de fixes despachado a CEO agente con los siguientes puntos:
+
+| # | Categoría | Fix |
+|---|---|---|
+| BR.1 | Reglas de negocio | Variación porcentual: período actual vs período anterior del mismo length (ya no día anterior) |
+| F.1 | Frontend | Reemplazar `.journey-description` redundante por bloque "Insights del Journey" con detección automática de cuellos de botella |
+| F.2 | Frontend | Popup didáctico al click en columna del journey (descripción + ejemplo + cómo interpretar) |
+| F.3 | Frontend | Charts evolutivos BOFU no respetan filtro temporal global — bug a arreglar |
+| F.4 | Frontend + MeisterTask | Tarjetas "Ventas pendientes": columna nueva "Etapa actual", canal correcto en "Origen", más profundidad, modal con detalle del lead |
+| F.5 | Cross-stack | Cápitas / Venta sigue sin funcionar (Performance + BOFU) — investigación profunda |
+| Op.1 | DevOps | 3.1 Node.js update en `extract_all.yml` (deadline jun 2026) |
+| Op.2 | Diagnóstico | Verificar developer token Google Ads (BASIC vs STANDARD) — bloquea search terms |
+
+---
+
+## Decisiones tomadas
+
+| # | Pregunta | Resolución |
+|---|----------|------------|
+| A | ¿Arrancamos por la tarea 1.1 (publicar en producción)? | Sí — 2026-05-05 |
+| B | ¿La 5.1 (login del cliente) va antes de compartir URL? | Se hace al final, una vez que todo el MVP esté validado — 2026-05-05 |
+| C | ¿Forzamos orden decreciente del journey? | No, respetar datos reales — 2026-05-05 |
+| D | ¿Mostramos las 14 etapas literales o agrupamos en buckets? | 14 etapas literales (luego se ocultó "Tareas Finalizadas" → 13 visibles) — 2026-05-05 |
+| E | ¿De dónde sale el `campaign_id` de los leads? | Tag de MeisterTask a futuro. Hoy Prepagas tiene UNA sola campaña (PMAX) — todos los leads se asocian al mismo ID — 2026-05-05 |
+| F | Desglose por segmento BOFU: ¿usar campo `operatoria` o `tipification`? | `tipification` (Voluntario / Monotributista / Obligatorio). `operatoria` no es indicador relevante — 2026-05-05 |
+| G | Conversion rate: ¿qué denominador? | Las 3 versiones (acumulado, mes mismo, 30d móviles). La principal es **B (mes mismo)** para comparar mes a mes — 2026-05-05 |
+| H | Tarea 1.12 (calidad de atribución): ¿MVP o Post-MVP? | Post-MVP — 2026-05-05 |
+| I | Variación %: ¿día previo o período mismo length? | Período del mismo length (ej: 30d vs 30d previos) — 2026-05-07 |
 
 ---
 

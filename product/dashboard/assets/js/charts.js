@@ -684,6 +684,78 @@ const _JOURNEY_PHASES_DEF = [
 ];
 
 /**
+ * Construye o actualiza el innerHTML del bloque .journey-description.
+ * Separado de _renderJourney para que el re-render incremental (cambio de período)
+ * pueda actualizar los números de texto sin reconstruir todo el DOM del journey.
+ * Usa fmtNumber (módulo-level) en vez de duplicar la lógica de formato.
+ *
+ * @param {HTMLElement} el     - el div.journey-description a actualizar
+ * @param {string[]}    labels - etiquetas del journey (ya filtradas)
+ * @param {number[]}    vals   - valores correspondientes
+ * @param {number}      total  - suma de todos los vals
+ */
+function _updateJourneyDesc(el, labels, vals, total) {
+  function getVal(lbl) {
+    const idx = labels.indexOf(lbl);
+    return idx !== -1 ? vals[idx] : 0;
+  }
+
+  const entrada       = getVal('Inbox') + getVal('Nuevo');
+  const seguimiento   = getVal('Para Hoy') + getVal('Procesando') + getVal('Contactados');
+  const altaIntencion = getVal('Prioritarios') + getVal('Cotizados') + getVal('En Auditoria');
+  const incubando     = getVal('Mes que viene') + getVal('A futuro');
+  const ganadas       = getVal('Ventas Ganadas');
+  const noProspera    = getVal('No prospera');
+  const cotizados     = getVal('Cotizados') + getVal('En Auditoria');
+
+  const alertHTML = cotizados > 3 && ganadas < Math.round(cotizados * 0.3)
+    ? `<p class="journey-desc-alert"><strong>Posible cuello de botella:</strong> hay ${fmtNumber(cotizados)} leads en Cotizados/En Auditoria pero solo ${fmtNumber(ganadas)} ventas ganadas. Revisá qué está frenando el cierre — puede ser precio, documentación o seguimiento tardío.</p>`
+    : '';
+
+  el.innerHTML =
+    '<p class="journey-desc-intro">El Customer Journey conecta cada etapa del proceso comercial, desde el primer contacto hasta el cierre de la venta. Es la visión unificada que UMOH construye cruzando datos de publicidad con el CRM del equipo de ventas — una visibilidad que ninguna agencia del mercado ofrece de forma integrada.</p>' +
+    alertHTML +
+    '<div class="jd-grid">' +
+      '<div class="jd-item">' +
+        '<span class="jd-dot jd-dot--entry"></span>' +
+        '<div class="jd-text">' +
+          '<strong>Entrada</strong> — ' + fmtNumber(entrada) + ' leads' +
+          '<p>Inbox y Nuevo: leads que acaban de llegar desde la campaña y todavía no fueron abiertos por ningún vendedor. Si este número crece semana a semana sin que baje, hay un problema de velocidad de respuesta.</p>' +
+        '</div>' +
+      '</div>' +
+      '<div class="jd-item">' +
+        '<span class="jd-dot jd-dot--seguimiento"></span>' +
+        '<div class="jd-text">' +
+          '<strong>Seguimiento</strong> — ' + fmtNumber(seguimiento) + ' leads' +
+          '<p>Para Hoy, Procesando, Contactados: el equipo ya los tomó y está trabajándolos. Un volumen alto aquí es saludable. Si "Para Hoy" tiene muchos leads pero "Contactados" tiene pocos, el equipo demora en avanzar.</p>' +
+        '</div>' +
+      '</div>' +
+      '<div class="jd-item">' +
+        '<span class="jd-dot jd-dot--alta"></span>' +
+        '<div class="jd-text">' +
+          '<strong>Alta intención</strong> — ' + fmtNumber(altaIntencion) + ' leads' +
+          '<p>Prioritarios, Cotizados, En Auditoria: las oportunidades más cercanas al cierre. Cada lead aquí tiene alto potencial de convertirse en venta esta semana. Priorizá el seguimiento diario en este bloque.</p>' +
+        '</div>' +
+      '</div>' +
+      '<div class="jd-item">' +
+        '<span class="jd-dot jd-dot--incub"></span>' +
+        '<div class="jd-text">' +
+          '<strong>Incubando</strong> — ' + fmtNumber(incubando) + ' leads' +
+          '<p>Mes que viene, A futuro: leads que mostraron interés pero no están listos todavía. Son el pipeline de los próximos ciclos. Un volumen bajo acá puede indicar que falta trabajo de seguimiento a largo plazo.</p>' +
+        '</div>' +
+      '</div>' +
+      '<div class="jd-item">' +
+        '<span class="jd-dot jd-dot--result"></span>' +
+        '<div class="jd-text">' +
+          '<strong>Resultado</strong> — ' + fmtNumber(ganadas) + ' ganadas · ' + fmtNumber(noProspera) + ' no prospera' +
+          '<p>Ventas Ganadas, No prospera, Erroneos: el desenlace final. La proporción de Ventas Ganadas sobre el total es la métrica más crítica del funnel. Si "No prospera" supera a "Ventas Ganadas", revisá la calidad del lead o el proceso de seguimiento.</p>' +
+        '</div>' +
+      '</div>' +
+    '</div>' +
+    '<p class="journey-desc-tip"><strong>Cómo leer el gráfico:</strong> cada barra es un estado del CRM, su altura es proporcional al estado con mayor volumen. El número bajo cada barra indica leads en ese estado; el porcentaje, su peso en el total del funnel. Un journey saludable concentra la mayor parte en Seguimiento y Alta intención, con un porcentaje creciente en Ventas Ganadas.</p>';
+}
+
+/**
  * Renderiza el Customer Journey horizontal en la sección MOFU.
  * Llamado siempre desde renderMofu().
  * @param {object} data - objeto de datos MOFU completo (necesita data.status)
@@ -763,6 +835,10 @@ function _renderJourney(data) {
       const totalEl = band.querySelector('.journey-phase-total');
       if (totalEl && phaseTotals[i] !== undefined) totalEl.textContent = fmtNumber(phaseTotals[i]);
     });
+
+    // Actualizar el bloque de descripción con los valores del período nuevo
+    const existingDesc = existingWrap.querySelector('.journey-description');
+    if (existingDesc) _updateJourneyDesc(existingDesc, labels, vals, total);
 
     return; // No reconstruir el DOM
   }
@@ -888,70 +964,9 @@ function _renderJourney(data) {
 
   wrap.appendChild(row);
 
-  // Texto explicativo del Customer Journey — con datos reales del período
-  // y guías de interpretación para detectar cuellos de botella.
-  function _getVal(lbl) {
-    const idx = labels.indexOf(lbl);
-    return idx !== -1 ? vals[idx] : 0;
-  }
-  const _n = v => Math.round(v).toLocaleString('es-AR');
-
-  const entrada      = _getVal('Inbox') + _getVal('Nuevo');
-  const seguimiento  = _getVal('Para Hoy') + _getVal('Procesando') + _getVal('Contactados');
-  const altaIntencion = _getVal('Prioritarios') + _getVal('Cotizados') + _getVal('En Auditoria');
-  const incubando    = _getVal('Mes que viene') + _getVal('A futuro');
-  const ganadas      = _getVal('Ventas Ganadas');
-  const noProspera   = _getVal('No prospera');
-
-  // Alerta de cuello de botella: cotizados altos con pocas ventas ganadas
-  const cotizados    = _getVal('Cotizados') + _getVal('En Auditoria');
-  const cuellobotella = cotizados > 3 && ganadas < Math.round(cotizados * 0.3)
-    ? `<p class="journey-desc-alert"><strong>Posible cuello de botella:</strong> hay ${_n(cotizados)} leads en Cotizados/En Auditoria pero solo ${_n(ganadas)} ventas ganadas. Revisá qué está frenando el cierre — puede ser precio, documentación o seguimiento tardío.</p>`
-    : '';
-
   const journeyDesc = document.createElement('div');
   journeyDesc.className = 'journey-description';
-  journeyDesc.innerHTML =
-    '<p class="journey-desc-intro">El Customer Journey conecta cada etapa del proceso comercial, desde el primer contacto hasta el cierre de la venta. Es la visión unificada que UMOH construye cruzando datos de publicidad con el CRM del equipo de ventas — una visibilidad que ninguna agencia del mercado ofrece de forma integrada.</p>' +
-    cuellobotella +
-    '<div class="jd-grid">' +
-      '<div class="jd-item">' +
-        '<span class="jd-dot jd-dot--entry"></span>' +
-        '<div class="jd-text">' +
-          '<strong>Entrada</strong> — ' + _n(entrada) + ' leads' +
-          '<p>Inbox y Nuevo: leads que acaban de llegar desde la campaña y todavía no fueron abiertos por ningún vendedor. Si este número crece semana a semana sin que baje, hay un problema de velocidad de respuesta.</p>' +
-        '</div>' +
-      '</div>' +
-      '<div class="jd-item">' +
-        '<span class="jd-dot jd-dot--seguimiento"></span>' +
-        '<div class="jd-text">' +
-          '<strong>Seguimiento</strong> — ' + _n(seguimiento) + ' leads' +
-          '<p>Para Hoy, Procesando, Contactados: el equipo ya los tomó y está trabajándolos. Un volumen alto aquí es saludable. Si "Para Hoy" tiene muchos leads pero "Contactados" tiene pocos, el equipo demora en avanzar.</p>' +
-        '</div>' +
-      '</div>' +
-      '<div class="jd-item">' +
-        '<span class="jd-dot jd-dot--alta"></span>' +
-        '<div class="jd-text">' +
-          '<strong>Alta intención</strong> — ' + _n(altaIntencion) + ' leads' +
-          '<p>Prioritarios, Cotizados, En Auditoria: las oportunidades más cercanas al cierre. Cada lead aquí tiene alto potencial de convertirse en venta esta semana. Priorizá el seguimiento diario en este bloque.</p>' +
-        '</div>' +
-      '</div>' +
-      '<div class="jd-item">' +
-        '<span class="jd-dot jd-dot--incub"></span>' +
-        '<div class="jd-text">' +
-          '<strong>Incubando</strong> — ' + _n(incubando) + ' leads' +
-          '<p>Mes que viene, A futuro: leads que mostraron interés pero no están listos todavía. Son el pipeline de los próximos ciclos. Un volumen bajo acá puede indicar que falta trabajo de seguimiento a largo plazo.</p>' +
-        '</div>' +
-      '</div>' +
-      '<div class="jd-item">' +
-        '<span class="jd-dot jd-dot--result"></span>' +
-        '<div class="jd-text">' +
-          '<strong>Resultado</strong> — ' + _n(ganadas) + ' ganadas · ' + _n(noProspera) + ' no prospera' +
-          '<p>Ventas Ganadas, No prospera, Erroneos: el desenlace final. La proporción de Ventas Ganadas sobre el total es la métrica más crítica del funnel. Si "No prospera" supera a "Ventas Ganadas", revisá la calidad del lead o el proceso de seguimiento.</p>' +
-        '</div>' +
-      '</div>' +
-    '</div>' +
-    '<p class="journey-desc-tip"><strong>Cómo leer el gráfico:</strong> cada barra es un estado del CRM, su altura es proporcional al estado con mayor volumen. El número bajo cada barra indica leads en ese estado; el porcentaje, su peso en el total del funnel. Un journey saludable concentra la mayor parte en Seguimiento y Alta intención, con un porcentaje creciente en Ventas Ganadas.</p>';
+  _updateJourneyDesc(journeyDesc, labels, vals, total);
   wrap.appendChild(journeyDesc);
 
   ctxSt.parentElement.appendChild(wrap);

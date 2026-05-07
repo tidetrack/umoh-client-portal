@@ -432,6 +432,14 @@ const KPI_INFO = {
   }
 };
 
+/** Clasifica un kpiKey por sección. Única fuente de verdad para ambos modales. */
+function _kpiSection(kpiKey) {
+  if (kpiKey.startsWith('tofu-')) return 'tofu';
+  if (kpiKey.startsWith('mofu-')) return 'mofu';
+  if (kpiKey.startsWith('bofu-') || (['revenue', 'sales'].includes(kpiKey) && _currentSection === 'bofu')) return 'bofu';
+  return 'performance';
+}
+
 function _renderModalChart(kpiKey) {
   if (window._kpiModalChartInstance) {
     window._kpiModalChartInstance.destroy();
@@ -440,10 +448,10 @@ function _renderModalChart(kpiKey) {
   const ctx = document.getElementById('kpi-modal-chart');
   if (!ctx) return false;
 
-  const isTofuKey = ['tofu-impressions', 'tofu-clicks', 'tofu-cpc'].includes(kpiKey);
-  const isMofuKey = ['mofu-leads', 'mofu-cpl', 'mofu-tipif', 'mofu-highintent', 'mofu-closedwon'].includes(kpiKey);
-  const isBofuKey = kpiKey.startsWith('bofu-') ||
-    (['revenue', 'sales'].includes(kpiKey) && _currentSection === 'bofu');
+  const section   = _kpiSection(kpiKey);
+  const isTofuKey = section === 'tofu';
+  const isMofuKey = section === 'mofu';
+  const isBofuKey = section === 'bofu';
 
   let data;
   if (isTofuKey) {
@@ -623,18 +631,12 @@ function _openKpiModal(kpiKey) {
   const info = KPI_INFO[kpiKey];
   if (!info) return;
 
-  // Seleccionar el objeto de datos correcto según la sección del KPI
-  const isTofuKpi = ['tofu-impressions', 'tofu-clicks', 'tofu-cpc'].includes(kpiKey);
-  const isMofuKpi = kpiKey.startsWith('mofu-');
-  // bofu-prefixed keys OR ambiguous keys (revenue/sales) opened from BOFU section
-  const isBofuKpi = kpiKey.startsWith('bofu-') ||
-    (['revenue', 'sales'].includes(kpiKey) && _currentSection === 'bofu');
-
+  const _sec = _kpiSection(kpiKey);
   let data;
-  if (isTofuKpi)      data = window._tofuData   || window._kpiModalData || {};
-  else if (isMofuKpi) data = window._mofuData   || window._kpiModalData || {};
-  else if (isBofuKpi) data = window._bofuData   || window._kpiModalData || {};
-  else                data = window._kpiModalData || {};
+  if (_sec === 'tofu')        data = window._tofuData   || window._kpiModalData || {};
+  else if (_sec === 'mofu')   data = window._mofuData   || window._kpiModalData || {};
+  else if (_sec === 'bofu')   data = window._bofuData   || window._kpiModalData || {};
+  else                        data = window._kpiModalData || {};
 
   const modal   = document.getElementById('kpi-modal');
   const title   = document.getElementById('kpi-modal-title');
