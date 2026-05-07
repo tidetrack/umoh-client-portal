@@ -1571,11 +1571,12 @@ function renderBofu(data) {
     });
   }
 
-  /* Segment sales table */
+  /* Segment sales table — incluye fila TOTAL al pie para que coincida con
+     el revenue total que muestra el KPI card "Ingresos Totales" del BOFU. */
   const segBody = document.getElementById('bofu-segment-body');
   if (segBody && data.typification) {
     const total = data.typification.data.reduce((a, b) => a + b, 0);
-    segBody.innerHTML = data.typification.labels.map((label, i) => {
+    const rows = data.typification.labels.map((label, i) => {
       const val   = data.typification.data[i];
       const pct   = total > 0 ? ((val / total) * 100).toFixed(1) : '0.0';
       const color = bofuColors[i] || bofuColors[0];
@@ -1589,6 +1590,14 @@ function renderBofu(data) {
         </tr>
       `;
     }).join('');
+    const totalRow = `
+      <tr class="segment-total-row">
+        <td class="segment-name segment-total-label">Total</td>
+        <td class="segment-value segment-total-value">${fmtNumber(total)}</td>
+        <td class="segment-pct segment-total-pct">100%</td>
+      </tr>
+    `;
+    segBody.innerHTML = rows + totalRow;
   }
 
   /* Sellers ranking table */

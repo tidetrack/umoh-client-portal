@@ -1788,6 +1788,33 @@ body.nav-hidden .nav-fab {
   white-space: nowrap;
 }
 
+/* Fila TOTAL al pie de la tabla — coincide con el revenue agregado del KPI
+   "Ingresos Totales" del BOFU. Tipografía más prominente y border superior
+   para separarla del cuerpo. */
+.segment-table .segment-total-row {
+  border-top: 2px solid var(--border-subtle);
+  background: var(--bg-page);
+}
+
+.segment-total-label {
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  font-size: 12px;
+  color: var(--text-secondary);
+}
+
+.segment-total-value {
+  font-weight: 800;
+  color: var(--text-primary);
+  font-size: 15px;
+}
+
+.segment-total-pct {
+  font-weight: 700;
+  color: var(--text-secondary);
+}
+
 [data-theme="dark"] .segment-table tbody tr:hover {
   background: rgba(255, 255, 255, 0.03);
 }
@@ -2841,20 +2868,22 @@ body.nav-hidden .nav-fab {
 
 .cs-flat { color: var(--text-muted); }
 /* ── Pending Price Table — Ventas sin monto cargado ─────────── */
+/* Tipografía alineada al ranking de vendedores (.sellers-table) para que las
+   dos tablas tengan jerarquía visual consistente en BOFU. */
 .pending-table {
   width: 100%;
   border-collapse: separate;
   border-spacing: 0 8px;
   font-family: var(--font);
-  font-size: 13px;
+  font-size: 17px;
 }
 .pending-table thead th {
-  font-size: 11px;
-  font-weight: 600;
-  letter-spacing: 0.06em;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
   text-transform: uppercase;
   color: var(--text-muted);
-  padding: 8px 12px;
+  padding: var(--sp-4) var(--sp-4);
   text-align: left;
 }
 
@@ -2889,7 +2918,7 @@ body.nav-hidden .nav-fab {
 }
 
 .pending-table tbody td {
-  padding: 12px;
+  padding: var(--sp-4) var(--sp-4);
   vertical-align: middle;
   background: transparent;
 }
@@ -2901,12 +2930,14 @@ body.nav-hidden .nav-fab {
 .pending-table tbody td:last-child {
   border-radius: 0 10px 10px 0;
 }
-.pending-table .pending-name { font-weight: 500; color: var(--text-primary); }
-.pending-table .pending-asesor { color: var(--text-secondary); }
-.pending-table .pending-tip { color: var(--text-secondary); }
+/* Tipografía y pesos al nivel de .sellers-table — la fila pending se siente
+   ahora una "tarjeta" con la misma jerarquía visual que la tabla de ranking. */
+.pending-table .pending-name   { font-weight: 700; font-size: 18px; color: var(--text-primary); }
+.pending-table .pending-asesor { color: var(--text-secondary); font-size: 15px; }
+.pending-table .pending-tip    { color: var(--text-secondary); font-size: 15px; }
 .pending-table .pending-tip .muted { color: var(--text-muted); font-style: italic; }
 .pending-table .th-num       { text-align: right; }
-.pending-table .pending-date { color: var(--text-muted); font-variant-numeric: tabular-nums; text-align: right; }
+.pending-table .pending-date { color: var(--text-muted); font-variant-numeric: tabular-nums; text-align: right; font-size: 14px; }
 .pending-empty {
   text-align: center;
   color: var(--text-muted);
@@ -2929,7 +2960,8 @@ body.nav-hidden .nav-fab {
 /* F.4.a — Etapa actual */
 .pending-table .pending-stage {
   color: var(--text-secondary);
-  font-size: 12px;
+  font-size: 14px;
+  font-weight: 600;
 }
 
 /* ── Lead Detail Modal (F.4.d) ─────────────────────────────── */
