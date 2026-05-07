@@ -103,10 +103,15 @@ try {
     $period = $_GET['period'] ?? '30d';
     $dates  = array_keys($by_date);
     if (empty($dates)) api_error('Sin leads en Supabase para ' . CLIENT_SLUG, 404);
-    $last   = end($dates);
-    $prev_d = count($dates) >= 2 ? $dates[count($dates) - 2] : null;
+    $last = end($dates);
 
     [$start, $end] = period_dates($period, $last, $dates[0] ?? null);
+
+    // Período previo: mismo length, terminando el día antes de $start
+    $period_days = (strtotime($end) - strtotime($start)) / 86400 + 1;
+    $prev_end    = date('Y-m-d', strtotime($start) - 86400);
+    $prev_start  = date('Y-m-d', strtotime($prev_end) - ($period_days - 1) * 86400);
+
     $selected = filter_range($by_date, $start, $end);
 
     // 6. Helper para clasificar un lead en sus buckets
@@ -174,27 +179,26 @@ try {
         'cpl'   => fn($r) => (float)$r['cpl'],
     ]);
 
-    // 9. Prev day
-    $prev = null;
-    if ($prev_d && isset($by_date[$prev_d])) {
-        $pr = $by_date[$prev_d];
-        $pr_total = $pr['total_leads'];
-        $pr_high = 0; $pr_typified = 0; $pr_closed_won = 0;
-        foreach ($pr['leads'] as $l) {
+    // 9. Prev — suma del período previo (mismo length que el actual), para deltas correctos.
+    $prev_selected = filter_range($by_date, $prev_start, $prev_end);
+    $pr_total = 0; $pr_high = 0; $pr_typified = 0; $pr_closed_won = 0; $pr_spend_total = 0.0;
+    foreach ($prev_selected as $d => $bucket) {
+        $pr_total      += $bucket['total_leads'];
+        $pr_spend_total += $spend_by_date[$d] ?? 0;
+        foreach ($bucket['leads'] as $l) {
             $c = $classify($l);
             if ($c['high_intent']) $pr_high++;
             if ($c['typified'])    $pr_typified++;
             if ($c['closed_won'])  $pr_closed_won++;
         }
-        $prev_spend = $spend_by_date[$prev_d] ?? 0;
-        $prev = [
-            'total_leads'       => $pr_total,
-            'cpl'               => $pr_total > 0 ? round($prev_spend / $pr_total, 2) : 0,
-            'tipification_rate' => $pr_total > 0 ? round($pr_typified / $pr_total * 100, 1) : 0,
-            'high_intent_leads' => $pr_high,
-            'closed_won_leads'  => $pr_closed_won,
-        ];
     }
+    $prev = [
+        'total_leads'       => $pr_total,
+        'cpl'               => $pr_total > 0 ? round($pr_spend_total / $pr_total, 2) : 0,
+        'tipification_rate' => $pr_total > 0 ? round($pr_typified / $pr_total * 100, 1) : 0,
+        'high_intent_leads' => $pr_high,
+        'closed_won_leads'  => $pr_closed_won,
+    ];
 
     // 10. Status breakdown — 14 columnas literales de MeisterTask, en orden del journey.
     //    Se construye a partir de $stage_by_section (ya ordenado por display_order.asc).

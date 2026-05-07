@@ -478,48 +478,7 @@ $_asset_v = defined('ASSET_VERSION') ? ASSET_VERSION : filemtime(__DIR__ . '/ass
           <div class="chart-card-body" style="padding: 0; overflow: hidden;">
             <canvas id="chart-status" aria-label="Distribución por estado de lead" style="display:none;"></canvas>
           </div>
-          <!-- Descripción explicativa del journey por sub-fase. Ayuda al cliente
-               a interpretar qué significa cada bloque de columnas y qué tipo
-               de gestión comercial corresponde a cada momento. -->
-          <div class="journey-description" aria-label="Explicación del customer journey">
-            <div class="jd-grid">
-              <div class="jd-item">
-                <span class="jd-dot jd-dot--entry"></span>
-                <div class="jd-text">
-                  <strong>Entrada</strong>
-                  <p>Leads recién ingresados al CRM. Aún sin contactar — primer punto de captación de la campaña.</p>
-                </div>
-              </div>
-              <div class="jd-item">
-                <span class="jd-dot jd-dot--seguimiento"></span>
-                <div class="jd-text">
-                  <strong>Seguimiento</strong>
-                  <p>Leads en contacto activo con el equipo comercial: tipificados, gestionados, en proceso de calificación.</p>
-                </div>
-              </div>
-              <div class="jd-item">
-                <span class="jd-dot jd-dot--alta"></span>
-                <div class="jd-text">
-                  <strong>Alta intención</strong>
-                  <p>Leads cerca del cierre: cotizaciones enviadas, en auditoría, prioritarios. Son los más propensos a convertir.</p>
-                </div>
-              </div>
-              <div class="jd-item">
-                <span class="jd-dot jd-dot--incub"></span>
-                <div class="jd-text">
-                  <strong>Incubando</strong>
-                  <p>Leads pospuestos a corto/mediano plazo. No descartados — quedan en pipeline esperando un nuevo contacto.</p>
-                </div>
-              </div>
-              <div class="jd-item">
-                <span class="jd-dot jd-dot--result"></span>
-                <div class="jd-text">
-                  <strong>Resultado</strong>
-                  <p>Cierre del journey: ventas ganadas (verde), leads que no prosperaron (rojo) o erróneos (gris).</p>
-                </div>
-              </div>
-            </div>
-          </div>
+          <!-- Insights del Journey: inyectado por _renderJourney() en charts.js -->
         </div>
       </div>
 
@@ -685,6 +644,7 @@ $_asset_v = defined('ASSET_VERSION') ? ASSET_VERSION : filemtime(__DIR__ . '/ass
                   <th>Asesor</th>
                   <th>Tipificación</th>
                   <th>Origen</th>
+                  <th>Etapa actual</th>
                   <th class="th-num">Fecha ingreso</th>
                 </tr>
               </thead>
@@ -723,6 +683,39 @@ $_asset_v = defined('ASSET_VERSION') ? ASSET_VERSION : filemtime(__DIR__ . '/ass
   <!-- Leaflet JS -->
   <script src="https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.js" crossorigin=""></script>
 
+  <!-- Journey Stage Modal: popup didáctico al click en columna del journey -->
+  <div id="journey-stage-modal" class="journey-modal-overlay" role="dialog" aria-modal="true" aria-labelledby="journey-modal-title" hidden>
+    <div class="journey-modal">
+      <button class="journey-modal-close" id="journey-modal-close" aria-label="Cerrar">&times;</button>
+      <div class="journey-modal-phase-badge" id="journey-modal-phase-badge">
+        <span class="journey-modal-phase-dot" id="journey-modal-phase-dot"></span>
+        <span id="journey-modal-phase-name"></span>
+      </div>
+      <h2 class="journey-modal-title" id="journey-modal-title">—</h2>
+      <div class="journey-modal-metric">
+        <span class="journey-modal-metric-value" id="journey-modal-metric-value">—</span>
+        <span class="journey-modal-metric-label">leads</span>
+        <span class="journey-modal-metric-pct" id="journey-modal-metric-pct"></span>
+      </div>
+      <div class="journey-modal-section">
+        <span class="journey-modal-section-label">Que significa esta etapa</span>
+        <p class="journey-modal-section-text" id="journey-modal-description"></p>
+      </div>
+      <div class="journey-modal-section">
+        <span class="journey-modal-section-label">Como interpretar el volumen</span>
+        <p class="journey-modal-section-text" id="journey-modal-interpretation"></p>
+      </div>
+      <div class="journey-modal-action">
+        <span class="journey-modal-action-label">Accion sugerida</span>
+        <p class="journey-modal-action-text" id="journey-modal-action"></p>
+      </div>
+      <div class="journey-modal-example">
+        <span class="journey-modal-example-label">Ejemplo aplicado</span>
+        <p class="journey-modal-example-text" id="journey-modal-example"></p>
+      </div>
+    </div>
+  </div>
+
   <!-- KPI Info Modal -->
   <div id="kpi-modal" class="kpi-modal-overlay" role="dialog" aria-modal="true" aria-labelledby="kpi-modal-title" hidden>
     <div class="kpi-modal">
@@ -736,6 +729,44 @@ $_asset_v = defined('ASSET_VERSION') ? ASSET_VERSION : filemtime(__DIR__ . '/ass
       <div class="kpi-modal-example">
         <span class="kpi-modal-example-label">Ejemplo aplicado</span>
         <p id="kpi-modal-example"></p>
+      </div>
+    </div>
+  </div>
+
+  <!-- Lead Detail Modal — abre al hacer click en una fila de ventas pendientes -->
+  <div id="lead-detail-modal" class="kpi-modal-overlay" role="dialog" aria-modal="true" aria-labelledby="lead-modal-title" tabindex="-1" hidden>
+    <div class="kpi-modal lead-modal">
+      <button class="kpi-modal-close" id="lead-modal-close" aria-label="Cerrar">&times;</button>
+      <h2 class="kpi-modal-title" id="lead-modal-title">—</h2>
+
+      <!-- Datos básicos -->
+      <div class="lead-modal-section">
+        <span class="lead-modal-section-label">Datos del lead</span>
+        <div class="lead-modal-basics-grid" id="lead-modal-basics">
+          <!-- Populated by _openLeadDetailModal() -->
+        </div>
+      </div>
+
+      <!-- Historial de etapas -->
+      <div class="lead-modal-section">
+        <span class="lead-modal-section-label">Historial de etapas</span>
+        <ul class="lead-modal-history-list" id="lead-modal-history">
+          <!-- Populated by _openLeadDetailModal() -->
+        </ul>
+      </div>
+
+      <!-- Datos monetarios (oculto si lead_monetary es null) -->
+      <div class="lead-modal-section" id="lead-modal-monetary-section" hidden>
+        <span class="lead-modal-section-label">Datos monetarios</span>
+        <div class="lead-modal-basics-grid" id="lead-modal-monetary">
+          <!-- Populated by _openLeadDetailModal() -->
+        </div>
+      </div>
+
+      <!-- Placeholder de seguimiento (pendiente endpoint) -->
+      <div class="lead-modal-section lead-modal-pending-note">
+        <span class="lead-modal-section-label">Actividad y seguimientos</span>
+        <p class="lead-modal-pending-text">Datos detallados disponibles proximamente &mdash; pendiente endpoint <code>/api/lead.php?id=X</code>.</p>
       </div>
     </div>
   </div>
@@ -767,6 +798,30 @@ $_asset_v = defined('ASSET_VERSION') ? ASSET_VERSION : filemtime(__DIR__ . '/ass
   <script src="assets/js/api.js?v=<?php echo $_asset_v; ?>"></script>
   <script src="assets/js/charts.js?v=<?php echo $_asset_v; ?>"></script>
   <script src="assets/js/filters.js?v=<?php echo $_asset_v; ?>"></script>
+
+  <!-- Lead Detail Modal — wiring de cierre (close btn, click outside, Escape) -->
+  <script>
+  (function() {
+    var overlay = document.getElementById('lead-detail-modal');
+    var closeBtn = document.getElementById('lead-modal-close');
+
+    function closeLead() { if (overlay) overlay.setAttribute('hidden', ''); }
+
+    if (closeBtn) closeBtn.addEventListener('click', closeLead);
+
+    if (overlay) {
+      /* Click fuera del modal inner */
+      overlay.addEventListener('click', function(e) {
+        if (e.target === overlay) closeLead();
+      });
+    }
+
+    /* Escape global */
+    document.addEventListener('keydown', function(e) {
+      if (e.key === 'Escape' && overlay && !overlay.hasAttribute('hidden')) closeLead();
+    });
+  })();
+  </script>
 
 </body>
 </html>

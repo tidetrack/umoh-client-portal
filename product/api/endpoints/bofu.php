@@ -122,9 +122,14 @@ try {
     $period = $_GET['period'] ?? '30d';
     $dates  = array_keys($by_date);
     $last   = end($dates);
-    $prev_d = count($dates) >= 2 ? $dates[count($dates) - 2] : null;
 
     [$start, $end] = period_dates($period, $last, $dates[0] ?? null);
+
+    // Período previo: mismo length, terminando el día antes de $start
+    $period_days = (strtotime($end) - strtotime($start)) / 86400 + 1;
+    $prev_end    = date('Y-m-d', strtotime($start) - 86400);
+    $prev_start  = date('Y-m-d', strtotime($prev_end) - ($period_days - 1) * 86400);
+
     $selected = filter_range($by_date, $start, $end);
 
     // 6. Agregar
@@ -157,22 +162,25 @@ try {
         'sales'   => fn($r) => (int)$r['closed_sales'],
     ]);
 
-    // 8. Prev day
-    $prev = null;
-    if ($prev_d && isset($by_date[$prev_d])) {
-        $pr = $by_date[$prev_d];
-        $pr_rev = $pr['total_revenue']; $pr_sales = $pr['closed_sales'];
-        $pr_cap = $pr['capitas'];
-        $pr_impr = $impr_by_date[$prev_d] ?? 0;
-        $prev = [
-            'total_revenue'         => round($pr_rev, 2),
-            'closed_sales'          => $pr_sales,
-            'avg_ticket'            => $pr_sales > 0 ? round($pr_rev / $pr_sales, 2) : 0,
-            'conversion_rate'       => $pr_impr > 0 ? round($pr_sales / $pr_impr * 100, 4) : 0,
-            'capitas_closed'        => $pr_cap,
-            'avg_ticket_per_capita' => $pr_cap > 0 ? round($pr_rev / $pr_cap, 2) : 0,
-        ];
+    // 8. Prev — suma del período previo (mismo length que el actual), para deltas correctos.
+    $prev_selected = filter_range($by_date, $prev_start, $prev_end);
+    $pr_rev = 0.0; $pr_sales = 0; $pr_cap = 0; $pr_impr = 0;
+    foreach ($prev_selected as $r) {
+        $pr_rev   += $r['total_revenue'];
+        $pr_sales += $r['closed_sales'];
+        $pr_cap   += $r['capitas'];
     }
+    foreach ($impr_by_date as $d => $n) {
+        if ($d >= $prev_start && $d <= $prev_end) $pr_impr += $n;
+    }
+    $prev = [
+        'total_revenue'         => round($pr_rev, 2),
+        'closed_sales'          => $pr_sales,
+        'avg_ticket'            => $pr_sales > 0 ? round($pr_rev / $pr_sales, 2) : 0,
+        'conversion_rate'       => $pr_impr > 0 ? round($pr_sales / $pr_impr * 100, 4) : 0,
+        'capitas_closed'        => $pr_cap,
+        'avg_ticket_per_capita' => $pr_cap > 0 ? round($pr_rev / $pr_cap, 2) : 0,
+    ];
 
     // 9. Tipification breakdown — top 5 operatorias por revenue
     $C = COLORS;
@@ -191,10 +199,7 @@ try {
     //     y elimina la duplicación de lógica de filtrado por campaign_lead.
     //
     //     Período actual: $start..$end (calculado arriba via period_dates).
-    //     Período previo: mismo length, terminando justo antes de $start.
-    $period_days = (strtotime($end) - strtotime($start)) / 86400 + 1;
-    $prev_end_seller   = date('Y-m-d', strtotime($start) - 86400);
-    $prev_start_seller = date('Y-m-d', strtotime($prev_end_seller) - ($period_days - 1) * 86400);
+    //     Período previo: reutiliza $prev_start / $prev_end calculados en el bloque 5.
 
     // Helper interno: lee seller_facts en un rango y agrega por seller_name.
     // avg_cycle_days se calcula como weighted avg por sales_count (matemática-
@@ -234,7 +239,7 @@ try {
     };
 
     $curr_sellers = $aggregate_sellers($start, $end);
-    $prev_sellers = $aggregate_sellers($prev_start_seller, $prev_end_seller);
+    $prev_sellers = $aggregate_sellers($prev_start, $prev_end);
 
     $build_seller_row = function(string $name, array $s) {
         $cycle = $s['sales'] > 0 ? round($s['cycle_weighted'] / $s['sales'], 1) : 0.0;

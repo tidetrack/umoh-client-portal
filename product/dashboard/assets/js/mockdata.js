@@ -571,6 +571,41 @@ const MOCK_DATA = {
     '7d': {
       total_revenue: 1240500, closed_sales: 12, avg_ticket: 103375,
       conversion_rate: 25.0, capitas_closed: 34, avg_ticket_per_capita: 36485,
+      pending_price: [
+        {
+          meistertask_id: 1841, nombre: 'Carolina Ibáñez', assignee: 'Sofía Méndez',
+          tipification: 'En Emisión', is_campaign: true, canal: 'Form',
+          section: 'Cerradas sin monto', lead_created_at: '2026-04-29T10:30:00',
+          lead_section_history: [
+            { from: 'Nuevos', to: 'Contactados', date: '2026-04-29T11:00:00' },
+            { from: 'Contactados', to: 'En Emisión', date: '2026-05-01T09:15:00' },
+            { from: 'En Emisión', to: 'Cerradas sin monto', date: '2026-05-03T16:40:00' }
+          ],
+          lead_monetary: null
+        },
+        {
+          meistertask_id: 1854, nombre: 'Roberto Salinas', assignee: 'Matías Torres',
+          tipification: 'En Emisión', is_campaign: false, canal: 'WhatsApp',
+          section: 'Cerradas sin monto', lead_created_at: '2026-04-30T14:20:00',
+          lead_section_history: [
+            { from: 'Nuevos', to: 'Contactados', date: '2026-04-30T15:00:00' },
+            { from: 'Contactados', to: 'En Emisión', date: '2026-05-02T10:30:00' },
+            { from: 'En Emisión', to: 'Cerradas sin monto', date: '2026-05-04T11:00:00' }
+          ],
+          lead_monetary: null
+        },
+        {
+          meistertask_id: 1862, nombre: 'Fernanda Quiroga', assignee: 'Luciana Pérez',
+          tipification: 'En Emisión', is_campaign: true, canal: 'Referido',
+          section: 'Cerradas sin monto', lead_created_at: '2026-05-01T09:00:00',
+          lead_section_history: [
+            { from: 'Nuevos', to: 'Contactados', date: '2026-05-01T09:45:00' },
+            { from: 'Contactados', to: 'En Emisión', date: '2026-05-03T08:20:00' },
+            { from: 'En Emisión', to: 'Cerradas sin monto', date: '2026-05-05T10:10:00' }
+          ],
+          lead_monetary: null
+        }
+      ],
       trend: {
         labels:  ['Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb', 'Dom'],
         revenue: [172000, 185000, 168000, 192000, 210000, 145000, 168500],
@@ -604,6 +639,74 @@ const MOCK_DATA = {
     '30d': {
       total_revenue: 4850000, closed_sales: 43, avg_ticket: 112791,
       conversion_rate: 22.99, capitas_closed: 124, avg_ticket_per_capita: 39113,
+      pending_price: [
+        {
+          meistertask_id: 1791, nombre: 'María José Delgado', assignee: 'Sofía Méndez',
+          tipification: 'En Emisión', is_campaign: true, canal: 'Form',
+          section: 'Cerradas sin monto', lead_created_at: '2026-04-08T11:00:00',
+          lead_section_history: [
+            { from: 'Nuevos', to: 'Contactados', date: '2026-04-08T11:30:00' },
+            { from: 'Contactados', to: 'En Emisión', date: '2026-04-10T09:00:00' },
+            { from: 'En Emisión', to: 'Cerradas sin monto', date: '2026-04-14T16:00:00' }
+          ],
+          lead_monetary: null
+        },
+        {
+          meistertask_id: 1804, nombre: 'Lucas Herrera', assignee: 'Matías Torres',
+          tipification: 'En Emisión', is_campaign: false, canal: 'WhatsApp',
+          section: 'Cerradas sin monto', lead_created_at: '2026-04-12T14:30:00',
+          lead_section_history: [
+            { from: 'Nuevos', to: 'Contactados', date: '2026-04-12T15:00:00' },
+            { from: 'Contactados', to: 'En Emisión', date: '2026-04-15T10:00:00' },
+            { from: 'En Emisión', to: 'Cerradas sin monto', date: '2026-04-18T09:30:00' }
+          ],
+          lead_monetary: null
+        },
+        {
+          meistertask_id: 1820, nombre: 'Valeria Suárez', assignee: 'Andrés Gómez',
+          tipification: 'En Emisión', is_campaign: true, canal: 'Instagram DM',
+          section: 'Cerradas sin monto', lead_created_at: '2026-04-18T09:15:00',
+          lead_section_history: [
+            { from: 'Nuevos', to: 'Contactados', date: '2026-04-18T09:50:00' },
+            { from: 'Contactados', to: 'En Emisión', date: '2026-04-20T11:30:00' },
+            { from: 'En Emisión', to: 'Cerradas sin monto', date: '2026-04-24T14:20:00' }
+          ],
+          lead_monetary: null
+        },
+        {
+          meistertask_id: 1833, nombre: 'Diego Ríos', assignee: 'Luciana Pérez',
+          tipification: 'En Emisión', is_campaign: false, canal: 'Referido',
+          section: 'Cerradas sin monto', lead_created_at: '2026-04-22T16:00:00',
+          lead_section_history: [
+            { from: 'Nuevos', to: 'Contactados', date: '2026-04-22T16:30:00' },
+            { from: 'Contactados', to: 'En Emisión', date: '2026-04-25T08:45:00' },
+            { from: 'En Emisión', to: 'Cerradas sin monto', date: '2026-04-29T11:00:00' }
+          ],
+          lead_monetary: null
+        },
+        {
+          meistertask_id: 1841, nombre: 'Carolina Ibáñez', assignee: 'Sofía Méndez',
+          tipification: 'En Emisión', is_campaign: true, canal: 'Form',
+          section: 'Cerradas sin monto', lead_created_at: '2026-04-29T10:30:00',
+          lead_section_history: [
+            { from: 'Nuevos', to: 'Contactados', date: '2026-04-29T11:00:00' },
+            { from: 'Contactados', to: 'En Emisión', date: '2026-05-01T09:15:00' },
+            { from: 'En Emisión', to: 'Cerradas sin monto', date: '2026-05-03T16:40:00' }
+          ],
+          lead_monetary: null
+        },
+        {
+          meistertask_id: 1854, nombre: 'Roberto Salinas', assignee: 'Matías Torres',
+          tipification: 'En Emisión', is_campaign: false, canal: 'WhatsApp',
+          section: 'Cerradas sin monto', lead_created_at: '2026-04-30T14:20:00',
+          lead_section_history: [
+            { from: 'Nuevos', to: 'Contactados', date: '2026-04-30T15:00:00' },
+            { from: 'Contactados', to: 'En Emisión', date: '2026-05-02T10:30:00' },
+            { from: 'En Emisión', to: 'Cerradas sin monto', date: '2026-05-04T11:00:00' }
+          ],
+          lead_monetary: null
+        }
+      ],
       trend: {
         labels:  ['Sem 1', 'Sem 2', 'Sem 3', 'Sem 4'],
         revenue: [1150000, 1280000, 1165000, 1255000],
@@ -637,6 +740,74 @@ const MOCK_DATA = {
     '90d': {
       total_revenue: 14200000, closed_sales: 121, avg_ticket: 117355,
       conversion_rate: 22.66, capitas_closed: 352, avg_ticket_per_capita: 40341,
+      pending_price: [
+        {
+          meistertask_id: 1720, nombre: 'Andrea Morales', assignee: 'Sofía Méndez',
+          tipification: 'En Emisión', is_campaign: true, canal: 'Google Ads',
+          section: 'Cerradas sin monto', lead_created_at: '2026-02-14T09:00:00',
+          lead_section_history: [
+            { from: 'Nuevos', to: 'Contactados', date: '2026-02-14T09:30:00' },
+            { from: 'Contactados', to: 'En Emisión', date: '2026-02-17T10:00:00' },
+            { from: 'En Emisión', to: 'Cerradas sin monto', date: '2026-02-20T14:00:00' }
+          ],
+          lead_monetary: null
+        },
+        {
+          meistertask_id: 1762, nombre: 'Pablo Espinoza', assignee: 'Andrés Gómez',
+          tipification: 'En Emisión', is_campaign: false, canal: 'Referido',
+          section: 'Cerradas sin monto', lead_created_at: '2026-03-05T11:30:00',
+          lead_section_history: [
+            { from: 'Nuevos', to: 'Contactados', date: '2026-03-05T12:00:00' },
+            { from: 'Contactados', to: 'En Emisión', date: '2026-03-08T09:30:00' },
+            { from: 'En Emisión', to: 'Cerradas sin monto', date: '2026-03-12T10:45:00' }
+          ],
+          lead_monetary: null
+        },
+        {
+          meistertask_id: 1791, nombre: 'María José Delgado', assignee: 'Sofía Méndez',
+          tipification: 'En Emisión', is_campaign: true, canal: 'Form',
+          section: 'Cerradas sin monto', lead_created_at: '2026-04-08T11:00:00',
+          lead_section_history: [
+            { from: 'Nuevos', to: 'Contactados', date: '2026-04-08T11:30:00' },
+            { from: 'Contactados', to: 'En Emisión', date: '2026-04-10T09:00:00' },
+            { from: 'En Emisión', to: 'Cerradas sin monto', date: '2026-04-14T16:00:00' }
+          ],
+          lead_monetary: null
+        },
+        {
+          meistertask_id: 1804, nombre: 'Lucas Herrera', assignee: 'Matías Torres',
+          tipification: 'En Emisión', is_campaign: false, canal: 'WhatsApp',
+          section: 'Cerradas sin monto', lead_created_at: '2026-04-12T14:30:00',
+          lead_section_history: [
+            { from: 'Nuevos', to: 'Contactados', date: '2026-04-12T15:00:00' },
+            { from: 'Contactados', to: 'En Emisión', date: '2026-04-15T10:00:00' },
+            { from: 'En Emisión', to: 'Cerradas sin monto', date: '2026-04-18T09:30:00' }
+          ],
+          lead_monetary: null
+        },
+        {
+          meistertask_id: 1820, nombre: 'Valeria Suárez', assignee: 'Andrés Gómez',
+          tipification: 'En Emisión', is_campaign: true, canal: 'Instagram DM',
+          section: 'Cerradas sin monto', lead_created_at: '2026-04-18T09:15:00',
+          lead_section_history: [
+            { from: 'Nuevos', to: 'Contactados', date: '2026-04-18T09:50:00' },
+            { from: 'Contactados', to: 'En Emisión', date: '2026-04-20T11:30:00' },
+            { from: 'En Emisión', to: 'Cerradas sin monto', date: '2026-04-24T14:20:00' }
+          ],
+          lead_monetary: null
+        },
+        {
+          meistertask_id: 1841, nombre: 'Carolina Ibáñez', assignee: 'Sofía Méndez',
+          tipification: 'En Emisión', is_campaign: true, canal: 'Form',
+          section: 'Cerradas sin monto', lead_created_at: '2026-04-29T10:30:00',
+          lead_section_history: [
+            { from: 'Nuevos', to: 'Contactados', date: '2026-04-29T11:00:00' },
+            { from: 'Contactados', to: 'En Emisión', date: '2026-05-01T09:15:00' },
+            { from: 'En Emisión', to: 'Cerradas sin monto', date: '2026-05-03T16:40:00' }
+          ],
+          lead_monetary: null
+        }
+      ],
       trend: {
         labels:  ['Enero', 'Febrero', 'Marzo'],
         revenue: [4550000, 4750000, 4900000],
@@ -833,8 +1004,9 @@ function generateCustomMockData(endpoint, startStr, endStr) {
     const baseSales  = Math.round(43 * days / 30);
     return {
       ...base,
-      total_revenue: baseRev,
-      closed_sales:  baseSales,
+      total_revenue:  baseRev,
+      closed_sales:   baseSales,
+      pending_price:  base.pending_price || [],
       trend: {
         labels,
         revenue: synth(baseRev / n,   0.12, n),

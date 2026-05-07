@@ -97,9 +97,14 @@ try {
     $period = $_GET['period'] ?? '30d';
     $dates  = array_keys($by_date);
     $last   = end($dates);
-    $prev_d = count($dates) >= 2 ? $dates[count($dates) - 2] : null;
 
     [$start, $end] = period_dates($period, $last, $dates[0] ?? null);
+
+    // Período previo: mismo length, terminando el día antes de $start
+    $period_days = (strtotime($end) - strtotime($start)) / 86400 + 1;
+    $prev_end    = date('Y-m-d', strtotime($start) - 86400);
+    $prev_start  = date('Y-m-d', strtotime($prev_end) - ($period_days - 1) * 86400);
+
     $selected = filter_range($by_date, $start, $end);
 
     // Agregar el período. Para channels/devices guardamos clicks Y impressions
@@ -244,18 +249,20 @@ try {
                                     : 0,
     ]);
 
-    // Prev: el día inmediatamente anterior al último, para mostrar delta puntual.
-    $prev = null;
-    if ($prev_d && isset($by_date[$prev_d])) {
-        $pr    = $by_date[$prev_d];
-        $pr_cl = (int)   $pr['clicks'];
-        $pr_sp = (float) $pr['spend'];
-        $prev  = [
-            'impressions' => (int)$pr['impressions'],
-            'clicks'      => $pr_cl,
-            'cpc'         => $pr_cl > 0 ? round($pr_sp / $pr_cl, 2) : 0,
-        ];
+    // Prev — suma del período previo (mismo length que el actual), para deltas correctos.
+    $prev_impressions_p = 0; $prev_clicks_p = 0; $prev_spend_p = 0.0;
+    $prev_selected = filter_range($by_date, $prev_start, $prev_end);
+    foreach ($prev_selected as $r) {
+        $prev_impressions_p += (int)   $r['impressions'];
+        $prev_clicks_p      += (int)   $r['clicks'];
+        $prev_spend_p       += (float) $r['spend'];
     }
+    $prev = [
+        'impressions' => $prev_impressions_p,
+        'clicks'      => $prev_clicks_p,
+        'cpc'         => $prev_clicks_p > 0 ? round($prev_spend_p / $prev_clicks_p, 2) : 0,
+        'spend'       => round($prev_spend_p, 2),
+    ];
 
     // Geo: normalizar nombres de Google Ads → labels del GeoJSON Gran Mendoza.
     // Google Ads reporta sin acentos y "Mendoza" para Capital Mendoza; el GeoJSON

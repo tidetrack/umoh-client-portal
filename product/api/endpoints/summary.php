@@ -95,10 +95,14 @@ try {
     $all_dates = array_unique(array_merge(array_keys($tofu), array_keys($mofu), array_keys($bofu)));
     sort($all_dates);
     if (empty($all_dates)) api_error('Sin datos en Supabase para ' . CLIENT_SLUG, 404);
-    $last   = end($all_dates);
-    $prev_d = count($all_dates) >= 2 ? $all_dates[count($all_dates) - 2] : null;
+    $last = end($all_dates);
 
     [$start, $end] = period_dates($period, $last, $all_dates[0] ?? null);
+
+    // Período previo: mismo length, terminando el día antes de $start
+    $period_days = (strtotime($end) - strtotime($start)) / 86400 + 1;
+    $prev_end    = date('Y-m-d', strtotime($start) - 86400);
+    $prev_start  = date('Y-m-d', strtotime($prev_end) - ($period_days - 1) * 86400);
 
     // 5. Filtrar y agregar el período
     $impressions = 0; $spend = 0.0; $leads_count = 0; $revenue = 0.0; $sales = 0;
@@ -133,25 +137,36 @@ try {
         'revenue' => fn($r) => (float)$r['revenue'],
     ]);
 
-    // 7. Prev (último punto antes del período seleccionado, para deltas)
-    $prev = null;
-    if ($prev_d) {
-        $prev = [
-            'revenue'      => isset($bofu[$prev_d]) ? round($bofu[$prev_d]['revenue'], 2) : 0,
-            'ad_spend'     => isset($tofu[$prev_d]) ? round($tofu[$prev_d]['spend'], 2)   : 0,
-            'impressions'  => $tofu[$prev_d]['impressions'] ?? 0,
-            'leads'        => $mofu[$prev_d] ?? 0,
-            'closed_sales' => $bofu[$prev_d]['sales'] ?? 0,
-        ];
+    // 7. Prev — suma del período previo (mismo length que el actual), para deltas correctos.
+    //    Si el rango previo no tiene datos, cada métrica queda en 0 (el frontend maneja eso).
+    $prev_impressions = 0; $prev_spend = 0.0; $prev_leads = 0; $prev_revenue = 0.0; $prev_sales = 0;
+    foreach ($tofu as $d => $r) {
+        if ($d < $prev_start || $d > $prev_end) continue;
+        $prev_impressions += $r['impressions'];
+        $prev_spend       += $r['spend'];
     }
+    foreach ($mofu as $d => $n) {
+        if ($d < $prev_start || $d > $prev_end) continue;
+        $prev_leads += $n;
+    }
+    foreach ($bofu as $d => $r) {
+        if ($d < $prev_start || $d > $prev_end) continue;
+        $prev_revenue += $r['revenue'];
+        $prev_sales   += $r['sales'];
+    }
+    $prev = [
+        'revenue'      => round($prev_revenue, 2),
+        'ad_spend'     => round($prev_spend, 2),
+        'impressions'  => $prev_impressions,
+        'leads'        => $prev_leads,
+        'closed_sales' => $prev_sales,
+    ];
 
     // 8. Ranking + summary de vendedores — lee de seller_facts (migración 012)
     //    en vez de calcular runtime. Esto cierra el bug de la card "Mejor
     //    Vendedor / Efectividad Promedio / Ciclo Promedio..." en Performance,
     //    que no se renderizaba porque el endpoint no devolvía sellers_summary.
-    $period_days_seller = (strtotime($end) - strtotime($start)) / 86400 + 1;
-    $prev_end_seller   = date('Y-m-d', strtotime($start) - 86400);
-    $prev_start_seller = date('Y-m-d', strtotime($prev_end_seller) - ($period_days_seller - 1) * 86400);
+    // Reutiliza $prev_start / $prev_end calculados en el bloque de período.
 
     // Helper: lee seller_facts en un rango y agrega por seller_name.
     $aggregate_sellers = function(string $rs, string $re) use ($campaign_filter) {
@@ -188,7 +203,7 @@ try {
     };
 
     $curr_sellers = $aggregate_sellers($start, $end);
-    $prev_sellers = $aggregate_sellers($prev_start_seller, $prev_end_seller);
+    $prev_sellers = $aggregate_sellers($prev_start, $prev_end);
 
     // 8a. Lista detallada de sellers (formato esperado por _renderSellersTable)
     $build_seller_row = function(string $name, array $s) {
