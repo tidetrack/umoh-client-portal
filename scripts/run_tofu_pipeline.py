@@ -40,6 +40,7 @@ import logging
 import os
 import sys
 from pathlib import Path
+from typing import Any
 
 # Resolver imports del directorio data/ independientemente del cwd
 _REPO_ROOT = Path(__file__).resolve().parent.parent
@@ -50,6 +51,7 @@ from dotenv import load_dotenv
 # Los imports de los módulos del pipeline van después del sys.path.insert
 from connections.supabase_client import get_client as get_supabase_client
 from extractors.google_ads import run as extract_google_ads
+from loaders.supabase_search_terms_writer import write_search_terms
 from loaders.supabase_tofu_writer import write_tofu_ads
 from normalizers.canonical import normalize
 
@@ -183,6 +185,39 @@ def main() -> None:
         logger.exception("Error escribiendo en Supabase.")
 
     # ------------------------------------------------------------------
+    # Paso 4b: Escribir términos de búsqueda en tofu_search_terms
+    #
+    # Los raw_search_terms vienen del extractor: pueden ser de search_term_view
+    # (campañas Search tradicionales) o de campaign_search_term_insight (PMAX).
+    # El writer hace upsert idempotente por (client_slug, date, campaign_id, term).
+    # Si raw_search_terms está vacío (ambas fuentes devolvieron 0 filas), el writer
+    # loguea el hecho y retorna sin error — no bloquea el pipeline.
+    # ------------------------------------------------------------------
+    search_terms_results: dict[str, Any] = {}
+    search_terms_errors: list[str] = []
+
+    for raw in raw_results:
+        client_id = raw.get("client_id", "")
+        raw_terms = raw.get("raw_search_terms", [])
+        try:
+            st_result = write_search_terms(
+                raw_terms=raw_terms,
+                client_slug=client_id,
+            )
+            search_terms_results[client_id] = st_result
+            logger.info(
+                "tofu_search_terms: cliente=%s filas_escritas=%d source_counts=%s",
+                client_id,
+                st_result.get("rows_written", 0),
+                st_result.get("source_counts", {}),
+            )
+        except Exception as exc:
+            err_msg = f"write_search_terms falló para cliente={client_id}: {exc}"
+            logger.error(err_msg)
+            search_terms_errors.append(err_msg)
+            # No se aborta el pipeline — los demás pasos continúan
+
+    # ------------------------------------------------------------------
     # Paso 5: Poblar tofu_facts via stored procedure
     #
     # Se ejecuta por cada cliente procesado. Para v1 (Prepagas, campaña única)
@@ -296,7 +331,9 @@ def main() -> None:
     # ------------------------------------------------------------------
     # Paso 7: Resumen
     # ------------------------------------------------------------------
-    has_errors = bool(supabase_error or facts_errors or sheets_mirror_errors)
+    has_errors = bool(
+        supabase_error or facts_errors or sheets_mirror_errors or search_terms_errors
+    )
     summary = {
         "status": "ok" if not has_errors else "partial_failure",
         "days_back": days_back,
@@ -309,6 +346,8 @@ def main() -> None:
         "supabase_clients": supabase_result.get("clients", []),
         "supabase_platforms": supabase_result.get("platforms", []),
         "supabase_error": supabase_error,
+        "search_terms": search_terms_results,
+        "search_terms_errors": search_terms_errors,
         "facts_errors": facts_errors,
         "sheets_mirror": sheets_mirror_results,
         "sheets_mirror_errors": sheets_mirror_errors,
