@@ -114,10 +114,16 @@ function build_trend(array $filtered, string $period, array $fields): array {
 
     if ($n === 0) return $result;
 
-    // Elegir granularidad
-    if ($n <= 14) {
+    // Granularidad: respetamos el período seleccionado por el usuario.
+    //   - 7d / 30d / 90d → siempre día (lo que Franco pide explícitamente)
+    //   - custom corto (≤14 puntos) → día
+    //   - custom largo (>45 puntos no-90d) → mes
+    //   - intermedio → semana
+    if (in_array($period, ['7d', '30d', '90d'], true)) {
         $mode = 'day';
-    } elseif ($period === '90d' || $n > 45) {
+    } elseif ($n <= 14) {
+        $mode = 'day';
+    } elseif ($n > 45) {
         $mode = 'month';
     } else {
         $mode = 'week';

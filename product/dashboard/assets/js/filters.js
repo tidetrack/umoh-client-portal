@@ -286,6 +286,66 @@ const KPI_INFO = {
     desc: 'Leads en estado "En Emisión": están activamente en el proceso de firma de contrato. Son las ventas más cercanas a cerrarse y el indicador más predictivo de ingresos futuros.',
     example: '15 leads de alta intención con un ticket promedio de $31.250 representan $468.750 en ingresos potenciales próximos a materializarse en el corto plazo.'
   },
+  'mofu-closedwon': {
+    name: 'Ventas Ganadas',
+    formula: '',
+    desc: 'Leads que llegaron a la etapa "Ventas Ganadas" del CRM en el período. Es la cantidad de cierres efectivos atribuidos a la campaña.',
+    example: d => {
+      // Tomar de status si está disponible, fallback a closed_won_leads
+      let won = d.closed_won_leads || 0;
+      if (d.status) {
+        const idx = d.status.labels.indexOf('Ventas Ganadas');
+        if (idx !== -1) won = d.status.data[idx] || 0;
+      }
+      const total = d.total_leads || 0;
+      const conv = total > 0 ? (won / total * 100).toFixed(1) : '0.0';
+      return `${_fn(won)} ventas ganadas sobre ${_fn(total)} leads del período = ${conv}% de conversión bruta.`;
+    }
+  },
+  'bofu-revenue': {
+    name: 'Ingresos Totales',
+    formula: 'Suma de precio_final de las ventas cerradas en el período',
+    desc: 'Total de ingresos generados por las ventas cerradas del cliente en el período. Solo incluye ventas de leads de campaña — las del vendedor (referidos, propios) van a un bloque separado.',
+    example: d => {
+      const rev = d.total_revenue || 0;
+      const sales = d.closed_sales || 0;
+      const ticket = sales > 0 ? rev / sales : 0;
+      return `Se generaron ${_fc(rev)} con ${_fn(sales)} ventas. Ticket promedio: ${_fc(ticket)}.`;
+    }
+  },
+  'bofu-sales': {
+    name: 'Ventas Cerradas',
+    formula: 'Cantidad de leads con is_closed=true en lead_monetary',
+    desc: 'Cantidad total de ventas efectivamente cerradas en el período. Una venta se cuenta cuando el vendedor marcó la operación como concluida en MeisterTask.',
+    example: d => {
+      const sales = d.closed_sales || 0;
+      const prevSales = d.prev?.closed_sales || 0;
+      const diff = prevSales > 0 ? ((sales - prevSales) / prevSales * 100).toFixed(1) : null;
+      const diffTxt = diff !== null ? ` (${diff >= 0 ? '+' : ''}${diff}% vs período anterior)` : '';
+      return `${_fn(sales)} ventas cerradas en el período${diffTxt}.`;
+    }
+  },
+  'bofu-capitas': {
+    name: 'Cápitas Cerradas',
+    formula: 'Suma de cápitas (titulares + grupo familiar) de cada venta',
+    desc: 'Cantidad total de afiliados firmados — incluye al titular más todos los miembros del grupo familiar/empresa. Una venta puede sumar múltiples cápitas.',
+    example: d => {
+      const cap = d.capitas_closed || 0;
+      const sales = d.closed_sales || 0;
+      const ratio = sales > 0 ? (cap / sales).toFixed(2) : '0';
+      return `${_fn(cap)} cápitas cerradas en ${_fn(sales)} ventas — ${ratio} cápitas promedio por venta.`;
+    }
+  },
+  'bofu-ticket-capita': {
+    name: 'Ticket Promedio por Cápita',
+    formula: 'Ingresos totales ÷ Cápitas cerradas',
+    desc: 'Ingreso promedio que aporta cada afiliado individual. A diferencia del ticket por venta, este número refleja el valor por persona contratada — útil para benchmarking entre planes.',
+    example: d => {
+      const tpc = d.avg_ticket_per_capita || 0;
+      const cap = d.capitas_closed || 0;
+      return `Cada cápita aportó en promedio ${_fc(tpc)} de ingreso. ${_fn(cap)} cápitas en total.`;
+    }
+  },
   'bofu-ticket': {
     name: 'Ticket Promedio por Venta',
     formula: 'Ingresos totales ÷ Ventas cerradas',
@@ -375,27 +435,31 @@ function _renderModalChart(kpiKey) {
   if (!ctx) return false;
 
   const isTofuKey = ['tofu-impressions', 'tofu-clicks', 'tofu-cpc'].includes(kpiKey);
-  const isMofuKey = ['mofu-leads', 'mofu-cpl', 'mofu-tipif', 'mofu-highintent'].includes(kpiKey);
+  const isMofuKey = ['mofu-leads', 'mofu-cpl', 'mofu-tipif', 'mofu-highintent', 'mofu-closedwon'].includes(kpiKey);
+  const isBofuKey = ['bofu-revenue', 'bofu-sales', 'bofu-ticket', 'bofu-conversion', 'bofu-capitas', 'bofu-ticket-capita', 'revenue', 'sales'].includes(kpiKey);
 
   let data;
   if (isTofuKey) {
     data = window._tofuData;
   } else if (isMofuKey) {
     data = window._mofuData;
+  } else if (isBofuKey && window._bofuData) {
+    data = window._bofuData;
   } else {
     data = window._kpiModalData;
   }
   if (!data || !data.trend) return false;
 
   const src     = data.trend.sparkline || data.trend;
-  const labels  = src.labels || [];
-  const spend   = src.spend   || data.trend.spend;
-  const revenue = src.revenue || data.trend.revenue;
+  const labels  = src.labels || data.trend.labels || [];
+  const spend   = src.spend   || data.trend.spend   || [];
+  const revenue = src.revenue || data.trend.revenue || [];
 
   let values, color, label;
   const isUp = arr => arr[arr.length - 1] >= arr[0];
 
-  if (kpiKey === 'revenue') {
+  if (kpiKey === 'revenue' && !isBofuKey) {
+    // Performance section revenue (uses spend+revenue from summary)
     values = revenue; color = isUp(revenue) ? '#22C55E' : '#FF0040'; label = 'Ingreso';
   } else if (kpiKey === 'spend') {
     values = spend; color = !isUp(spend) ? '#22C55E' : '#EF4444'; label = 'Inversión';
@@ -410,7 +474,8 @@ function _renderModalChart(kpiKey) {
     const tot = revenue.reduce((a, b) => a + b, 0);
     values = revenue.map(r => tot > 0 ? Math.round((r / tot) * data.leads) : 0);
     color = isUp(values) ? '#22C55E' : '#FF0040'; label = 'Leads';
-  } else if (kpiKey === 'sales') {
+  } else if (kpiKey === 'sales' && !isBofuKey) {
+    // Performance section sales
     const tot = revenue.reduce((a, b) => a + b, 0);
     values = revenue.map(r => tot > 0 ? Math.round((r / tot) * data.closed_sales) : 0);
     color = isUp(values) ? '#22C55E' : '#FF0040'; label = 'Ventas';
@@ -433,6 +498,34 @@ function _renderModalChart(kpiKey) {
   } else if (kpiKey === 'mofu-highintent') {
     values = src.leads || data.trend.leads || [];
     color = isUp(values) ? '#22C55E' : '#FF0040'; label = 'Leads (proxy alta intención)';
+  } else if (kpiKey === 'mofu-closedwon') {
+    values = src.leads || data.trend.leads || [];
+    color = isUp(values) ? '#22C55E' : '#FF0040'; label = 'Leads (proxy ventas ganadas)';
+  } else if (kpiKey === 'bofu-revenue' || (kpiKey === 'revenue' && isBofuKey)) {
+    values = data.trend.revenue || [];
+    color = isUp(values) ? '#22C55E' : '#FF0040'; label = 'Ingresos';
+  } else if (kpiKey === 'bofu-sales' || (kpiKey === 'sales' && isBofuKey)) {
+    values = data.trend.sales || [];
+    color = isUp(values) ? '#22C55E' : '#FF0040'; label = 'Ventas';
+  } else if (kpiKey === 'bofu-ticket') {
+    // Ticket = revenue / sales por punto — si no existen ambos, usar revenue como proxy
+    const rev   = data.trend.revenue || [];
+    const sales = data.trend.sales   || [];
+    values = rev.map((r, i) => sales[i] > 0 ? Math.round(r / sales[i]) : 0);
+    color = isUp(values) ? '#22C55E' : '#FF0040'; label = 'Ticket promedio';
+  } else if (kpiKey === 'bofu-conversion') {
+    // Conversión por punto: proporción relativa de ventas
+    values = data.trend.sales || [];
+    color = isUp(values) ? '#22C55E' : '#FF0040'; label = 'Ventas (proxy conversión)';
+  } else if (kpiKey === 'bofu-capitas') {
+    // Cápitas: proporción de sales escalada por ratio total
+    const salesArr = data.trend.sales || [];
+    const ratio    = data.closed_sales > 0 ? (data.capitas_closed / data.closed_sales) : 1;
+    values = salesArr.map(s => Math.round(s * ratio));
+    color = isUp(values) ? '#22C55E' : '#FF0040'; label = 'Cápitas';
+  } else if (kpiKey === 'bofu-ticket-capita') {
+    values = data.trend.revenue || [];
+    color = isUp(values) ? '#22C55E' : '#FF0040'; label = 'Ingreso (proxy ticket/cápita)';
   } else {
     return false;
   }
@@ -441,7 +534,7 @@ function _renderModalChart(kpiKey) {
 
   const fill = color === '#22C55E' ? 'rgba(34,197,94,0.10)' : 'rgba(239,68,68,0.10)';
 
-  const chartLabels = (isTofuKey || isMofuKey)
+  const chartLabels = (isTofuKey || isMofuKey || isBofuKey)
     ? (data.trend.labels || values.map((_, i) => `${i + 1}`))
     : (labels.length === values.length ? labels : values.map((_, i) => `${i + 1}`));
 
@@ -472,7 +565,9 @@ function _renderModalChart(kpiKey) {
             title: items => items[0]?.label || '',
             label: c => {
               const v = c.parsed.y;
-              if (kpiKey === 'tofu-cpc' || kpiKey === 'mofu-cpl') return ` ${label}: $${Math.round(v).toLocaleString('es-AR')}`;
+              const currencyKeys = ['tofu-cpc', 'mofu-cpl', 'bofu-revenue', 'bofu-ticket', 'bofu-ticket-capita'];
+              if (currencyKeys.includes(kpiKey)) return ` ${label}: $${Math.round(v).toLocaleString('es-AR')}`;
+              if (kpiKey === 'roi') return ` ${label}: ${v.toFixed(1)}%`;
               return ` ${label}: ${Number.isInteger(v) ? v.toLocaleString('es-AR') : v.toFixed(1)}`;
             }
           }
@@ -493,7 +588,12 @@ function _renderModalChart(kpiKey) {
               if (kpiKey === 'tofu-impressions' || kpiKey === 'tofu-clicks') {
                 return v >= 1000 ? (v / 1000).toFixed(0) + 'k' : v;
               }
-              if (kpiKey === 'tofu-cpc' || kpiKey === 'mofu-cpl') return '$' + (v / 1000).toFixed(1) + 'k';
+              if (['tofu-cpc', 'mofu-cpl', 'bofu-ticket', 'bofu-ticket-capita'].includes(kpiKey)) {
+                return '$' + (v / 1000).toFixed(1) + 'k';
+              }
+              if (['bofu-revenue', 'bofu-ticket-capita'].includes(kpiKey)) {
+                return v >= 1000000 ? '$' + (v / 1000000).toFixed(1) + 'M' : '$' + (v / 1000).toFixed(0) + 'k';
+              }
               return v >= 1000000 ? '$' + (v / 1000000).toFixed(1) + 'M' : v >= 1000 ? '$' + (v / 1000).toFixed(0) + 'k' : v;
             }
           },
@@ -508,7 +608,17 @@ function _renderModalChart(kpiKey) {
 function _openKpiModal(kpiKey) {
   const info = KPI_INFO[kpiKey];
   if (!info) return;
-  const data = window._kpiModalData || {};
+
+  // Seleccionar el objeto de datos correcto según la sección del KPI
+  const isTofuKpi = ['tofu-impressions', 'tofu-clicks', 'tofu-cpc'].includes(kpiKey);
+  const isMofuKpi = kpiKey.startsWith('mofu-');
+  const isBofuKpi = kpiKey.startsWith('bofu-');
+
+  let data;
+  if (isTofuKpi)      data = window._tofuData   || window._kpiModalData || {};
+  else if (isMofuKpi) data = window._mofuData   || window._kpiModalData || {};
+  else if (isBofuKpi) data = window._bofuData   || window._kpiModalData || {};
+  else                data = window._kpiModalData || {};
 
   const modal   = document.getElementById('kpi-modal');
   const title   = document.getElementById('kpi-modal-title');

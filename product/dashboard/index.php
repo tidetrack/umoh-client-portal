@@ -478,6 +478,48 @@ $_asset_v = defined('ASSET_VERSION') ? ASSET_VERSION : filemtime(__DIR__ . '/ass
           <div class="chart-card-body" style="padding: 0; overflow: hidden;">
             <canvas id="chart-status" aria-label="Distribución por estado de lead" style="display:none;"></canvas>
           </div>
+          <!-- Descripción explicativa del journey por sub-fase. Ayuda al cliente
+               a interpretar qué significa cada bloque de columnas y qué tipo
+               de gestión comercial corresponde a cada momento. -->
+          <div class="journey-description" aria-label="Explicación del customer journey">
+            <div class="jd-grid">
+              <div class="jd-item">
+                <span class="jd-dot jd-dot--entry"></span>
+                <div class="jd-text">
+                  <strong>Entrada</strong>
+                  <p>Leads recién ingresados al CRM. Aún sin contactar — primer punto de captación de la campaña.</p>
+                </div>
+              </div>
+              <div class="jd-item">
+                <span class="jd-dot jd-dot--seguimiento"></span>
+                <div class="jd-text">
+                  <strong>Seguimiento</strong>
+                  <p>Leads en contacto activo con el equipo comercial: tipificados, gestionados, en proceso de calificación.</p>
+                </div>
+              </div>
+              <div class="jd-item">
+                <span class="jd-dot jd-dot--alta"></span>
+                <div class="jd-text">
+                  <strong>Alta intención</strong>
+                  <p>Leads cerca del cierre: cotizaciones enviadas, en auditoría, prioritarios. Son los más propensos a convertir.</p>
+                </div>
+              </div>
+              <div class="jd-item">
+                <span class="jd-dot jd-dot--incub"></span>
+                <div class="jd-text">
+                  <strong>Incubando</strong>
+                  <p>Leads pospuestos a corto/mediano plazo. No descartados — quedan en pipeline esperando un nuevo contacto.</p>
+                </div>
+              </div>
+              <div class="jd-item">
+                <span class="jd-dot jd-dot--result"></span>
+                <div class="jd-text">
+                  <strong>Resultado</strong>
+                  <p>Cierre del journey: ventas ganadas (verde), leads que no prosperaron (rojo) o erróneos (gris).</p>
+                </div>
+              </div>
+            </div>
+          </div>
         </div>
       </div>
 
