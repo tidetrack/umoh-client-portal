@@ -46,6 +46,16 @@ async function fetchData(endpoint, params = {}) {
     headers: { 'Accept': 'application/json' }
   });
 
+  // Si el servidor devuelve 401 (sin sesión válida), caer al mock para
+  // evitar pantalla en blanco — solo aplica a endpoints con mock disponible.
+  if (res.status === 401) {
+    try {
+      return await getMockData(endpoint, params);
+    } catch (_) {
+      // Si el mock tampoco tiene datos, continuar con el error normal
+    }
+  }
+
   if (!res.ok) {
     throw new Error(`API error ${res.status} on /${endpoint}`);
   }

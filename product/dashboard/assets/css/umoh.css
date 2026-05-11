@@ -3275,7 +3275,7 @@ body.nav-hidden .nav-fab {
 /* ── Variables del sidebar ────────────────────────────────────── */
 :root {
   --sb-width:          240px;
-  --sb-width-collapsed: 60px;
+  --sb-width-collapsed: 76px;
   --sb-transition:     0.25s ease;
 }
 
@@ -3329,6 +3329,29 @@ body.sidebar-collapsed .dashboard-sidebar {
   gap:         var(--sp-2);
   min-width:   0;
   overflow:    hidden;
+}
+
+/* Logo del cliente — separado del asterisco UMOH con divisor sutil */
+.sb-client-logo-wrap {
+  display:         flex;
+  align-items:     center;
+  padding-left:    var(--sp-2);
+  border-left:     1px solid var(--border-subtle);
+  height:          24px;
+  flex-shrink:     0;
+}
+
+.sb-client-logo {
+  height:      24px;
+  width:       auto;
+  max-width:   80px;
+  object-fit:  contain;
+  display:     block;
+}
+
+/* Ocultar el logo del cliente en modo colapsado (no hay espacio) */
+body.sidebar-collapsed .sb-client-logo-wrap {
+  display: none;
 }
 
 .sb-brand-mark {
@@ -3627,6 +3650,18 @@ body.sidebar-collapsed #sb-campaigns-trigger.has-campaign .sb-campaign-dot {
 .sb-nav-icon {
   flex-shrink: 0;
   color:       inherit;
+}
+
+/* Material Symbols en items de nav del sidebar */
+.sb-nav-item .material-symbols-outlined.sb-nav-icon {
+  font-size:   22px;
+  line-height: 1;
+  font-variation-settings: 'FILL' 0, 'wght' 300, 'GRAD' 0, 'opsz' 24;
+  width:       22px;
+  height:      22px;
+  display:     flex;
+  align-items: center;
+  justify-content: center;
 }
 
 /* Tooltip en modo colapsado */
@@ -3941,6 +3976,16 @@ body.sidebar-collapsed .dashboard-content {
     box-shadow: 4px 0 24px rgba(0,0,0,0.25);
   }
 
+  /* Hamburger: ocultar cuando el drawer está abierto */
+  body.sidebar-mobile-open .sb-hamburger {
+    display: none;
+  }
+
+  /* Botón colapsar: ocultar en mobile (el drawer no se "minimiza") */
+  .sb-collapse-btn {
+    display: none;
+  }
+
   /* Overlay detrás del drawer */
   body.sidebar-mobile-open::before {
     content:    '';
@@ -3965,6 +4010,15 @@ body.sidebar-collapsed .dashboard-content {
   body.sidebar-collapsed .dashboard-sidebar {
     width: var(--sb-width);
   }
+
+  /* Logo del cliente: oculto en mobile hasta que el drawer esté abierto */
+  .sb-client-logo-wrap {
+    display: none;
+  }
+
+  body.sidebar-mobile-open .sb-client-logo-wrap {
+    display: flex;
+  }
 }
 
 /* ── Sección Inicio ─────────────────────────────────────────── */
@@ -3979,7 +4033,7 @@ body.sidebar-collapsed .dashboard-content {
   width:           52px;
   height:          52px;
   border-radius:   50%;
-  background:      rgba(255, 0, 64, 0.10);
+  background:      transparent;
   border:          3px solid var(--border-subtle);
   display:         flex;
   align-items:     center;
@@ -3989,7 +4043,7 @@ body.sidebar-collapsed .dashboard-content {
 }
 
 [data-theme="dark"] .inicio-avatar {
-  background: rgba(255, 0, 64, 0.15);
+  background: transparent;
 }
 
 .inicio-greeting-block {
@@ -4039,10 +4093,51 @@ body.sidebar-collapsed .dashboard-content {
 }
 
 .inicio-ai-header {
-  display:       flex;
-  align-items:   center;
-  gap:           var(--sp-3);
-  margin-bottom: var(--sp-4);
+  display:         flex;
+  align-items:     center;
+  gap:             var(--sp-3);
+  margin-bottom:   var(--sp-4);
+  justify-content: space-between;
+}
+
+/* Botón Regenerar análisis */
+.inicio-ai-refresh-btn {
+  display:      flex;
+  align-items:  center;
+  gap:          var(--sp-1);
+  font-size:    12px;
+  font-weight:  500;
+  color:        var(--text-muted);
+  background:   transparent;
+  border:       1px solid var(--border-subtle);
+  border-radius: var(--r-sm);
+  padding:      4px 10px;
+  cursor:       pointer;
+  transition:   color 0.15s, border-color 0.15s, background 0.15s;
+  flex-shrink:  0;
+}
+
+.inicio-ai-refresh-btn:hover {
+  color:         var(--umoh-accent);
+  border-color:  var(--umoh-accent);
+  background:    rgba(255,0,64,0.04);
+}
+
+.inicio-ai-refresh-btn.loading svg {
+  animation: spinRefresh 0.8s linear infinite;
+}
+
+@keyframes spinRefresh {
+  from { transform: rotate(0deg); }
+  to   { transform: rotate(360deg); }
+}
+
+/* Timestamp de última actualización */
+.inicio-ai-timestamp {
+  font-size:   11px;
+  color:       var(--text-muted);
+  margin-top:  var(--sp-3);
+  text-align:  right;
 }
 
 .inicio-ai-badge {
@@ -4141,7 +4236,13 @@ body.sidebar-collapsed .dashboard-content {
   display:  grid;
   grid-template-columns: repeat(4, 1fr);
   gap:      var(--sp-4);
-  margin-bottom: var(--sp-8);
+  margin-bottom: var(--sp-4);
+}
+
+/* Sección Inicio: padding-bottom reducido — el contenido es corto y
+   el sp-12 global genera scroll vacío debajo del footer. */
+#section-inicio {
+  padding-bottom: var(--sp-6);
 }
 
 .inicio-quick-card {

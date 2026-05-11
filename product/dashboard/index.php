@@ -28,6 +28,9 @@ $_asset_v = defined('ASSET_VERSION') ? ASSET_VERSION : filemtime(__DIR__ . '/ass
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet">
 
+  <!-- Material Symbols Outlined — íconos de secciones del sidebar -->
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200&icon_names=settings,bar_chart_4_bars,visibility,psychology_alt,add_shopping_cart" />
+
   <!-- Leaflet CSS -->
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.css" crossorigin="">
 
@@ -73,10 +76,14 @@ $_asset_v = defined('ASSET_VERSION') ? ASSET_VERSION : filemtime(__DIR__ . '/ass
     <!-- A. Header del sidebar: logo PNG asterisco UMOH + nombre + botón colapsar -->
     <div class="sb-header">
       <div class="sb-brand">
-        <!-- Logo: asterisco UMOH — imagen distinta por tema (claro/oscuro) -->
+        <!-- Logo UMOH (asterisco) + logo del cliente -->
+        <!-- TODO Fase 4 multi-cliente: resolver client-logo.webp dinámicamente via CLIENT_SLUG -->
         <div class="sb-brand-mark" aria-hidden="true">
           <img src="assets/img/umoh-asterisk-dark.png"  alt="UMOH" class="sb-brand-img avatar-light">
           <img src="assets/img/umoh-asterisk-light.png" alt="UMOH" class="sb-brand-img avatar-dark">
+        </div>
+        <div class="sb-client-logo-wrap" aria-hidden="true">
+          <img src="assets/img/client-logo.webp" alt="Logo cliente" class="sb-client-logo">
         </div>
         <div class="sb-brand-text sb-label">
           <span class="sb-brand-agency">umoh</span>
@@ -154,38 +161,22 @@ $_asset_v = defined('ASSET_VERSION') ? ASSET_VERSION : filemtime(__DIR__ . '/ass
             <span class="sb-tooltip" aria-hidden="true">Inicio</span>
           </button>
           <button class="sb-nav-item" data-section="performance" aria-current="false">
-            <svg class="sb-nav-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-              <rect x="18" y="3" width="4" height="18"/>
-              <rect x="10" y="8" width="4" height="13"/>
-              <rect x="2"  y="13" width="4" height="8"/>
-            </svg>
+            <span class="material-symbols-outlined sb-nav-icon" aria-hidden="true">bar_chart_4_bars</span>
             <span class="sb-label">Performance</span>
             <span class="sb-tooltip" aria-hidden="true">Performance</span>
           </button>
           <button class="sb-nav-item" data-section="tofu" aria-current="false">
-            <svg class="sb-nav-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-              <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/>
-              <path d="M15.54 8.46a5 5 0 0 1 0 7.07"/>
-              <path d="M19.07 4.93a10 10 0 0 1 0 14.14"/>
-            </svg>
+            <span class="material-symbols-outlined sb-nav-icon" aria-hidden="true">visibility</span>
             <span class="sb-label">I. Awareness</span>
             <span class="sb-tooltip" aria-hidden="true">I. Awareness</span>
           </button>
           <button class="sb-nav-item" data-section="mofu" aria-current="false">
-            <svg class="sb-nav-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-              <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/>
-              <circle cx="9" cy="7" r="4"/>
-              <path d="M23 21v-2a4 4 0 0 0-3-3.87"/>
-              <path d="M16 3.13a4 4 0 0 1 0 7.75"/>
-            </svg>
+            <span class="material-symbols-outlined sb-nav-icon" aria-hidden="true">psychology_alt</span>
             <span class="sb-label">II. Interest</span>
             <span class="sb-tooltip" aria-hidden="true">II. Interest</span>
           </button>
           <button class="sb-nav-item" data-section="bofu" aria-current="false">
-            <svg class="sb-nav-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-              <rect x="2" y="7" width="20" height="14" rx="2" ry="2"/>
-              <path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16"/>
-            </svg>
+            <span class="material-symbols-outlined sb-nav-icon" aria-hidden="true">add_shopping_cart</span>
             <span class="sb-label">III. Sales</span>
             <span class="sb-tooltip" aria-hidden="true">III. Sales</span>
           </button>
@@ -340,8 +331,16 @@ $_asset_v = defined('ASSET_VERSION') ? ASSET_VERSION : filemtime(__DIR__ . '/ass
             <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
               <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/>
             </svg>
-            Resumen de campaña
+            Análisis IA
           </span>
+          <button class="inicio-ai-refresh-btn" id="inicio-ai-refresh-btn" type="button" title="Regenerar análisis" aria-label="Regenerar análisis">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <polyline points="23 4 23 10 17 10"/>
+              <polyline points="1 20 1 14 7 14"/>
+              <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/>
+            </svg>
+            Regenerar
+          </button>
         </div>
         <!-- Skeleton mientras carga -->
         <div class="inicio-ai-skeleton" id="inicio-ai-skeleton">
@@ -372,6 +371,7 @@ $_asset_v = defined('ASSET_VERSION') ? ASSET_VERSION : filemtime(__DIR__ . '/ass
             </svg>
             <p id="inicio-ai-recommendation"></p>
           </div>
+          <p class="inicio-ai-timestamp" id="inicio-ai-timestamp" aria-live="polite"></p>
         </div>
       </div>
 

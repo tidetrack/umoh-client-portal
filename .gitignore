@@ -71,3 +71,8 @@ data/inbox/**/*.csv
 data/inbox/processed/**
 !data/inbox/README.md
 !data/inbox/**/.gitkeep
+
+# Assets de cliente sueltos en root (deben ir a clients/{slug}/assets/)
+/prepaga_logo.webp
+/*.webp
+/*.psd

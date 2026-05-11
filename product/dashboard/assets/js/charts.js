@@ -1976,6 +1976,40 @@ function renderInicio(data) {
 
     if (rec) rec.textContent = ai.recommendation || '';
     if (content) content.removeAttribute('hidden');
+
+    // Timestamp de generación
+    const tsEl = document.getElementById('inicio-ai-timestamp');
+    if (tsEl) {
+      const generatedAt = ai.generated_at || null;
+      if (generatedAt) {
+        const d = new Date(generatedAt);
+        tsEl.textContent = 'Última actualización: ' + d.toLocaleString('es-AR', { day:'2-digit', month:'short', year:'numeric', hour:'2-digit', minute:'2-digit' });
+      } else {
+        // Resumen generado on-the-fly: marcar como "ahora"
+        tsEl.textContent = 'Generado: ahora';
+      }
+    }
+  }
+
+  /* ── Botón Regenerar análisis ────────────────────────── */
+  const refreshBtn = document.getElementById('inicio-ai-refresh-btn');
+  if (refreshBtn) {
+    // Evitar duplicar el listener si renderInicio se llama más de una vez
+    if (!refreshBtn._umohRefreshBound) {
+      refreshBtn._umohRefreshBound = true;
+      refreshBtn.addEventListener('click', async () => {
+        refreshBtn.classList.add('loading');
+        refreshBtn.disabled = true;
+        // Re-fetch del endpoint inicio — regenera el resumen heurístico
+        try {
+          const data = await fetchData('inicio', { period: _currentPeriod || '30d' });
+          renderInicio(data);
+        } finally {
+          refreshBtn.classList.remove('loading');
+          refreshBtn.disabled = false;
+        }
+      });
+    }
   }
 
   /* ── Quick access cards ─────────────────────────────── */
