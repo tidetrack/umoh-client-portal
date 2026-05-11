@@ -4694,3 +4694,307 @@ body.sidebar-layout .theme-toggle-switch {
   display: none;
 }
 
+/* ══════════════════════════════════════════════════════════════
+   SPRINT UX FINAL — 19 corrections batch
+   ══════════════════════════════════════════════════════════════ */
+
+/* ── 1. Brand mark: imagen PNG real del asterisco UMOH ─────── */
+.sb-brand-mark {
+  background: #0B1E3F; /* azul UMOH para contraste con el asterisco rojo/blanco */
+  padding:    4px;
+  width:      34px;
+  height:     34px;
+}
+
+.sb-brand-img {
+  width:      100%;
+  height:     100%;
+  object-fit: contain;
+  display:    block;
+  filter:     none; /* la imagen ya tiene sus colores correctos */
+}
+
+/* Ocultar SVG inline que ya no se usa */
+.sb-brand-svg {
+  display: none;
+}
+
+/* ── 2. Avatares: imagen real del usuario ───────────────────── */
+.sb-user-avatar img {
+  width:         100%;
+  height:        100%;
+  object-fit:    cover;
+  border-radius: 50%;
+  filter:        none; /* foto real — no invertir */
+  display:       block;
+}
+
+.sb-user-avatar--lg img {
+  width:         100%;
+  height:        100%;
+  object-fit:    cover;
+  border-radius: 50%;
+  filter:        none;
+  display:       block;
+}
+
+/* Cuando hay imagen, no mostrar el background de initial */
+.sb-user-avatar:has(img) {
+  background: transparent;
+  padding:    0;
+}
+
+/* ── 3. "Todas las campañas" — wrap en 2 líneas ─────────────── */
+.sb-campaign-name {
+  white-space: normal;
+  word-break:  break-word;
+  line-height: 1.3;
+}
+
+.sb-dt-name {
+  white-space: normal;
+  word-break:  break-word;
+  line-height: 1.3;
+}
+
+/* ── 4. Secciones nav: lista fija siempre visible ───────────── */
+/* El .sb-section--nav ya no usa dropdown — el nav-list es visible siempre */
+.sb-section--nav {
+  flex: 1;
+  padding-bottom: var(--sp-2);
+}
+
+.sb-section--nav .sb-nav-list {
+  padding: var(--sp-1) 0;
+}
+
+/* ── 5. Período personalizado: ocultar historic section ─────── */
+/* La sección historic-section se eliminó del HTML — ya no se muestra */
+.historic-section {
+  display: none;
+}
+
+/* ── 6. Resize handle del sidebar ───────────────────────────── */
+.sb-resize-handle {
+  position:   absolute;
+  top:        0;
+  right:      -4px;
+  width:      8px;
+  height:     100%;
+  cursor:     col-resize;
+  z-index:    200;
+  background: transparent;
+  transition: background 0.2s;
+}
+
+.sb-resize-handle:hover,
+.sb-resize-handle.dragging {
+  background: rgba(255, 0, 64, 0.35);
+}
+
+/* ── 7. Footer visual: alinear con sidebar ──────────────────── */
+.site-footer {
+  background:   var(--bg-card);
+  border-top:   1px solid var(--border-subtle);
+  color:        var(--text-secondary);
+}
+
+.footer-brand {
+  color: var(--text-primary);
+}
+
+.footer-text {
+  color: var(--text-secondary);
+}
+
+/* Dark mode footer */
+[data-theme="dark"] .site-footer {
+  background:  var(--bg-card);
+  border-top:  1px solid var(--border-subtle);
+}
+
+/* ── 8. Popup de perfil: heredar tema ───────────────────────── */
+/* El dropdown ya estaba en la raíz del DOM (position: absolute en sb-user).
+   El bug era que tenía colores hardcodeados a oscuro.
+   Ahora usa variables semánticas que respetan el tema. */
+.sb-user-dropdown {
+  background:   var(--bg-card);
+  border-color: var(--border-subtle);
+}
+
+[data-theme="dark"] .sb-user-dropdown {
+  background:   var(--bg-card); /* #1E2A3A — ya correcto */
+  border-color: var(--border-subtle);
+}
+
+/* Texto dentro del dropdown hereda el tema */
+.sb-user-dropdown .user-menu-fullname {
+  color: var(--text-primary);
+}
+
+.sb-user-dropdown .user-menu-role {
+  color: var(--text-secondary);
+}
+
+.sb-user-dropdown .user-menu-item {
+  color: var(--text-secondary);
+}
+
+.sb-user-dropdown .user-menu-item:hover {
+  background: rgba(0, 0, 0, 0.04);
+  color:      var(--text-primary);
+}
+
+[data-theme="dark"] .sb-user-dropdown .user-menu-item:hover {
+  background: rgba(255, 255, 255, 0.06);
+}
+
+.sb-user-dropdown .user-menu-item--danger:hover {
+  background: rgba(255, 0, 64, 0.10);
+  color:      var(--umoh-accent);
+}
+
+.sb-user-dropdown .user-menu-divider {
+  background: var(--border-subtle);
+}
+
+.sb-user-dropdown .user-menu-header {
+  background: var(--bg-card-header);
+  border-radius: var(--r-lg) var(--r-lg) 0 0;
+}
+
+/* ── 9. Flecha perfil: lógica de dropdown que abre hacia ARRIBA ──
+   El dropdown del perfil sube desde la esquina inferior del sidebar.
+   → Cerrado: flecha apunta ARRIBA (↑) — indicando que al click el menú emerge hacia arriba.
+   → Abierto: flecha apunta ABAJO (↓) — indicando que al click el menú se cierra hacia abajo.
+   El SVG base (points="6 9 12 15 18 9") dibuja una ↓.
+   rotate(180deg) la convierte en ↑. */
+.sb-user-trigger .sb-user-chevron {
+  transform: rotate(180deg); /* cerrado → apunta arriba (↑) */
+}
+
+.sb-user-trigger[aria-expanded="true"] .sb-user-chevron {
+  transform: rotate(0deg); /* abierto → apunta abajo (↓) */
+}
+
+/* ── 10. Section headers: tipografía grande y con presencia ─── */
+.section-title--hero {
+  font-size:      clamp(36px, 5vw, 64px);
+  font-weight:    800;
+  letter-spacing: -1.5px;
+  color:          var(--text-primary);
+  line-height:    1;
+  margin-bottom:  var(--sp-1);
+}
+
+.section-title--sub {
+  font-size:      clamp(14px, 2vw, 20px);
+  font-weight:    600;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color:          var(--umoh-accent);
+  line-height:    1;
+  margin-bottom:  var(--sp-3);
+}
+
+/* ── 11. Inicio — saludo más grande ─────────────────────────── */
+.inicio-saludo {
+  font-size:      clamp(32px, 4vw, 52px);
+  font-weight:    800;
+  letter-spacing: -1px;
+  line-height:    1.05;
+}
+
+/* ── 12. AI Empty state ──────────────────────────────────────── */
+.inicio-ai-empty {
+  display:         flex;
+  flex-direction:  column;
+  align-items:     center;
+  gap:             var(--sp-3);
+  padding:         var(--sp-8) var(--sp-6);
+  color:           var(--text-muted);
+  text-align:      center;
+}
+
+.inicio-ai-empty[hidden] {
+  display: none;
+}
+
+.inicio-ai-empty-text {
+  font-size:   16px;
+  font-weight: 600;
+  color:       var(--text-secondary);
+  margin:      0;
+}
+
+.inicio-ai-empty-sub {
+  font-size:   13px;
+  color:       var(--text-muted);
+  margin:      0;
+  max-width:   340px;
+}
+
+/* ── 13. MOFU: journey-insights 2 columnas ─────────────────── */
+.journey-insights-list {
+  display:               grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap:                   var(--sp-3);
+}
+
+@media (max-width: 768px) {
+  .journey-insights-list {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* ── 14. journey-insights-header: más presencia ─────────────── */
+.journey-insights-header {
+  margin-bottom: var(--sp-2);
+}
+
+.journey-insights-icon {
+  width:           32px;
+  height:          32px;
+  background:      rgba(255, 0, 64, 0.10);
+  border-radius:   var(--r-md);
+  display:         flex;
+  align-items:     center;
+  justify-content: center;
+  font-size:       18px;
+}
+
+.journey-insights-title {
+  font-size:      14px;
+  font-weight:    700;
+  color:          var(--text-primary);
+  letter-spacing: 0.02em;
+  text-transform: none;
+}
+
+/* ── 15. MOFU Segmento: igual de ancho que Customer Journey ─── */
+/* El chart-card de Segmento ahora vive en charts-grid--2col.
+   Si solo hay 1 chart-card en ese grid, ocupa la primer columna.
+   Para hacerlo del mismo ancho que el Journey (charts-grid--full),
+   se le aplica span 2 para que ocupe todo el ancho. */
+#section-mofu .charts-grid--2col > .chart-card:only-child {
+  grid-column: 1 / -1;
+  max-width:   480px; /* evitar que se estire demasiado en pantallas anchas */
+  justify-self: start;
+}
+
+/* ── 16. Tema claro: sb-theme-section ya no existe ──────────── */
+.sb-theme-section {
+  display: none;
+}
+
+/* ── 17. Icono tema en user-menu-item hereda colores del tema ── */
+.sb-user-dropdown .sb-theme-icon {
+  color: var(--text-muted);
+}
+
+/* Mostrar el icono correcto según tema */
+[data-theme="light"] .sb-user-dropdown .sb-theme-icon--sun  { display: none; }
+[data-theme="light"] .sb-user-dropdown .sb-theme-icon--moon { display: block; }
+[data-theme="dark"]  .sb-user-dropdown .sb-theme-icon--sun  { display: block; }
+[data-theme="dark"]  .sb-user-dropdown .sb-theme-icon--moon { display: none; }
+

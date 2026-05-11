@@ -961,7 +961,13 @@ function _updateJourneyInsights(el, labels, vals, total) {
 
   el.innerHTML =
     '<div class="journey-insights-header">' +
-      '<span class="journey-insights-icon">*</span>' +
+      '<span class="journey-insights-icon">' +
+        '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">' +
+          '<circle cx="12" cy="12" r="10"/>' +
+          '<line x1="12" y1="8" x2="12" y2="12"/>' +
+          '<line x1="12" y1="16" x2="12.01" y2="16"/>' +
+        '</svg>' +
+      '</span>' +
       '<span class="journey-insights-title">Insights del Journey</span>' +
     '</div>' +
     '<div class="journey-insights-list">' + cardsHTML + '</div>';
@@ -1945,21 +1951,32 @@ function renderInicio(data) {
 
   if (skeleton) skeleton.style.display = 'none';
 
-  const ai = data.ai_summary || {};
+  const ai    = data.ai_summary || {};
+  const empty = document.getElementById('inicio-ai-empty');
 
-  if (headline) headline.textContent = ai.headline || '';
+  const hasAiData = ai.headline || (Array.isArray(ai.highlights) && ai.highlights.length > 0);
 
-  if (hlList && Array.isArray(ai.highlights)) {
-    hlList.innerHTML = '';
-    ai.highlights.forEach(h => {
-      const li = document.createElement('li');
-      li.textContent = h;
-      hlList.appendChild(li);
-    });
+  if (!hasAiData) {
+    /* Mostrar placeholder cuando no hay datos de campaña */
+    if (empty)   empty.removeAttribute('hidden');
+    if (content) content.setAttribute('hidden', '');
+  } else {
+    if (empty) empty.setAttribute('hidden', '');
+
+    if (headline) headline.textContent = ai.headline || '';
+
+    if (hlList && Array.isArray(ai.highlights)) {
+      hlList.innerHTML = '';
+      ai.highlights.forEach(h => {
+        const li = document.createElement('li');
+        li.textContent = h;
+        hlList.appendChild(li);
+      });
+    }
+
+    if (rec) rec.textContent = ai.recommendation || '';
+    if (content) content.removeAttribute('hidden');
   }
-
-  if (rec) rec.textContent = ai.recommendation || '';
-  if (content) content.removeAttribute('hidden');
 
   /* ── Quick access cards ─────────────────────────────── */
   const grid = document.getElementById('inicio-quick-grid');

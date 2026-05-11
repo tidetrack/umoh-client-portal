@@ -64,8 +64,6 @@ function _activateSidebarNavItem(section) {
     item.classList.toggle('active', active);
     item.setAttribute('aria-current', active ? 'page' : 'false');
   });
-  // Sincronizar el trigger del dropdown de secciones
-  _updateSectionsTrigger(section);
 }
 
 function _activatePeriod(btn) {
@@ -170,14 +168,6 @@ function _toggleTheme() {
 /* ── User menu (sidebar) ─────────────────────────────────── */
 
 /**
- * Genera la inicial del nombre de usuario para el avatar.
- * Usa la primera letra del nombre en mayúscula.
- */
-function _getUserInitial(name) {
-  return (name || 'U').trim().charAt(0).toUpperCase();
-}
-
-/**
  * Actualiza el label del botón de tema en el sidebar
  * según el tema activo actual.
  */
@@ -191,18 +181,12 @@ function _syncThemeLabel() {
 function initUserMenu() {
   const name      = window.DASHBOARD_USERNAME || 'Usuario';
   const firstName = name.split(' ')[0];
-  const initial   = _getUserInitial(firstName);
 
   const setTextEl = (id, val) => { const el = document.getElementById(id); if (el) el.textContent = val; };
 
   // Sidebar user elements
   setTextEl('sb-user-name',     firstName);
   setTextEl('sb-user-fullname', name);
-
-  // Avatares de inicial: trigger + menú expandido + sección inicio
-  setTextEl('sb-user-initial-trigger', initial);
-  setTextEl('sb-user-initial-menu',    initial);
-  setTextEl('inicio-avatar-initial',   initial);
 
   // Sección Inicio: saludo personalizado
   setTextEl('inicio-user-name', firstName);
@@ -807,18 +791,7 @@ function initFilters() {
     });
   });
 
-  /* Histórico total — granularity buttons */
-  document.querySelectorAll('.historic-btn').forEach(btn => {
-    btn.addEventListener('click', () => {
-      document.querySelectorAll('.historic-btn').forEach(b => b.classList.remove('active'));
-      btn.classList.add('active');
-      const granularity = btn.dataset.granularity;
-      _currentGranularity = granularity;
-      _closeDatePicker();
-      _currentPeriod = 'all';
-      refreshDashboard(_currentSection, 'all', { granularity });
-    });
-  });
+  /* Histórico total — granularity buttons (eliminados del HTML; listener vacío por seguridad) */
 
   /* Apply custom date range */
   const applyBtn = document.getElementById('date-apply-btn');
@@ -828,12 +801,6 @@ function initFilters() {
   document.querySelectorAll('.sb-nav-item').forEach(item => {
     item.addEventListener('click', () => {
       const section = item.dataset.section;
-
-      // Actualizar el trigger del dropdown de secciones con el ítem activo
-      _updateSectionsTrigger(section);
-
-      // Cerrar el panel de secciones al navegar
-      _closeSectionsPanel();
 
       if (section === _currentSection) {
         _closeMobileDrawer();
@@ -860,9 +827,6 @@ function initFilters() {
 
   /* Dropdown de campañas */
   _initCampaignsDropdown();
-
-  /* Dropdown de secciones */
-  _initSectionsDropdown();
 }
 
 /* ── Dropdown de campañas — trigger expandir/colapsar ────── */
@@ -888,67 +852,6 @@ function _initCampaignsDropdown() {
       trigger.setAttribute('aria-expanded', 'false');
     }
   });
-}
-
-/* ── Dropdown de secciones — trigger expandir/colapsar ────── */
-function _initSectionsDropdown() {
-  const trigger = document.getElementById('sb-sections-trigger');
-  const panel   = document.getElementById('sb-sections-panel');
-  if (!trigger || !panel) return;
-
-  trigger.addEventListener('click', e => {
-    e.stopPropagation();
-    const isOpen = trigger.classList.contains('is-open');
-    trigger.classList.toggle('is-open', !isOpen);
-    panel.classList.toggle('is-open', !isOpen);
-    trigger.setAttribute('aria-expanded', String(!isOpen));
-  });
-
-  // Click fuera cierra el dropdown
-  document.addEventListener('click', e => {
-    const section = document.querySelector('.sb-section--nav');
-    if (section && !section.contains(e.target)) {
-      _closeSectionsPanel();
-    }
-  });
-}
-
-function _closeSectionsPanel() {
-  const trigger = document.getElementById('sb-sections-trigger');
-  const panel   = document.getElementById('sb-sections-panel');
-  if (trigger) {
-    trigger.classList.remove('is-open');
-    trigger.setAttribute('aria-expanded', 'false');
-  }
-  if (panel) panel.classList.remove('is-open');
-}
-
-/**
- * Actualiza el trigger del dropdown de secciones para reflejar la sección activa.
- * Copia el ícono SVG del nav-item seleccionado al trigger, y actualiza el nombre.
- */
-function _updateSectionsTrigger(section) {
-  const nameEl  = document.getElementById('sb-sections-active-name');
-  const iconEl  = document.getElementById('sb-sections-active-icon');
-
-  // Buscar el nav-item con data-section correspondiente
-  const navItem = document.querySelector(`.sb-nav-item[data-section="${section}"]`);
-  if (!navItem) return;
-
-  const labelEl = navItem.querySelector('.sb-label');
-  if (nameEl && labelEl) nameEl.textContent = labelEl.textContent;
-
-  // Clonar el SVG del nav-item al trigger
-  if (iconEl) {
-    const srcIcon = navItem.querySelector('.sb-nav-icon');
-    if (srcIcon) {
-      const cloned = srcIcon.cloneNode(true);
-      cloned.id = 'sb-sections-active-icon';
-      cloned.classList.remove('sb-nav-icon');
-      cloned.classList.add('sb-dt-icon', 'sb-sections-active-icon');
-      iconEl.replaceWith(cloned);
-    }
-  }
 }
 
 /**
@@ -1212,6 +1115,68 @@ function _escape(s) {
   })[c]);
 }
 
+/* ── Sidebar resize arrastrable ─────────────────────────────
+   Permite ajustar el ancho del sidebar entre 220 y 360 px.
+   El ancho se persiste en localStorage('umoh:sidebar-width').
+   En mobile (<768px) el resize no aplica. */
+function initSidebarResize() {
+  const sidebar = document.getElementById('dashboard-sidebar');
+  const handle  = document.getElementById('sb-resize-handle');
+  const content = document.getElementById('dashboard-content');
+  if (!sidebar || !handle || !content) return;
+
+  const SB_MIN   = 220;
+  const SB_MAX   = 360;
+  const SB_KEY   = 'umoh:sidebar-width';
+
+  /* Restaurar ancho guardado */
+  const saved = parseInt(localStorage.getItem(SB_KEY), 10);
+  if (saved && saved >= SB_MIN && saved <= SB_MAX) {
+    _applySidebarWidth(saved, sidebar, content);
+  }
+
+  let dragging = false;
+  let startX   = 0;
+  let startW   = 0;
+
+  handle.addEventListener('mousedown', e => {
+    if (window.innerWidth <= 768) return;
+    dragging = true;
+    startX   = e.clientX;
+    startW   = sidebar.offsetWidth;
+    handle.classList.add('dragging');
+    document.body.style.cursor    = 'col-resize';
+    document.body.style.userSelect = 'none';
+    e.preventDefault();
+  });
+
+  document.addEventListener('mousemove', e => {
+    if (!dragging) return;
+    const delta = e.clientX - startX;
+    const newW  = Math.min(SB_MAX, Math.max(SB_MIN, startW + delta));
+    _applySidebarWidth(newW, sidebar, content);
+  });
+
+  document.addEventListener('mouseup', () => {
+    if (!dragging) return;
+    dragging = false;
+    handle.classList.remove('dragging');
+    document.body.style.cursor    = '';
+    document.body.style.userSelect = '';
+    localStorage.setItem(SB_KEY, sidebar.offsetWidth);
+  });
+}
+
+function _applySidebarWidth(w, sidebar, content) {
+  const px = w + 'px';
+  sidebar.style.width = px;
+  content.style.marginLeft = px;
+  content.style.width = 'calc(100% - ' + px + ')';
+  /* Actualizar la variable CSS para que elementos como el date-picker
+     que dependen de --sb-width se posicionen correctamente */
+  document.documentElement.style.setProperty('--sb-width', px);
+}
+
 /* ── Bootstrap ──────────────────────────────────────────── */
 document.addEventListener('DOMContentLoaded', () => {
   initTheme();
@@ -1222,9 +1187,7 @@ document.addEventListener('DOMContentLoaded', () => {
   initKpiModals();
   initScrollNavBehavior();
   initCampaignSelector();
-
-  // Sincronizar el trigger de secciones con la sección activa al cargar
-  _updateSectionsTrigger(_currentSection);
+  initSidebarResize();
 
   refreshDashboard(_currentSection, _currentPeriod);
 });

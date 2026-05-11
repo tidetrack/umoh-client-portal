@@ -70,14 +70,12 @@ $_asset_v = defined('ASSET_VERSION') ? ASSET_VERSION : filemtime(__DIR__ . '/ass
   ══════════════════════════════════════════════ -->
   <aside class="dashboard-sidebar" id="dashboard-sidebar" aria-label="Panel de navegación">
 
-    <!-- A. Header del sidebar: logo SVG inline + nombre + botón colapsar -->
+    <!-- A. Header del sidebar: logo PNG asterisco UMOH + nombre + botón colapsar -->
     <div class="sb-header">
       <div class="sb-brand">
-        <!-- Logo: SVG inline del asterisco UMOH en rojo — visible igual en ambos temas -->
+        <!-- Logo: asterisco UMOH real (mitad rojo, mitad blanco) sobre fondo azul UMOH -->
         <div class="sb-brand-mark" aria-hidden="true">
-          <svg class="sb-brand-svg" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
-            <path d="M12 2 L12 22 M2 7 L22 17 M22 7 L2 17" stroke="#ffffff" stroke-width="2.8" stroke-linecap="round"/>
-          </svg>
+          <img src="assets/img/umoh-asterisk.png" alt="UMOH" class="sb-brand-img">
         </div>
         <div class="sb-brand-text sb-label">
           <span class="sb-brand-agency">umoh</span>
@@ -143,72 +141,54 @@ $_asset_v = defined('ASSET_VERSION') ? ASSET_VERSION : filemtime(__DIR__ . '/ass
         </div>
       </div>
 
-      <!-- C. Navegación de secciones — dropdown expandible -->
+      <!-- C. Navegación de secciones — lista fija siempre visible -->
       <div class="sb-section sb-section--nav">
-        <!-- Trigger del dropdown de secciones -->
-        <button class="sb-dropdown-trigger" id="sb-sections-trigger" aria-expanded="false" aria-controls="sb-sections-panel" type="button">
-          <!-- El icono activo se actualiza por JS -->
-          <svg class="sb-dt-icon sb-sections-active-icon" id="sb-sections-active-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-            <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/>
-            <polyline points="9 22 9 12 15 12 15 22"/>
-          </svg>
-          <div class="sb-dt-text sb-label">
-            <span class="sb-dt-name" id="sb-sections-active-name">Inicio</span>
-          </div>
-          <svg class="sb-dt-chevron sb-label" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-            <polyline points="6 9 12 15 18 9"/>
-          </svg>
-        </button>
-
-        <!-- Panel expandible de secciones -->
-        <div class="sb-nav-dropdown-panel" id="sb-sections-panel">
-          <nav class="sb-nav-list" role="navigation" aria-label="Secciones del dashboard">
-            <button class="sb-nav-item active" data-section="inicio" aria-current="page">
-              <svg class="sb-nav-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-                <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/>
-                <polyline points="9 22 9 12 15 12 15 22"/>
-              </svg>
-              <span class="sb-label">Inicio</span>
-              <span class="sb-tooltip" aria-hidden="true">Inicio</span>
-            </button>
-            <button class="sb-nav-item" data-section="performance" aria-current="false">
-              <svg class="sb-nav-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-                <rect x="18" y="3" width="4" height="18"/>
-                <rect x="10" y="8" width="4" height="13"/>
-                <rect x="2"  y="13" width="4" height="8"/>
-              </svg>
-              <span class="sb-label">Performance</span>
-              <span class="sb-tooltip" aria-hidden="true">Performance</span>
-            </button>
-            <button class="sb-nav-item" data-section="tofu" aria-current="false">
-              <svg class="sb-nav-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-                <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/>
-                <path d="M15.54 8.46a5 5 0 0 1 0 7.07"/>
-                <path d="M19.07 4.93a10 10 0 0 1 0 14.14"/>
-              </svg>
-              <span class="sb-label">Awareness / TOFU</span>
-              <span class="sb-tooltip" aria-hidden="true">Awareness</span>
-            </button>
-            <button class="sb-nav-item" data-section="mofu" aria-current="false">
-              <svg class="sb-nav-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-                <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/>
-                <circle cx="9" cy="7" r="4"/>
-                <path d="M23 21v-2a4 4 0 0 0-3-3.87"/>
-                <path d="M16 3.13a4 4 0 0 1 0 7.75"/>
-              </svg>
-              <span class="sb-label">Interest / MOFU</span>
-              <span class="sb-tooltip" aria-hidden="true">Interest</span>
-            </button>
-            <button class="sb-nav-item" data-section="bofu" aria-current="false">
-              <svg class="sb-nav-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-                <rect x="2" y="7" width="20" height="14" rx="2" ry="2"/>
-                <path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16"/>
-              </svg>
-              <span class="sb-label">Sales / BOFU</span>
-              <span class="sb-tooltip" aria-hidden="true">Sales</span>
-            </button>
-          </nav>
-        </div>
+        <nav class="sb-nav-list" id="sb-nav-list" role="navigation" aria-label="Secciones del dashboard">
+          <button class="sb-nav-item active" data-section="inicio" aria-current="page">
+            <svg class="sb-nav-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/>
+              <polyline points="9 22 9 12 15 12 15 22"/>
+            </svg>
+            <span class="sb-label">Inicio</span>
+            <span class="sb-tooltip" aria-hidden="true">Inicio</span>
+          </button>
+          <button class="sb-nav-item" data-section="performance" aria-current="false">
+            <svg class="sb-nav-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <rect x="18" y="3" width="4" height="18"/>
+              <rect x="10" y="8" width="4" height="13"/>
+              <rect x="2"  y="13" width="4" height="8"/>
+            </svg>
+            <span class="sb-label">Performance</span>
+            <span class="sb-tooltip" aria-hidden="true">Performance</span>
+          </button>
+          <button class="sb-nav-item" data-section="tofu" aria-current="false">
+            <svg class="sb-nav-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/>
+              <path d="M15.54 8.46a5 5 0 0 1 0 7.07"/>
+              <path d="M19.07 4.93a10 10 0 0 1 0 14.14"/>
+            </svg>
+            <span class="sb-label">I. Awareness</span>
+            <span class="sb-tooltip" aria-hidden="true">I. Awareness</span>
+          </button>
+          <button class="sb-nav-item" data-section="mofu" aria-current="false">
+            <svg class="sb-nav-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/>
+              <circle cx="9" cy="7" r="4"/>
+              <path d="M23 21v-2a4 4 0 0 0-3-3.87"/>
+              <path d="M16 3.13a4 4 0 0 1 0 7.75"/>
+            </svg>
+            <span class="sb-label">II. Interest</span>
+            <span class="sb-tooltip" aria-hidden="true">II. Interest</span>
+          </button>
+          <button class="sb-nav-item" data-section="bofu" aria-current="false">
+            <svg class="sb-nav-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <rect x="2" y="7" width="20" height="14" rx="2" ry="2"/>
+              <path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16"/>
+            </svg>
+            <span class="sb-label">III. Sales</span>
+            <span class="sb-tooltip" aria-hidden="true">III. Sales</span>
+          </button>
+        </nav>
       </div>
 
       <!-- D. Selector de período -->
@@ -241,15 +221,6 @@ $_asset_v = defined('ASSET_VERSION') ? ASSET_VERSION : filemtime(__DIR__ . '/ass
         <!-- Panel inline del date picker — se expande dentro del sidebar -->
         <div class="sb-custom-date-panel" id="sb-custom-date-panel">
           <div class="date-picker-inner">
-            <div id="historic-section" class="historic-section">
-              <span class="historic-label">Histórico total</span>
-              <div class="historic-granularity" role="group" aria-label="Granularidad del histórico">
-                <button class="historic-btn" data-granularity="dias">Días</button>
-                <button class="historic-btn" data-granularity="semanas">Semanas</button>
-                <button class="historic-btn active" data-granularity="meses">Meses</button>
-              </div>
-            </div>
-            <div class="date-picker-divider"></div>
             <div class="date-picker-row">
               <label class="date-picker-label" for="date-start">Desde</label>
               <input type="date" id="date-start" class="date-picker-input">
@@ -279,38 +250,15 @@ $_asset_v = defined('ASSET_VERSION') ? ASSET_VERSION : filemtime(__DIR__ . '/ass
 
     </div><!-- /.sb-body -->
 
-    <!-- E. Toggle de tema (arriba del perfil) -->
-    <div class="sb-theme-section" id="sb-theme-section">
-      <button class="sb-theme-row" id="sb-theme-toggle" type="button" title="Cambiar tema" aria-label="Cambiar modo claro/oscuro">
-        <!-- Icono sol (modo dark → click pone light) -->
-        <svg class="sb-theme-icon sb-theme-icon--sun" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-          <circle cx="12" cy="12" r="5"/>
-          <line x1="12" y1="1" x2="12" y2="3"/>
-          <line x1="12" y1="21" x2="12" y2="23"/>
-          <line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/>
-          <line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/>
-          <line x1="1" y1="12" x2="3" y2="12"/>
-          <line x1="21" y1="12" x2="23" y2="12"/>
-          <line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/>
-          <line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/>
-        </svg>
-        <!-- Icono luna (modo light → click pone dark) -->
-        <svg class="sb-theme-icon sb-theme-icon--moon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-          <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/>
-        </svg>
-        <span class="sb-label sb-theme-label" id="sb-theme-label">Modo oscuro</span>
-      </button>
-    </div>
-
-    <!-- F. Perfil de usuario al fondo -->
+    <!-- E. Perfil de usuario al fondo (el tema va adentro del dropdown) -->
     <div class="sb-user" id="sb-user">
       <!-- Dropdown: sale hacia arriba -->
       <div class="sb-user-dropdown" id="sb-user-dropdown" role="menu">
         <div class="user-menu-header">
           <div class="user-menu-avatar-lg">
-            <!-- Avatar inicial del usuario — JS actualiza con la letra correcta -->
-            <div class="sb-user-avatar has-initial sb-user-avatar--lg">
-              <span class="sb-user-avatar-initial" id="sb-user-initial-menu">U</span>
+            <!-- Avatar real del usuario -->
+            <div class="sb-user-avatar sb-user-avatar--lg" id="sb-user-avatar-menu">
+              <img src="assets/img/franco-avatar.png" alt="Avatar">
             </div>
           </div>
           <div>
@@ -318,6 +266,25 @@ $_asset_v = defined('ASSET_VERSION') ? ASSET_VERSION : filemtime(__DIR__ . '/ass
             <div class="user-menu-role">Administrador</div>
           </div>
         </div>
+        <div class="user-menu-divider"></div>
+        <!-- Tema dentro del dropdown -->
+        <button class="user-menu-item" id="sb-theme-toggle" type="button" role="menuitem" aria-label="Cambiar modo claro/oscuro">
+          <svg class="sb-theme-icon sb-theme-icon--sun" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <circle cx="12" cy="12" r="5"/>
+            <line x1="12" y1="1" x2="12" y2="3"/>
+            <line x1="12" y1="21" x2="12" y2="23"/>
+            <line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/>
+            <line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/>
+            <line x1="1" y1="12" x2="3" y2="12"/>
+            <line x1="21" y1="12" x2="23" y2="12"/>
+            <line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/>
+            <line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/>
+          </svg>
+          <svg class="sb-theme-icon sb-theme-icon--moon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/>
+          </svg>
+          <span id="sb-theme-label">Modo oscuro</span>
+        </button>
         <div class="user-menu-divider"></div>
         <a href="logout.php" class="user-menu-item user-menu-item--danger" role="menuitem">
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
@@ -330,9 +297,9 @@ $_asset_v = defined('ASSET_VERSION') ? ASSET_VERSION : filemtime(__DIR__ . '/ass
       </div>
       <!-- Trigger -->
       <button class="sb-user-trigger" id="sb-user-trigger" aria-haspopup="true" aria-expanded="false">
-        <!-- Avatar: círculo con inicial del usuario -->
-        <div class="sb-user-avatar has-initial" id="sb-user-avatar-trigger">
-          <span class="sb-user-avatar-initial" id="sb-user-initial-trigger">U</span>
+        <!-- Avatar: foto real del usuario -->
+        <div class="sb-user-avatar" id="sb-user-avatar">
+          <img src="assets/img/franco-avatar.png" alt="Avatar">
         </div>
         <div class="sb-user-info sb-label">
           <span class="sb-user-name" id="sb-user-name">Usuario</span>
@@ -344,6 +311,9 @@ $_asset_v = defined('ASSET_VERSION') ? ASSET_VERSION : filemtime(__DIR__ . '/ass
         </svg>
       </button>
     </div>
+
+    <!-- Resize handle — arrastrar para ajustar el ancho del sidebar -->
+    <div class="sb-resize-handle" id="sb-resize-handle" aria-hidden="true" title="Arrastrar para redimensionar"></div>
 
   </aside><!-- /#dashboard-sidebar -->
 
@@ -365,8 +335,8 @@ $_asset_v = defined('ASSET_VERSION') ? ASSET_VERSION : filemtime(__DIR__ . '/ass
       <!-- Header con saludo -->
       <div class="inicio-header">
         <div class="inicio-avatar" aria-hidden="true" id="inicio-avatar">
-          <!-- Inicial del usuario — JS actualiza con la letra correcta -->
-          <span id="inicio-avatar-initial" style="font-size:22px;font-weight:700;color:var(--umoh-accent);line-height:1;font-family:var(--font);">U</span>
+          <!-- Avatar real del usuario -->
+          <img src="assets/img/franco-avatar.png" alt="Avatar" style="width:100%;height:100%;object-fit:cover;border-radius:50%;">
         </div>
         <div class="inicio-greeting-block">
           <h1 class="inicio-saludo">Hola, <span id="inicio-user-name">Franco</span></h1>
@@ -391,6 +361,15 @@ $_asset_v = defined('ASSET_VERSION') ? ASSET_VERSION : filemtime(__DIR__ . '/ass
           <div class="sk-line sk-line--medium"></div>
           <div class="sk-line sk-line--long"></div>
           <div class="sk-line sk-line--short"></div>
+        </div>
+        <!-- Placeholder cuando no hay datos -->
+        <div id="inicio-ai-empty" class="inicio-ai-empty" hidden>
+          <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="var(--text-muted)" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <rect x="2" y="7" width="20" height="14" rx="2" ry="2"/>
+            <path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16"/>
+          </svg>
+          <p class="inicio-ai-empty-text">Sin campañas activas</p>
+          <p class="inicio-ai-empty-sub">Los datos aparecerán aquí una vez que el pipeline esté conectado.</p>
         </div>
         <!-- Contenido real (oculto hasta que carga) -->
         <div id="inicio-ai-content" hidden>
@@ -507,7 +486,8 @@ $_asset_v = defined('ASSET_VERSION') ? ASSET_VERSION : filemtime(__DIR__ . '/ass
     <section id="section-tofu" class="dashboard-section" aria-label="Awareness TOFU">
 
       <div class="section-header">
-        <h2 class="section-title">Awareness / TOFU</h2>
+        <h2 class="section-title--hero">Top of Funnel</h2>
+        <p class="section-title--sub">Awareness</p>
         <p class="section-subtitle">Impacto inicial y alcance de la marca en Google</p>
       </div>
 
@@ -634,7 +614,8 @@ $_asset_v = defined('ASSET_VERSION') ? ASSET_VERSION : filemtime(__DIR__ . '/ass
     <section id="section-mofu" class="dashboard-section" aria-label="Interest MOFU">
 
       <div class="section-header">
-        <h2 class="section-title">Interest / MOFU</h2>
+        <h2 class="section-title--hero">Middle of Funnel</h2>
+        <p class="section-title--sub">Interest</p>
         <p class="section-subtitle">Efectividad de la estrategia para filtrar y calificar interesados</p>
       </div>
 
@@ -704,7 +685,7 @@ $_asset_v = defined('ASSET_VERSION') ? ASSET_VERSION : filemtime(__DIR__ . '/ass
         </div>
       </div>
 
-      <div class="charts-grid charts-grid--donut-solo">
+      <div class="charts-grid charts-grid--2col">
         <div class="chart-card">
           <div class="chart-card-header">
             <h3 class="chart-title">Distribución por Segmento</h3>
@@ -722,7 +703,8 @@ $_asset_v = defined('ASSET_VERSION') ? ASSET_VERSION : filemtime(__DIR__ . '/ass
     <section id="section-bofu" class="dashboard-section" aria-label="Sales BOFU">
 
       <div class="section-header">
-        <h2 class="section-title">Sales / BOFU</h2>
+        <h2 class="section-title--hero">Bottom of Funnel</h2>
+        <p class="section-title--sub">Sales</p>
         <p class="section-subtitle">Resultado del trabajo conjunto entre Marketing y Ventas</p>
       </div>
 
