@@ -65,3 +65,9 @@ supabase/.temp/
 # MeisterTask — data de cliente (CSVs exports). El template JSON sí va al repo.
 Meistertask/**/*.csv
 Meistertask/*.csv
+
+# Inbox de ingesta manual — CSVs de cliente, jamás al repo
+data/inbox/**/*.csv
+data/inbox/processed/**
+!data/inbox/README.md
+!data/inbox/**/.gitkeep
