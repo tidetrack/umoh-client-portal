@@ -122,23 +122,29 @@ if ($supabase_url && $supabase_key) {
         'Content-Type: application/json',
     ];
 
-    // TOFU: impresiones y clicks agregados
-    $tofu_url = $supabase_url . '/rest/v1/tofu_ads_daily'
-        . '?select=impressions,clicks,spend,cpc'
-        . '&date=gte.' . urlencode($date_from)
-        . '&order=date.asc';
+    // Helper para fetch JSON de Supabase
+    $fetch = function (string $u) use ($headers) {
+        $ch = curl_init($u);
+        curl_setopt_array($ch, [
+            CURLOPT_RETURNTRANSFER => true,
+            CURLOPT_HTTPHEADER     => $headers,
+            CURLOPT_TIMEOUT        => 5,
+        ]);
+        $raw = curl_exec($ch);
+        curl_close($ch);
+        return is_string($raw) ? (json_decode($raw, true) ?: []) : [];
+    };
 
-    $ch = curl_init($tofu_url);
-    curl_setopt_array($ch, [
-        CURLOPT_RETURNTRANSFER => true,
-        CURLOPT_HTTPHEADER     => $headers,
-        CURLOPT_TIMEOUT        => 5,
-    ]);
-    $tofu_raw = curl_exec($ch);
-    curl_close($ch);
+    // Las tablas *_facts ya están agregadas por (client_slug, date, campaign_id)
+    // y son las que usa el script run_inicio_summary.py. Leer de aquí garantiza
+    // consistencia entre el dashboard y el resumen IA cacheado en ai_summaries.
 
-    if ($tofu_raw) {
-        $rows = json_decode($tofu_raw, true) ?: [];
+    // TOFU
+    $rows = $fetch($supabase_url . '/rest/v1/tofu_facts'
+        . '?select=impressions,clicks,spend'
+        . '&client_slug=eq.prepagas'
+        . '&date=gte.' . urlencode($date_from));
+    if (!empty($rows)) {
         $tofu_data = [
             'impressions' => array_sum(array_column($rows, 'impressions')),
             'clicks'      => array_sum(array_column($rows, 'clicks')),
@@ -149,60 +155,36 @@ if ($supabase_url && $supabase_key) {
             : 0;
     }
 
-    // MOFU: leads totales y CPL
-    $mofu_url = $supabase_url . '/rest/v1/leads'
-        . '?select=id,status,is_campaign_lead'
-        . '&created_at=gte.' . urlencode($date_from . 'T00:00:00')
-        . '&is_campaign_lead=eq.true';
-
-    $ch = curl_init($mofu_url);
-    curl_setopt_array($ch, [
-        CURLOPT_RETURNTRANSFER => true,
-        CURLOPT_HTTPHEADER     => $headers,
-        CURLOPT_TIMEOUT        => 5,
-    ]);
-    $mofu_raw = curl_exec($ch);
-    curl_close($ch);
-
-    if ($mofu_raw) {
-        $leads        = json_decode($mofu_raw, true) ?: [];
-        $total_leads  = count($leads);
-        $spend        = $tofu_data['spend'] ?? 0;
-        $mofu_data    = [
-            'total_leads'    => $total_leads,
-            'cost_per_lead'  => ($total_leads > 0 && $spend > 0) ? $spend / $total_leads : 0,
+    // MOFU
+    $rows = $fetch($supabase_url . '/rest/v1/mofu_facts'
+        . '?select=total_leads,closed_won_leads'
+        . '&client_slug=eq.prepagas'
+        . '&date=gte.' . urlencode($date_from));
+    if (!empty($rows)) {
+        $total_leads = array_sum(array_column($rows, 'total_leads'));
+        $spend       = $tofu_data['spend'] ?? 0;
+        $mofu_data   = [
+            'total_leads'   => $total_leads,
+            'cost_per_lead' => ($total_leads > 0 && $spend > 0) ? $spend / $total_leads : 0,
         ];
     }
 
-    // BOFU: ventas cerradas e ingresos
-    $bofu_url = $supabase_url . '/rest/v1/lead_monetary'
-        . '?select=precio_final,capitas'
-        . '&is_closed=eq.true'
-        . '&created_at=gte.' . urlencode($date_from . 'T00:00:00');
-
-    $ch = curl_init($bofu_url);
-    curl_setopt_array($ch, [
-        CURLOPT_RETURNTRANSFER => true,
-        CURLOPT_HTTPHEADER     => $headers,
-        CURLOPT_TIMEOUT        => 5,
-    ]);
-    $bofu_raw = curl_exec($ch);
-    curl_close($ch);
-
-    if ($bofu_raw) {
-        $sales      = json_decode($bofu_raw, true) ?: [];
-        $count      = count($sales);
-        $revenue    = array_sum(array_column($sales, 'precio_final'));
-        $bofu_data  = [
-            'closed_sales'  => $count,
-            'total_revenue' => $revenue,
-            'avg_ticket'    => $count > 0 ? $revenue / $count : 0,
-        ];
-        if (isset($mofu_data)) {
-            $bofu_data['conversion_rate'] = $mofu_data['total_leads'] > 0
+    // BOFU
+    $rows = $fetch($supabase_url . '/rest/v1/bofu_facts'
+        . '?select=sales_count,revenue,avg_ticket,conversion_rate_mes'
+        . '&client_slug=eq.prepagas'
+        . '&date=gte.' . urlencode($date_from));
+    if (!empty($rows)) {
+        $count   = array_sum(array_column($rows, 'sales_count'));
+        $revenue = array_sum(array_column($rows, 'revenue'));
+        $bofu_data = [
+            'closed_sales'    => $count,
+            'total_revenue'   => $revenue,
+            'avg_ticket'      => $count > 0 ? $revenue / $count : 0,
+            'conversion_rate' => isset($mofu_data) && $mofu_data['total_leads'] > 0
                 ? ($count / $mofu_data['total_leads']) * 100
-                : 0;
-        }
+                : 0,
+        ];
     }
 }
 
