@@ -3331,20 +3331,18 @@ body.sidebar-collapsed .dashboard-sidebar {
   overflow:    hidden;
 }
 
-/* Logo del cliente — separado del asterisco UMOH con divisor sutil */
+/* Logo del cliente — elemento principal del sidebar header (reemplaza al asterisco UMOH) */
 .sb-client-logo-wrap {
   display:         flex;
   align-items:     center;
-  padding-left:    var(--sp-2);
-  border-left:     1px solid var(--border-subtle);
-  height:          24px;
+  height:          32px;
   flex-shrink:     0;
 }
 
 .sb-client-logo {
-  height:      24px;
+  height:      32px;
   width:       auto;
-  max-width:   80px;
+  max-width:   120px;
   object-fit:  contain;
   display:     block;
 }
@@ -3438,12 +3436,13 @@ body.sidebar-collapsed .sb-collapse-btn svg {
 /* ── Sidebar scrollable body ─────────────────────────────────── */
 .sb-body {
   flex:            1;
-  overflow-y:      auto;
-  overflow-x:      hidden;
-  display:         flex;
-  flex-direction:  column;
-  scrollbar-width: thin;
-  scrollbar-color: var(--border-subtle) transparent;
+  overflow-y:          auto;
+  overflow-x:          hidden;
+  display:             flex;
+  flex-direction:      column;
+  scrollbar-width:     thin;
+  scrollbar-color:     var(--border-subtle) transparent;
+  overscroll-behavior: contain;
 }
 
 .sb-body::-webkit-scrollbar { width: 4px; }
@@ -3933,11 +3932,11 @@ body.sidebar-collapsed .dashboard-content {
 .sb-hamburger {
   display:         none;
   position:        fixed;
-  top:             14px;
-  left:            14px;
+  top:             12px;
+  left:            12px;
   z-index:         200;
-  width:           40px;
-  height:          40px;
+  width:           44px;   /* Apple HIG mínimo táctil */
+  height:          44px;
   border-radius:   var(--r-md);
   background:      var(--umoh-primary);
   border:          none;
@@ -3946,7 +3945,7 @@ body.sidebar-collapsed .dashboard-content {
   align-items:     center;
   justify-content: center;
   box-shadow:      var(--shadow-md);
-  transition:      background 0.15s;
+  transition:      background 0.15s, opacity 0.2s;
 }
 
 .sb-hamburger:hover {
@@ -3963,42 +3962,63 @@ body.sidebar-collapsed .dashboard-content {
     display: flex;
   }
 
+  /* Drawer: off-screen a la izquierda por defecto.
+     Solo se anima transform — ancho es fijo, no hay width transition en mobile. */
   .dashboard-sidebar {
     transform:  translateX(-100%);
-    transition: transform 0.25s ease, width 0.25s ease;
+    transition: transform 0.22s cubic-bezier(0.25, 0.46, 0.45, 0.94);
     width:      var(--sb-width);
     box-shadow: none;
+    /* Scroll del body del sidebar no se propaga al documento */
+    overscroll-behavior: contain;
   }
 
-  /* Sidebar abierto en mobile */
+  /* Sidebar abierto: slide-in con sombra pronunciada */
   body.sidebar-mobile-open .dashboard-sidebar {
     transform:  translateX(0);
-    box-shadow: 4px 0 24px rgba(0,0,0,0.25);
+    box-shadow: 6px 0 32px rgba(0,0,0,0.3);
   }
 
-  /* Hamburger: ocultar cuando el drawer está abierto */
+  /* Hamburger: se oculta cuando el drawer está abierto */
   body.sidebar-mobile-open .sb-hamburger {
-    display: none;
+    opacity:        0;
+    pointer-events: none;
   }
 
-  /* Botón colapsar: ocultar en mobile (el drawer no se "minimiza") */
+  /* Botón colapsar: no aplica en mobile — el drawer no se minimiza */
   .sb-collapse-btn {
     display: none;
   }
 
-  /* Overlay detrás del drawer */
+  /* Overlay detrás del drawer: blur para aislar el sidebar del contenido */
   body.sidebar-mobile-open::before {
-    content:    '';
-    position:   fixed;
-    inset:      0;
-    background: rgba(0,0,0,0.4);
-    z-index:    99;
+    content:         '';
+    position:        fixed;
+    inset:           0;
+    background:      rgba(0,0,0,0.5);
+    backdrop-filter: blur(3px);
+    -webkit-backdrop-filter: blur(3px);
+    z-index:         99;
+    /* Fade suave con la misma duración que el slide */
+    animation: overlayIn 0.22s ease forwards;
   }
 
+  /* Items de nav en mobile: touch targets mínimos 48px */
+  .sb-nav-item {
+    min-height:  48px;
+    font-size:   15px;
+  }
+
+  /* Labels de nav: tamaño algo mayor en mobile para legibilidad táctil */
+  .sb-nav-item .sb-label {
+    font-size: 15px;
+  }
+
+  /* Contenido principal */
   .dashboard-content {
     margin-left: 0;
     width:       100%;
-    padding-top: 56px; /* espacio para el hamburger */
+    padding-top: 64px; /* hamburger (44px) + margen cómodo */
   }
 
   body.sidebar-collapsed .dashboard-content {
@@ -4006,17 +4026,13 @@ body.sidebar-collapsed .dashboard-content {
     width:       100%;
   }
 
-  /* Collapsed en mobile no aplica (solo el drawer aplica) */
+  /* Collapsed en mobile no aplica — el drawer es siempre full-width */
   body.sidebar-collapsed .dashboard-sidebar {
     width: var(--sb-width);
   }
 
-  /* Logo del cliente: oculto en mobile hasta que el drawer esté abierto */
+  /* Logo del cliente: siempre visible dentro del drawer (es el único logo de marca) */
   .sb-client-logo-wrap {
-    display: none;
-  }
-
-  body.sidebar-mobile-open .sb-client-logo-wrap {
     display: flex;
   }
 }
@@ -5190,4 +5206,129 @@ body.sidebar-layout .theme-toggle-switch {
 [data-theme="light"] .sb-user-dropdown .sb-theme-icon--moon { display: block; }
 [data-theme="dark"]  .sb-user-dropdown .sb-theme-icon--sun  { display: block; }
 [data-theme="dark"]  .sb-user-dropdown .sb-theme-icon--moon { display: none; }
+
+/* ── Modal: Regenerar análisis ──────────────────────────────── */
+.regen-modal-overlay {
+  position:   fixed;
+  inset:      0;
+  background: rgba(0,0,0,0.45);
+  backdrop-filter: blur(4px);
+  z-index:    500;
+  display:    flex;
+  align-items: center;
+  justify-content: center;
+  padding:    var(--sp-4);
+}
+
+.regen-modal-overlay[hidden] {
+  display: none;
+}
+
+.regen-modal {
+  background:    var(--bg-card);
+  border:        1px solid var(--border-subtle);
+  border-radius: var(--r-lg);
+  box-shadow:    var(--shadow-lg);
+  padding:       var(--sp-6);
+  width:         100%;
+  max-width:     520px;
+}
+
+.regen-modal-header {
+  display:         flex;
+  align-items:     center;
+  justify-content: space-between;
+  margin-bottom:   var(--sp-4);
+}
+
+.regen-modal-title {
+  font-size:   16px;
+  font-weight: 600;
+  color:       var(--text-primary);
+  margin:      0;
+}
+
+.regen-modal-close {
+  background:    transparent;
+  border:        none;
+  color:         var(--text-muted);
+  cursor:        pointer;
+  padding:       var(--sp-1);
+  border-radius: var(--r-sm);
+  display:       flex;
+  align-items:   center;
+  transition:    color 0.15s;
+}
+
+.regen-modal-close:hover {
+  color: var(--text-primary);
+}
+
+.regen-modal-body {
+  font-size:     14px;
+  color:         var(--text-secondary);
+  line-height:   1.55;
+  margin:        0 0 var(--sp-4);
+}
+
+.regen-modal-cmd-wrap {
+  display:       flex;
+  align-items:   center;
+  gap:           var(--sp-2);
+  background:    var(--bg-base);
+  border:        1px solid var(--border-subtle);
+  border-radius: var(--r-md);
+  padding:       var(--sp-3) var(--sp-4);
+  margin-bottom: var(--sp-3);
+}
+
+.regen-modal-cmd {
+  flex:          1;
+  font-family:   'Courier New', Courier, monospace;
+  font-size:     12px;
+  color:         var(--text-primary);
+  word-break:    break-all;
+  user-select:   all;
+}
+
+.regen-modal-copy {
+  background:    var(--umoh-primary);
+  border:        none;
+  border-radius: var(--r-sm);
+  color:         #fff;
+  cursor:        pointer;
+  font-size:     12px;
+  font-weight:   600;
+  padding:       6px 12px;
+  display:       flex;
+  align-items:   center;
+  gap:           var(--sp-1);
+  flex-shrink:   0;
+  transition:    background 0.15s;
+  white-space:   nowrap;
+}
+
+.regen-modal-copy:hover {
+  background: var(--umoh-dark);
+}
+
+.regen-modal-note {
+  font-size:  12px;
+  color:      var(--text-muted);
+  margin:     0;
+}
+
+@media (max-width: 480px) {
+  .regen-modal {
+    padding: var(--sp-4);
+  }
+  .regen-modal-cmd-wrap {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+  .regen-modal-copy {
+    width: 100%;
+    justify-content: center;
+  }
+}
 

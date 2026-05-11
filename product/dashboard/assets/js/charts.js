@@ -1992,21 +1992,17 @@ function renderInicio(data) {
   }
 
   /* ── Botón Regenerar análisis ────────────────────────── */
+  // El resumen lo genera el script local `scripts/run_inicio_summary.py`.
+  // El botón abre un modal con el comando exacto para copiar y pegar en terminal.
+  // Una vez corrido el script, el próximo load del dashboard levanta el cache de Supabase.
   const refreshBtn = document.getElementById('inicio-ai-refresh-btn');
   if (refreshBtn) {
     // Evitar duplicar el listener si renderInicio se llama más de una vez
     if (!refreshBtn._umohRefreshBound) {
       refreshBtn._umohRefreshBound = true;
-      refreshBtn.addEventListener('click', async () => {
-        refreshBtn.classList.add('loading');
-        refreshBtn.disabled = true;
-        // Re-fetch del endpoint inicio — regenera el resumen heurístico
-        try {
-          const data = await fetchData('inicio', { period: _currentPeriod || '30d' });
-          renderInicio(data);
-        } finally {
-          refreshBtn.classList.remove('loading');
-          refreshBtn.disabled = false;
+      refreshBtn.addEventListener('click', () => {
+        if (typeof window._openRegenModal === 'function') {
+          window._openRegenModal(_currentPeriod || '30d');
         }
       });
     }
@@ -2046,6 +2042,11 @@ function renderInicio(data) {
   SECTIONS.forEach(sec => {
     const kpi    = kpis[sec.key] || {};
     const delta  = kpi.delta_pct || 0;
+
+    // Mostrar '—' si el valor es nulo, vacío, cero literal o cero formateado
+    const _isZeroish = v => !v || v === '0' || v === '$0' || v === '0k' || v === '$0k' || v === '0.0x' || v === '—';
+    const displayValue = _isZeroish(kpi.value) ? '—' : kpi.value;
+
     const deltaClass = delta > 0 ? 'inicio-quick-delta--good'
                      : delta < 0 ? 'inicio-quick-delta--bad'
                      : 'inicio-quick-delta--flat';
@@ -2064,7 +2065,7 @@ function renderInicio(data) {
       <span class="inicio-quick-section-name">${sec.label}</span>
       <div>
         <div class="inicio-quick-kpi-label">${kpi.label || '—'}</div>
-        <div class="inicio-quick-kpi-value">${kpi.value || '—'}</div>
+        <div class="inicio-quick-kpi-value">${displayValue}</div>
       </div>
       <span class="inicio-quick-delta ${deltaClass}">${deltaText}</span>
     `;

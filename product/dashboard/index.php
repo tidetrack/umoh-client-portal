@@ -29,7 +29,10 @@ $_asset_v = defined('ASSET_VERSION') ? ASSET_VERSION : filemtime(__DIR__ . '/ass
   <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet">
 
   <!-- Material Symbols Outlined — íconos de secciones del sidebar -->
-  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200&icon_names=settings,bar_chart_4_bars,visibility,psychology_alt,add_shopping_cart" />
+  <!-- Nota: se carga la familia completa sin restricción de icon_names.
+       El parámetro icon_names combinado con axes (opsz,wght,FILL,GRAD) causa
+       que Google Fonts devuelva CSS vacío. La familia completa pesa ~35 KB gzip. -->
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined" />
 
   <!-- Leaflet CSS -->
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.css" crossorigin="">
@@ -76,12 +79,9 @@ $_asset_v = defined('ASSET_VERSION') ? ASSET_VERSION : filemtime(__DIR__ . '/ass
     <!-- A. Header del sidebar: logo PNG asterisco UMOH + nombre + botón colapsar -->
     <div class="sb-header">
       <div class="sb-brand">
-        <!-- Logo UMOH (asterisco) + logo del cliente -->
-        <!-- TODO Fase 4 multi-cliente: resolver client-logo.webp dinámicamente via CLIENT_SLUG -->
-        <div class="sb-brand-mark" aria-hidden="true">
-          <img src="assets/img/umoh-asterisk-dark.png"  alt="UMOH" class="sb-brand-img avatar-light">
-          <img src="assets/img/umoh-asterisk-light.png" alt="UMOH" class="sb-brand-img avatar-dark">
-        </div>
+        <!-- Logo del cliente — ocupa el lugar del asterisco UMOH en el header del sidebar.
+             El asterisco UMOH se mantiene disponible para uso en login/loading screens.
+             TODO Fase 4 multi-cliente: resolver client-logo.webp dinámicamente via CLIENT_SLUG -->
         <div class="sb-client-logo-wrap" aria-hidden="true">
           <img src="assets/img/client-logo.webp" alt="Logo cliente" class="sb-client-logo">
         </div>
@@ -375,9 +375,29 @@ $_asset_v = defined('ASSET_VERSION') ? ASSET_VERSION : filemtime(__DIR__ . '/ass
         </div>
       </div>
 
-      <!-- Cards de acceso rápido -->
+      <!-- Cards de acceso rápido (generadas dinámicamente por renderInicio) -->
+      <!-- Los 4 skeletons iniciales dan feedback visual mientras carga el endpoint -->
       <div class="inicio-quick-grid" id="inicio-quick-grid">
-        <!-- Generadas dinámicamente por renderInicio() -->
+        <div class="inicio-quick-card iq-skeleton" aria-hidden="true">
+          <div class="inicio-quick-icon"></div>
+          <span class="inicio-quick-section-name iq-sk-label"></span>
+          <div><div class="iq-sk-val"></div><div class="iq-sk-label"></div></div>
+        </div>
+        <div class="inicio-quick-card iq-skeleton" aria-hidden="true">
+          <div class="inicio-quick-icon"></div>
+          <span class="inicio-quick-section-name iq-sk-label"></span>
+          <div><div class="iq-sk-val"></div><div class="iq-sk-label"></div></div>
+        </div>
+        <div class="inicio-quick-card iq-skeleton" aria-hidden="true">
+          <div class="inicio-quick-icon"></div>
+          <span class="inicio-quick-section-name iq-sk-label"></span>
+          <div><div class="iq-sk-val"></div><div class="iq-sk-label"></div></div>
+        </div>
+        <div class="inicio-quick-card iq-skeleton" aria-hidden="true">
+          <div class="inicio-quick-icon"></div>
+          <span class="inicio-quick-section-name iq-sk-label"></span>
+          <div><div class="iq-sk-val"></div><div class="iq-sk-label"></div></div>
+        </div>
       </div>
 
     </section>
@@ -993,6 +1013,82 @@ $_asset_v = defined('ASSET_VERSION') ? ASSET_VERSION : filemtime(__DIR__ . '/ass
     document.addEventListener('keydown', function(e) {
       if (e.key === 'Escape' && overlay && !overlay.hasAttribute('hidden')) closeLead();
     });
+  })();
+  </script>
+
+  <!-- ══════════════════════════════════════════════
+       MODAL: Comando CLI para regenerar el análisis de Inicio
+       Se activa desde el botón "Regenerar" en la sección Inicio.
+  ══════════════════════════════════════════════ -->
+  <div id="regen-modal-overlay" class="regen-modal-overlay" hidden role="dialog" aria-modal="true" aria-labelledby="regen-modal-title">
+    <div class="regen-modal">
+      <div class="regen-modal-header">
+        <h3 class="regen-modal-title" id="regen-modal-title">Regenerar análisis</h3>
+        <button class="regen-modal-close" id="regen-modal-close" aria-label="Cerrar">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
+          </svg>
+        </button>
+      </div>
+      <p class="regen-modal-body">Corré este comando en tu terminal local para generar un resumen fresco. Una vez ejecutado, recargá el dashboard para ver el análisis actualizado.</p>
+      <div class="regen-modal-cmd-wrap">
+        <code class="regen-modal-cmd" id="regen-modal-cmd">python scripts/run_inicio_summary.py --client-slug prepagas --period 30d</code>
+        <button class="regen-modal-copy" id="regen-modal-copy" type="button" aria-label="Copiar comando">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <rect x="9" y="9" width="13" height="13" rx="2" ry="2"/>
+            <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/>
+          </svg>
+          Copiar
+        </button>
+      </div>
+      <p class="regen-modal-note">El período del comando se actualiza según el selector activo.</p>
+    </div>
+  </div>
+
+  <script>
+  (function () {
+    const overlay   = document.getElementById('regen-modal-overlay');
+    const closeBtn  = document.getElementById('regen-modal-close');
+    const copyBtn   = document.getElementById('regen-modal-copy');
+    const cmdEl     = document.getElementById('regen-modal-cmd');
+
+    function openRegenModal(period) {
+      if (!overlay || !cmdEl) return;
+      const slug = 'prepagas';
+      cmdEl.textContent = `python scripts/run_inicio_summary.py --client-slug ${slug} --period ${period}`;
+      overlay.removeAttribute('hidden');
+      document.body.style.overflow = 'hidden';
+    }
+
+    function closeRegenModal() {
+      if (!overlay) return;
+      overlay.setAttribute('hidden', '');
+      document.body.style.overflow = '';
+    }
+
+    if (closeBtn) closeBtn.addEventListener('click', closeRegenModal);
+    if (overlay) {
+      overlay.addEventListener('click', function (e) {
+        if (e.target === overlay) closeRegenModal();
+      });
+    }
+    document.addEventListener('keydown', function (e) {
+      if (e.key === 'Escape' && overlay && !overlay.hasAttribute('hidden')) closeRegenModal();
+    });
+
+    if (copyBtn && cmdEl) {
+      copyBtn.addEventListener('click', function () {
+        navigator.clipboard.writeText(cmdEl.textContent).then(() => {
+          copyBtn.textContent = 'Copiado';
+          setTimeout(() => {
+            copyBtn.innerHTML = `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg> Copiar`;
+          }, 2000);
+        });
+      });
+    }
+
+    // Exponer openRegenModal al scope global para que charts.js lo llame
+    window._openRegenModal = openRegenModal;
   })();
   </script>
 
