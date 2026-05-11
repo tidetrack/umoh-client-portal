@@ -73,9 +73,10 @@ $_asset_v = defined('ASSET_VERSION') ? ASSET_VERSION : filemtime(__DIR__ . '/ass
     <!-- A. Header del sidebar: logo PNG asterisco UMOH + nombre + botón colapsar -->
     <div class="sb-header">
       <div class="sb-brand">
-        <!-- Logo: asterisco UMOH real (mitad rojo, mitad blanco) sobre fondo azul UMOH -->
+        <!-- Logo: asterisco UMOH — imagen distinta por tema (claro/oscuro) -->
         <div class="sb-brand-mark" aria-hidden="true">
-          <img src="assets/img/umoh-asterisk.png" alt="UMOH" class="sb-brand-img">
+          <img src="assets/img/umoh-asterisk-dark.png"  alt="UMOH" class="sb-brand-img avatar-light">
+          <img src="assets/img/umoh-asterisk-light.png" alt="UMOH" class="sb-brand-img avatar-dark">
         </div>
         <div class="sb-brand-text sb-label">
           <span class="sb-brand-agency">umoh</span>
@@ -193,7 +194,10 @@ $_asset_v = defined('ASSET_VERSION') ? ASSET_VERSION : filemtime(__DIR__ . '/ass
 
       <!-- D. Selector de período -->
       <div class="sb-period-wrap" id="sb-period-wrap">
-        <span class="sb-period-label">Período</span>
+        <div class="sb-period-header">
+          <span class="sb-period-label">Período</span>
+          <span class="sb-period-range" id="sb-period-range" aria-live="polite"></span>
+        </div>
         <div class="sb-period-selector" role="group" aria-label="Selector de período">
           <button class="sb-period-btn" data-period="7d">
             <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
@@ -268,25 +272,6 @@ $_asset_v = defined('ASSET_VERSION') ? ASSET_VERSION : filemtime(__DIR__ . '/ass
             <div class="user-menu-role">Administrador</div>
           </div>
         </div>
-        <div class="user-menu-divider"></div>
-        <!-- Tema dentro del dropdown -->
-        <button class="user-menu-item" id="sb-theme-toggle" type="button" role="menuitem" aria-label="Cambiar modo claro/oscuro">
-          <svg class="sb-theme-icon sb-theme-icon--sun" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-            <circle cx="12" cy="12" r="5"/>
-            <line x1="12" y1="1" x2="12" y2="3"/>
-            <line x1="12" y1="21" x2="12" y2="23"/>
-            <line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/>
-            <line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/>
-            <line x1="1" y1="12" x2="3" y2="12"/>
-            <line x1="21" y1="12" x2="23" y2="12"/>
-            <line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/>
-            <line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/>
-          </svg>
-          <svg class="sb-theme-icon sb-theme-icon--moon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-            <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/>
-          </svg>
-          <span id="sb-theme-label">Modo oscuro</span>
-        </button>
         <div class="user-menu-divider"></div>
         <a href="logout.php" class="user-menu-item user-menu-item--danger" role="menuitem">
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">

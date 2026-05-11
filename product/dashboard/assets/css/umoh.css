@@ -3670,6 +3670,30 @@ body.sidebar-collapsed .sb-nav-item:hover .sb-tooltip {
   white-space:     nowrap;
 }
 
+/* Header del selector: label "PERÍODO" a la izquierda, rango de fechas a la derecha */
+.sb-period-header {
+  display:         flex;
+  align-items:     baseline;
+  justify-content: space-between;
+  gap:             var(--sp-2);
+  padding:         0 var(--sp-2) var(--sp-2);
+}
+.sb-period-header .sb-period-label {
+  padding:         0;
+}
+.sb-period-range {
+  font-size:       10.5px;
+  font-weight:     500;
+  color:           var(--text-muted);
+  white-space:     nowrap;
+  letter-spacing:  0.01em;
+  font-variant-numeric: tabular-nums;
+}
+body.sidebar-collapsed .sb-period-header,
+body.sidebar-collapsed .sb-period-range {
+  display: none;
+}
+
 /* Los period-btn en sidebar se apilan verticalmente */
 .sb-period-selector {
   display:        flex;
@@ -4689,9 +4713,14 @@ body.sidebar-layout .dashboard-nav {
   position: relative;
 }
 
-/* ── Ocultar el theme-toggle flotante cuando hay sidebar ────── */
+/* ── Theme toggle: esquina superior derecha, sobre el content ── */
+/* En sidebar layout el toggle sigue flotando fixed, visible siempre */
 body.sidebar-layout .theme-toggle-switch {
-  display: none;
+  display: block;
+  position: fixed;
+  top:   16px;
+  right: 20px;
+  z-index: 150;
 }
 
 /* ══════════════════════════════════════════════════════════════
@@ -4706,13 +4735,20 @@ body.sidebar-layout .theme-toggle-switch {
   height:     34px;
 }
 
-.sb-brand-img {
+/* Override: las .sb-brand-img con clase avatar-light/dark usan el switch de tema */
+.sb-brand-mark .sb-brand-img {
   width:      100%;
   height:     100%;
   object-fit: contain;
-  display:    block;
-  filter:     none; /* la imagen ya tiene sus colores correctos */
+  filter:     none;
 }
+
+/* Switch light/dark del brand-mark — mismo patrón que el avatar de usuario */
+.sb-brand-mark .avatar-light { display: block; }
+.sb-brand-mark .avatar-dark  { display: none;  }
+
+[data-theme="dark"] .sb-brand-mark .avatar-light { display: none;  }
+[data-theme="dark"] .sb-brand-mark .avatar-dark  { display: block; }
 
 /* Ocultar SVG inline que ya no se usa */
 .sb-brand-svg {
@@ -4746,11 +4782,32 @@ body.sidebar-layout .theme-toggle-switch {
 
 /* ── Admin avatar: variantes por tema ───────────────────────── */
 /* Mismo patrón que .sb-theme-icon--sun / --moon               */
+/* Especificidad explícita: sobreescribe .sb-user-avatar img { display:block } */
 .avatar-light { display: block; }
 .avatar-dark  { display: none;  }
 
 [data-theme="dark"] .avatar-light { display: none;  }
 [data-theme="dark"] .avatar-dark  { display: block; }
+
+/* Fix: .sb-user-avatar img { display:block } pisaba .avatar-dark { display:none }
+   Estos selectores tienen mayor especificidad para ganar en ambos temas */
+.sb-user-avatar .avatar-dark,
+.sb-user-avatar--lg .avatar-dark,
+.inicio-avatar .avatar-dark {
+  display: none;
+}
+
+[data-theme="dark"] .sb-user-avatar .avatar-dark,
+[data-theme="dark"] .sb-user-avatar--lg .avatar-dark,
+[data-theme="dark"] .inicio-avatar .avatar-dark {
+  display: block;
+}
+
+[data-theme="dark"] .sb-user-avatar .avatar-light,
+[data-theme="dark"] .sb-user-avatar--lg .avatar-light,
+[data-theme="dark"] .inicio-avatar .avatar-light {
+  display: none;
+}
 
 /* Asegura que ambas imágenes usen las mismas dimensiones */
 .sb-user-avatar .avatar-light,

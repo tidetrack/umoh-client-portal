@@ -141,6 +141,7 @@ function _applyCustomRange() {
 
   _closeDatePicker();
   _currentPeriod = 'custom';
+  _updatePeriodRange('custom');
   // Pasa la granularity activa para que build_trend la respete en el backend
   refreshDashboard(_currentSection, 'custom', {
     start: startInput.value,
@@ -787,6 +788,7 @@ function initFilters() {
       _activatePeriod(btn);
       _currentPeriod = period;
       _updateInicioSubtitle(period);
+      _updatePeriodRange(period);
       refreshDashboard(_currentSection, _currentPeriod);
     });
   });
@@ -906,6 +908,42 @@ function _updateInicioSubtitle(period) {
   el.textContent = labels[period] || labels['30d'];
 }
 
+/* Calcula el rango de fechas (inclusive) cubierto por el período activo
+   y lo muestra al lado del label "Período" en el sidebar. */
+const _MESES_ES = ['ene','feb','mar','abr','may','jun','jul','ago','sep','oct','nov','dic'];
+function _fmtFechaCorta(d) {
+  return d.getDate() + ' ' + _MESES_ES[d.getMonth()];
+}
+function _fmtFechaCortaConYear(d) {
+  return d.getDate() + ' ' + _MESES_ES[d.getMonth()] + ' ' + d.getFullYear();
+}
+function _updatePeriodRange(period) {
+  const el = document.getElementById('sb-period-range');
+  if (!el) return;
+  const hoy = new Date();
+  let desde, hasta;
+  if (period === 'custom') {
+    const s = document.getElementById('date-start');
+    const e = document.getElementById('date-end');
+    if (s && e && s.value && e.value) {
+      desde = new Date(s.value + 'T00:00:00');
+      hasta = new Date(e.value + 'T00:00:00');
+    } else {
+      el.textContent = '';
+      return;
+    }
+  } else {
+    const dias = parseInt(String(period).replace('d',''), 10) || 30;
+    hasta = hoy;
+    desde = new Date(hoy);
+    desde.setDate(hoy.getDate() - (dias - 1));
+  }
+  const sameYear = desde.getFullYear() === hasta.getFullYear();
+  el.textContent = sameYear
+    ? _fmtFechaCorta(desde) + ' – ' + _fmtFechaCortaConYear(hasta)
+    : _fmtFechaCortaConYear(desde) + ' – ' + _fmtFechaCortaConYear(hasta);
+}
+
 /* ── FAB scroll-to-top ──────────────────────────────────────
    En layout de sidebar, el nav-bar ya no existe — el FAB solo
    actúa como scroll-to-top. Aparece al superar el umbral. */
@@ -955,6 +993,28 @@ function initSidebar() {
       const isCollapsed = document.body.classList.toggle('sidebar-collapsed');
       localStorage.setItem('umoh:sidebar', isCollapsed ? 'collapsed' : 'expanded');
       _syncCollapseBtn();
+
+      // Al colapsar: limpiar los inline styles del resize para que las reglas
+      // CSS de .sidebar-collapsed tomen el control sin interferencia.
+      // Al expandir: restaurar el ancho guardado por el resize (si existe).
+      const sidebar = document.getElementById('dashboard-sidebar');
+      const content = document.getElementById('dashboard-content');
+      if (isCollapsed) {
+        if (sidebar) sidebar.style.width = '';
+        if (content) {
+          content.style.marginLeft = '';
+          content.style.width      = '';
+        }
+        document.documentElement.style.removeProperty('--sb-width');
+      } else {
+        // Expandido: restaurar el ancho de resize si hay uno guardado
+        const savedW = parseInt(localStorage.getItem('umoh:sidebar-width'), 10);
+        if (sidebar && content && savedW && savedW >= 220 && savedW <= 360) {
+          _applySidebarWidth(savedW, sidebar, content);
+        }
+      }
+      // Sincronizar visibilidad del handle de resize
+      _syncResizeHandle();
     });
   }
 
@@ -989,6 +1049,17 @@ function _syncCollapseBtn() {
   const isCollapsed = document.body.classList.contains('sidebar-collapsed');
   btn.setAttribute('aria-label', isCollapsed ? 'Expandir sidebar' : 'Colapsar sidebar');
   btn.setAttribute('title',      isCollapsed ? 'Expandir'         : 'Colapsar');
+}
+
+/**
+ * Oculta/muestra el resize handle según el estado colapsado del sidebar.
+ * El handle no debe ser interactuable cuando el sidebar está colapsado.
+ */
+function _syncResizeHandle() {
+  const handle = document.getElementById('sb-resize-handle');
+  if (!handle) return;
+  const isCollapsed = document.body.classList.contains('sidebar-collapsed');
+  handle.style.display = isCollapsed ? 'none' : '';
 }
 
 function _closeMobileDrawer() {
@@ -1118,7 +1189,8 @@ function _escape(s) {
 /* ── Sidebar resize arrastrable ─────────────────────────────
    Permite ajustar el ancho del sidebar entre 220 y 360 px.
    El ancho se persiste en localStorage('umoh:sidebar-width').
-   En mobile (<768px) el resize no aplica. */
+   En mobile (<768px) el resize no aplica.
+   El resize NO se aplica cuando el sidebar está colapsado. */
 function initSidebarResize() {
   const sidebar = document.getElementById('dashboard-sidebar');
   const handle  = document.getElementById('sb-resize-handle');
@@ -1129,10 +1201,15 @@ function initSidebarResize() {
   const SB_MAX   = 360;
   const SB_KEY   = 'umoh:sidebar-width';
 
-  /* Restaurar ancho guardado */
+  /* Sincronizar handle: ocultarlo si sidebar empieza colapsado */
+  _syncResizeHandle();
+
+  /* Restaurar ancho guardado — solo si el sidebar NO está colapsado */
   const saved = parseInt(localStorage.getItem(SB_KEY), 10);
   if (saved && saved >= SB_MIN && saved <= SB_MAX) {
-    _applySidebarWidth(saved, sidebar, content);
+    if (!document.body.classList.contains('sidebar-collapsed')) {
+      _applySidebarWidth(saved, sidebar, content);
+    }
   }
 
   let dragging = false;
@@ -1141,11 +1218,13 @@ function initSidebarResize() {
 
   handle.addEventListener('mousedown', e => {
     if (window.innerWidth <= 768) return;
+    /* No iniciar resize si el sidebar está colapsado */
+    if (document.body.classList.contains('sidebar-collapsed')) return;
     dragging = true;
     startX   = e.clientX;
     startW   = sidebar.offsetWidth;
     handle.classList.add('dragging');
-    document.body.style.cursor    = 'col-resize';
+    document.body.style.cursor     = 'col-resize';
     document.body.style.userSelect = 'none';
     e.preventDefault();
   });
@@ -1161,7 +1240,7 @@ function initSidebarResize() {
     if (!dragging) return;
     dragging = false;
     handle.classList.remove('dragging');
-    document.body.style.cursor    = '';
+    document.body.style.cursor     = '';
     document.body.style.userSelect = '';
     localStorage.setItem(SB_KEY, sidebar.offsetWidth);
   });
@@ -1188,6 +1267,7 @@ document.addEventListener('DOMContentLoaded', () => {
   initScrollNavBehavior();
   initCampaignSelector();
   initSidebarResize();
+  _updatePeriodRange(_currentPeriod);
 
   refreshDashboard(_currentSection, _currentPeriod);
 });
