@@ -71,33 +71,42 @@ function _destroyChart(id) {
   if (_charts[id]) { _charts[id].destroy(); delete _charts[id]; }
 }
 
-/* ── Línea de tendencia (regresión lineal simple) ─────────
-   Calcula y = a + bx para la serie y devuelve un array con
-   los valores de la recta de tendencia, mismo largo que el input.
-   Usar como segundo dataset (type: 'line') en bar charts. */
-function _trendLineData(values) {
-  const n = values.length;
-  if (n < 2) return values.slice();
-  const xs = values.map((_, i) => i);
-  const sumX = xs.reduce((a, b) => a + b, 0);
-  const sumY = values.reduce((a, b) => a + Number(b || 0), 0);
-  const sumXY = xs.reduce((s, x, i) => s + x * Number(values[i] || 0), 0);
-  const sumX2 = xs.reduce((s, x) => s + x * x, 0);
-  const meanX = sumX / n;
-  const meanY = sumY / n;
-  const denom = sumX2 - n * meanX * meanX;
-  const slope = denom === 0 ? 0 : (sumXY - n * meanX * meanY) / denom;
-  const intercept = meanY - slope * meanX;
-  return xs.map(x => intercept + slope * x);
+/* ── Media móvil (moving average) ────────────────────────
+   Reemplaza la regresión lineal por una media móvil centrada.
+   La ventana se elige automáticamente según la cantidad de puntos:
+   - ≤ 7 puntos  → ventana 3
+   - ≤ 30 puntos → ventana 7
+   - > 30 puntos → ventana 14
+   Los extremos donde no hay suficientes vecinos usan una ventana
+   parcial (promedio de los puntos disponibles), así la línea
+   siempre cubre todos los datos sin valores nulos. */
+function _movingAverage(values, window) {
+  const n    = values.length;
+  const half = Math.floor(window / 2);
+  return values.map(function(_, i) {
+    const from = Math.max(0, i - half);
+    const to   = Math.min(n - 1, i + half);
+    const slice = values.slice(from, to + 1);
+    const sum   = slice.reduce(function(a, b) { return a + Number(b || 0); }, 0);
+    return sum / slice.length;
+  });
 }
 
-/* Devuelve el dataset Chart.js de la línea de tendencia.
+function _trendWindow(n) {
+  if (n <= 7)  return 3;
+  if (n <= 30) return 7;
+  return 14;
+}
+
+/* Devuelve el dataset Chart.js de la línea de media móvil.
    color: opcional, usa accent UMOH por default. */
-function _trendLineDataset(values, label = 'Tendencia', color = 'rgba(255, 0, 64, 0.85)') {
+function _trendLineDataset(values, label = 'Media móvil', color = 'rgba(255, 0, 64, 0.85)') {
+  const win  = _trendWindow(values.length);
+  const data = _movingAverage(values, win);
   return {
     type:             'line',
     label:            label,
-    data:             _trendLineData(values),
+    data:             data,
     borderColor:      color,
     backgroundColor:  'transparent',
     borderWidth:      2,
@@ -105,7 +114,7 @@ function _trendLineDataset(values, label = 'Tendencia', color = 'rgba(255, 0, 64
     pointRadius:      0,
     pointHoverRadius: 0,
     fill:             false,
-    tension:          0,
+    tension:          0.3,
     order:            0,
     yAxisID:          'y',
   };
@@ -125,10 +134,16 @@ function setKPI(id, value) {
 /**
  * Delta comparativo vs período anterior.
  * lowerIsBetter = true para métricas de costo (CPC, CPL, gasto).
+ * Si prev es 0 o null/undefined, muestra "0%" en vez de quedar vacío.
  */
 function _setDelta(id, current, prev, lowerIsBetter = false) {
   const el = document.getElementById(id);
-  if (!el || !prev) return;
+  if (!el) return;
+  if (prev == null || prev === 0) {
+    el.textContent = '0% vs período anterior';
+    el.className   = 'kpi-delta delta--neutral';
+    return;
+  }
   const pct      = ((current - prev) / Math.abs(prev)) * 100;
   const isPositive = pct >= 0;
   const isGood     = lowerIsBetter ? !isPositive : isPositive;
@@ -207,37 +222,37 @@ function _renderCommercialSummary(s) {
 
   el.innerHTML =
     '<div class="cs-grid">' +
-      '<div class="cs-item">' +
+      '<div class="cs-item" data-cs-kpi="cs-top-seller" tabindex="0" role="button" aria-label="Ver detalle de Mejor Vendedor">' +
         '<span class="cs-label">Mejor Vendedor</span>' +
         '<span class="cs-value cs-value--name">' + s.top_seller + '</span>' +
         (p.top_seller && p.top_seller !== s.top_seller
           ? '<span class="cs-delta cs-flat">ant. ' + p.top_seller + '</span>'
           : '<span class="cs-delta cs-flat">—</span>') +
       '</div>' +
-      '<div class="cs-item">' +
+      '<div class="cs-item" data-cs-kpi="cs-avg-effectiveness" tabindex="0" role="button" aria-label="Ver detalle de Efectividad Promedio">' +
         '<span class="cs-label">Efectividad Promedio</span>' +
         '<span class="cs-value">' + fmtPercent(s.avg_effectiveness) + '</span>' +
         mini(s.avg_effectiveness, p.avg_effectiveness, false) +
       '</div>' +
-      '<div class="cs-item">' +
+      '<div class="cs-item" data-cs-kpi="cs-total-sales" tabindex="0" role="button" aria-label="Ver detalle de Ventas del Equipo">' +
         '<span class="cs-label">Ventas del Equipo</span>' +
         '<span class="cs-value">' + fmtNumber(s.total_sales) + '</span>' +
         mini(s.total_sales, p.total_sales, false) +
       '</div>' +
-      '<div class="cs-item">' +
+      '<div class="cs-item" data-cs-kpi="cs-avg-cycle-days" tabindex="0" role="button" aria-label="Ver detalle de Ciclo Promedio">' +
         '<span class="cs-label">Ciclo Promedio</span>' +
         '<span class="cs-value">' + s.avg_cycle_days.toFixed(1) + ' días</span>' +
         mini(s.avg_cycle_days, p.avg_cycle_days, true) +
       '</div>' +
-      '<div class="cs-item">' +
+      '<div class="cs-item" data-cs-kpi="cs-avg-ticket" tabindex="0" role="button" aria-label="Ver detalle de Ticket Promedio">' +
         '<span class="cs-label">Ticket Promedio</span>' +
         '<span class="cs-value">' + fmtCurrency(s.avg_ticket) + '</span>' +
         mini(s.avg_ticket, p.avg_ticket, false) +
       '</div>' +
-      '<div class="cs-item">' +
+      '<div class="cs-item" data-cs-kpi="cs-avg-capitas-per-sale" tabindex="0" role="button" aria-label="Ver detalle de Cápitas por Venta">' +
         '<span class="cs-label">Cápitas / Venta</span>' +
-        '<span class="cs-value">' + (s.avg_capitas_per_sale ? s.avg_capitas_per_sale.toFixed(2) : '—') + '</span>' +
-        (s.avg_capitas_per_sale ? mini(s.avg_capitas_per_sale, p.avg_capitas_per_sale, false) : '') +
+        '<span class="cs-value">' + (s.avg_capitas_per_sale != null && s.avg_capitas_per_sale > 0 ? s.avg_capitas_per_sale.toFixed(2) + ' cap.' : '—') + '</span>' +
+        (s.avg_capitas_per_sale != null && s.avg_capitas_per_sale > 0 ? mini(s.avg_capitas_per_sale, p.avg_capitas_per_sale, false) : '') +
       '</div>' +
     '</div>';
 }
@@ -345,15 +360,21 @@ function renderPerformance(data) {
 function _renderSearchTerms(terms, mode) {
   const tbody = document.getElementById('search-terms-body');
   const colHeader = document.getElementById('terms-col-header');
-  if (!tbody || !terms) return;
+  if (!tbody) return;
+
+  if (colHeader) colHeader.textContent = mode === 'impressions' ? 'Impresiones' : 'Clicks';
+
+  // Estado vacío: sin datos en el período o pendiente de integración
+  if (!terms || terms.length === 0) {
+    tbody.innerHTML = '<tr><td colspan="3" class="terms-empty">Sin datos de términos de búsqueda para el período seleccionado.</td></tr>';
+    return;
+  }
 
   const colors = [
     CHART_PALETTE.blue.solid, CHART_PALETTE.teal.solid, CHART_PALETTE.purple.solid,
     CHART_PALETTE.amber.solid, CHART_PALETTE.coral.solid, CHART_PALETTE.green.solid,
     CHART_PALETTE.blue.solid, CHART_PALETTE.teal.solid
   ];
-
-  if (colHeader) colHeader.textContent = mode === 'impressions' ? 'Impresiones' : 'Clicks';
 
   tbody.innerHTML = terms.map((row, i) => {
     const pct   = mode === 'impressions' ? (row.pct_imp || row.pct) : row.pct;
@@ -605,23 +626,34 @@ function invalidateGeoMap() { /* no-op: geo es tabla, no mapa */ }
    - prefers-reduced-motion: sin animaciones si está activo
 ══════════════════════════════════════════════════════════ */
 
-// Paleta semántica: color por nombre de etapa (no por posición).
-// Familia azul = entrada/seguimiento, ámbar = alta intención,
-// púrpura = incubando, verde/rojo/gris = resultados.
+// Paleta semántica con escala cromática progresiva por sub-fase.
+// Dentro de cada sub-fase los colores van de menor a mayor intensidad
+// (izquierda → derecha), para que la lectura cromática sea progresiva.
+//
+// Entrada    (cyan claro → cyan medio)
+// Seguimiento (azul claro → azul medio → azul intenso)
+// Alta intención (ámbar claro → ámbar → naranja)
+// Incubando  (púrpura claro → púrpura)
+// Resultado  (verde sólido | rojo | gris — terminales distintos, sin escala)
 const _JOURNEY_COLORS = {
-  'Inbox':           'rgba(99,179,237,0.55)',
-  'Nuevo':           'rgba(99,179,237,0.82)',
-  'Prioritarios':    'rgba(251,191,36,0.78)',
-  'Para Hoy':        'rgba(66,153,225,0.78)',
-  'Procesando':      'rgba(66,153,225,0.92)',
-  'Contactados':     'rgba(49,130,206,1.00)',
-  'Cotizados':       'rgba(251,191,36,0.92)',
-  'En Auditoria':    'rgba(245,158,11,1.00)',
-  'Mes que viene':   'rgba(167,139,250,0.72)',
-  'A futuro':        'rgba(167,139,250,0.94)',
-  'Ventas Ganadas':  'rgba(72,199,142,0.85)',
-  'No prospera':     'rgba(245,101,101,0.88)',
-  'Erroneos':        'rgba(160,174,192,0.68)',
+  // Entrada — cyan escala 2 pasos
+  'Inbox':           'rgba(125,211,252,0.70)',   // sky-300 suave
+  'Nuevo':           'rgba(14,165,233,0.85)',    // sky-500 intenso
+  // Seguimiento — azul escala 3 pasos
+  'Para Hoy':        'rgba(147,197,253,0.75)',   // blue-300 claro
+  'Procesando':      'rgba(59,130,246,0.85)',    // blue-500 medio
+  'Contactados':     'rgba(29,78,216,0.95)',     // blue-700 intenso
+  // Alta intención — ámbar→naranja escala 3 pasos
+  'Prioritarios':    'rgba(253,230,138,0.80)',   // amber-200 claro
+  'Cotizados':       'rgba(251,191,36,0.90)',    // amber-400 medio
+  'En Auditoria':    'rgba(217,119,6,1.00)',     // amber-700 naranja intenso
+  // Incubando — púrpura escala 2 pasos
+  'Mes que viene':   'rgba(216,180,254,0.75)',   // purple-300 claro
+  'A futuro':        'rgba(147,51,234,0.90)',    // purple-600 intenso
+  // Resultado — colores terminales independientes (no escala)
+  'Ventas Ganadas':  'rgba(34,197,94,0.90)',     // verde sólido
+  'No prospera':     'rgba(239,68,68,0.85)',     // rojo
+  'Erroneos':        'rgba(148,163,184,0.65)',   // gris neutro
 };
 
 // Sub-fase de cada etapa (para el tooltip y la banda visual)
@@ -642,13 +674,304 @@ const _JOURNEY_PHASE_MAP = {
 };
 
 // Configuración de las bandas de sub-fases (cols = número de columnas del journey en esa fase)
+// sections: nombres exactos de etapas que pertenecen a esta sub-fase (para calcular totales por nombre, sin asumir índices)
 const _JOURNEY_PHASES_DEF = [
-  { name: 'Entrada',        color: '#63b3ed', cols: 2 },
-  { name: 'Seguimiento',    color: '#4299e1', cols: 3 },
-  { name: 'Alta intención', color: '#f6ad55', cols: 3 },
-  { name: 'Incubando',      color: '#b794f4', cols: 2 },
-  { name: 'Resultado',      color: '#68d391', cols: 3 },
+  { name: 'Entrada',        color: '#63b3ed', cols: 2, sections: ['Inbox', 'Nuevo'] },
+  { name: 'Seguimiento',    color: '#4299e1', cols: 3, sections: ['Para Hoy', 'Procesando', 'Contactados'] },
+  { name: 'Alta intención', color: '#f6ad55', cols: 3, sections: ['Prioritarios', 'Cotizados', 'En Auditoria'] },
+  { name: 'Incubando',      color: '#b794f4', cols: 2, sections: ['Mes que viene', 'A futuro'] },
+  { name: 'Resultado',      color: '#68d391', cols: 3, sections: ['Ventas Ganadas', 'No prospera', 'Erroneos'] },
 ];
+
+/**
+ * Datos didácticos estáticos por etapa del journey.
+ * Usados por _openJourneyModal() al hacer click en una columna.
+ * Keys: nombre exacto de la etapa tal como llega del backend.
+ */
+var _JOURNEY_STAGE_INFO = {
+  'Inbox': {
+    description:    'Los leads en Inbox acaban de ingresar al sistema desde la campaña y todavía no fueron asignados ni abiertos por ningún vendedor. Es el punto de entrada crudo del funnel — la primera señal de que la publicidad está generando demanda real.',
+    interpretation: 'Un Inbox con muchos leads y sin movimiento es una señal de alerta: la campaña atrae, pero el equipo no está respondiendo a tiempo. La velocidad de respuesta en las primeras horas después del ingreso es el factor que más impacta la tasa de conversión.',
+    action:         'Si Inbox supera el 20% del total del pipeline, revisar la capacidad de respuesta del equipo. Los leads sin contacto en las primeras 2 horas tienen una probabilidad de conversión significativamente menor.'
+  },
+  'Nuevo': {
+    description:    'Nuevo agrupa leads que ya fueron reconocidos por el sistema pero que aún no iniciaron el proceso de calificación comercial. Están a un paso del Inbox — alguien los vio, pero todavía no los trabajó.',
+    interpretation: 'Si Nuevo acumula un volumen alto de forma sostenida, puede indicar que los vendedores están marcando leads como vistos sin avanzar el proceso. Diferenciar entre "tomé el lead" y "empecé a trabajarlo" es clave para diagnosticar el cuello.',
+    action:         'Establecer un criterio claro: un lead en Nuevo debe pasar a Para Hoy o Procesando en un plazo máximo de 24 horas hábiles. Si no se puede cumplir, el problema es de capacidad o priorización.'
+  },
+  'Para Hoy': {
+    description:    'Para Hoy es la bandeja de tareas del día del equipo comercial. Contiene leads que el sistema o el propio vendedor marcaron como urgentes para gestionar en la jornada actual. Es un indicador directo de la carga de trabajo inmediata.',
+    interpretation: 'Un Para Hoy alto con un Contactados bajo en el mismo período indica que el equipo está sobrecargado o priorizando mal. Si crece sin vaciarse, la gestión está atrasada respecto al ritmo de entrada de leads.',
+    action:         'Revisar Para Hoy cada mañana como primera tarea del equipo. Si hay más de 10 leads pendientes por vendedor, redistribuir la carga antes de que el retraso se acumule.'
+  },
+  'Procesando': {
+    description:    'Procesando contiene leads que están siendo trabajados activamente: el vendedor está intentando establecer contacto, completando datos o esperando respuesta del prospecto. Es la etapa de mayor intensidad operativa del journey.',
+    interpretation: 'Un volumen saludable en Procesando indica que el equipo está activo. Si este número cae pero Para Hoy crece, los leads no están avanzando. Si Procesando es muy alto y Contactados es bajo, el problema puede estar en la calidad del contacto o en la disponibilidad del prospecto.',
+    action:         'Definir un límite máximo de tiempo en Procesando. Un lead que lleva más de 5 días en esta columna sin avanzar debe ser re-calificado o movido a A futuro.'
+  },
+  'Contactados': {
+    description:    'Contactados son leads con los que el vendedor ya estableció comunicación efectiva. Se les habló, se identificó su necesidad y están en evaluación activa. Es el primer gran filtro del journey: separar los que responden de los que no.',
+    interpretation: 'Un ratio alto de Contactados respecto a Para Hoy y Procesando indica que el equipo está siendo efectivo en alcanzar prospectos. Si Contactados es bajo, el problema puede estar en la calidad de los datos de contacto o en la estrategia de outreach.',
+    action:         'Los leads en Contactados tienen el timing más favorable para avanzar al cierre. Priorizar el seguimiento en las siguientes 24-48 horas para no perder el momento de interés del prospecto.'
+  },
+  'Prioritarios': {
+    description:    'Prioritarios es un marcador del vendedor que indica leads de alta calidad o urgencia especial: alguien que pidió información detallada, que ya comparó opciones, o que tiene una necesidad inmediata. Son las oportunidades con mayor probabilidad de cierre en el corto plazo.',
+    interpretation: 'Un volumen creciente en Prioritarios es una buena señal de calificación. Si Prioritarios crece pero las Ventas Ganadas no, puede haber un problema en el proceso de cierre o en el manejo de objeciones finales.',
+    action:         'Los leads Prioritarios merecen seguimiento diario por el vendedor y visibilidad del supervisor. Cada día sin avance reduce la probabilidad de cierre. Considerar acompañamiento comercial directo del lider de ventas.'
+  },
+  'Cotizados': {
+    description:    'Los leads en Cotizados ya recibieron una propuesta económica concreta y están evaluando la decisión de compra. Es una de las etapas más avanzadas del journey — el prospecto conoce el precio, las coberturas y las condiciones del servicio.',
+    interpretation: 'Si Cotizados crece sin que crezcan las Ventas Ganadas, hay fricción en la etapa de cierre. Las causas más frecuentes son: precio percibido como alto, falta de urgencia del prospecto, competencia en evaluación paralela, o seguimiento tardío después de la cotización.',
+    action:         'Priorizar el seguimiento de leads Cotizados en las próximas 48 horas. El tiempo entre la cotización y el primer seguimiento es el factor crítico. Un lead cotizado que no recibe respuesta en 48 horas tiene alta probabilidad de enfriarse.'
+  },
+  'En Auditoria': {
+    description:    'En Auditoria son leads que aceptaron avanzar pero cuyo expediente está siendo revisado por el equipo de backoffice o la aseguradora. El proceso comercial terminó — el resultado depende ahora de la aprobación administrativa.',
+    interpretation: 'Un volumen alto en Auditoria es una señal positiva: significa que el equipo comercial está convirtiendo leads en solicitudes formales. Si este número crece mucho sin que Ventas Ganadas crezca en proporción, puede haber rechazo por calidad de datos o documentación incompleta.',
+    action:         'Seguir de cerca el tiempo promedio en Auditoria. Si supera los 5 días hábiles, contactar al prospecto para mantenerlo informado y evitar que desista durante la espera.'
+  },
+  'Mes que viene': {
+    description:    'Mes que viene son leads que mostraron interés real pero eligieron posponer la decisión al próximo mes. No rechazaron — agendaron. Son el pipeline de corto plazo que, bien gestionado, se convierte en ventas del ciclo siguiente.',
+    interpretation: 'Un porcentaje elevado en Mes que viene puede indicar que los vendedores están siendo demasiado permisivos con las postergaciones, o que hay una fricción real con el momento de compra. También puede ser una señal positiva si el producto tiene estacionalidad natural.',
+    action:         'Crear un recordatorio de reactivación para cada lead en Mes que viene. El seguimiento debe iniciar 5 días antes de la fecha objetivo, no el mismo dia. El prospecto debe sentir continuidad, no una llamada inesperada.'
+  },
+  'A futuro': {
+    description:    'A futuro son leads con interés identificado pero sin fecha concreta de compra. El timeline es mayor a un mes. Son el pipeline de mediano plazo — no se descartan, pero requieren una estrategia de nurturing diferente a los leads activos.',
+    interpretation: 'Si A futuro acumula un porcentaje muy alto del total, puede indicar que el equipo está estacionando leads sin trabajarlos, o que el producto tiene un ciclo de decision genuinamente largo. Diferenciar estos dos escenarios es clave para saber si el problema es comercial o del mercado.',
+    action:         'Los leads en A futuro deben recibir contacto mensual mínimo: una nota de valor, un cambio en la propuesta, o un recordatorio de beneficio. El silencio durante meses casi siempre deriva en pérdida del lead cuando el prospecto finalmente decide.'
+  },
+  'Ventas Ganadas': {
+    description:    'Ventas Ganadas son los leads que completaron el proceso de compra: la póliza o contrato fue emitido, el prospecto se convirtió en cliente. Es el único resultado que genera ingresos reales para el negocio y el indicador más importante del journey.',
+    interpretation: 'El ratio Ventas Ganadas sobre el total de leads es la tasa de conversión del funnel completo. Un valor por encima del 5% es generalmente saludable en seguros de salud. Si este porcentaje baja de un período al otro, revisar si el problema está en la calidad del lead (TOFU) o en el proceso comercial (MOFU).',
+    action:         'Cada venta ganada debe tener un proceso de onboarding claro para el nuevo cliente. La satisfacción en los primeros 30 días impacta directamente en la retención y en las referencias, que son el canal de menor costo de adquisición.'
+  },
+  'No prospera': {
+    description:    'No prospera son leads que pasaron por el proceso comercial pero no cerraron: el prospecto decidió no comprar, eligió otra opción, o no cumplía los requisitos del producto. Es el resultado negativo esperado en cualquier funnel — un porcentaje de No prospera es inevitable y sano.',
+    interpretation: 'Si No prospera supera a Ventas Ganadas, la relación entre esfuerzo comercial y resultado es negativa. Las causas pueden ser: calidad baja del lead, precio fuera del mercado, proceso de venta débil, o producto no adecuado para el segmento objetivo.',
+    action:         'Analizar los motivos de No prospera sistemáticamente. Si hay un patrón (precio, cobertura, competencia), esa información debe alimentar tanto la estrategia comercial como la segmentación de campañas. No prospera es el feedback más valioso del funnel.'
+  },
+  'Erroneos': {
+    description:    'Erroneos son leads que llegaron al CRM pero no corresponden al público objetivo: datos de contacto inválidos, personas fuera del perfil, duplicados, o formularios completados por error. Son ruido en el pipeline que consume tiempo del equipo sin posibilidad de conversión.',
+    interpretation: 'Un porcentaje de Erroneos por encima del 10% del total es una señal de alerta seria en la segmentación de la campaña. Indica que la audiencia publicitaria está atrayendo tráfico no calificado, lo cual encarece el CPL real y sobrecarga al equipo con gestión improductiva.',
+    action:         'Reportar el perfil de los leads erróneos al equipo de media para afinar la segmentación. Cada lead erróneo es dinero invertido en publicidad que no tiene posibilidad de retorno. Reducir Erroneos mejora directamente el CPL real y la eficiencia del equipo.'
+  }
+};
+
+/**
+ * Abre el modal didáctico del journey stage.
+ * Llamado al hacer click en cualquier .journey-col.
+ *
+ * @param {string} label - nombre de la etapa
+ * @param {number} val   - cantidad de leads en esta etapa
+ * @param {number} total - total de leads del período
+ */
+function _openJourneyModal(label, val, total) {
+  var modal = document.getElementById('journey-stage-modal');
+  if (!modal) return;
+
+  var info = _JOURNEY_STAGE_INFO[label] || {
+    description:    'Etapa del customer journey.',
+    interpretation: 'Analizar el volumen en contexto con el resto del pipeline.',
+    action:         'Revisar con el equipo comercial el estado de estos leads.'
+  };
+  var phase  = _JOURNEY_PHASE_MAP[label] || { name: 'Journey', color: '#8FA5A8' };
+  var pctStr = total > 0 ? ((val / total) * 100).toFixed(1) + '% del total' : '';
+
+  document.getElementById('journey-modal-title').textContent          = label;
+  document.getElementById('journey-modal-metric-value').textContent   = fmtNumber(val);
+  document.getElementById('journey-modal-metric-pct').textContent     = pctStr;
+  document.getElementById('journey-modal-phase-name').textContent     = phase.name;
+  document.getElementById('journey-modal-description').textContent    = info.description;
+  document.getElementById('journey-modal-interpretation').textContent = info.interpretation;
+  document.getElementById('journey-modal-action').textContent         = info.action;
+
+  var phaseBadge = document.getElementById('journey-modal-phase-badge');
+  phaseBadge.style.background = phase.color + '22';
+  phaseBadge.style.color      = phase.color;
+
+  var phaseDot = document.getElementById('journey-modal-phase-dot');
+  phaseDot.style.background = phase.color;
+
+  var exampleText = val === 0
+    ? 'No hay leads en esta etapa en el período seleccionado.'
+    : 'En este período, ' + fmtNumber(val) + ' leads se encuentran en "' + label + '"' +
+      (total > 0 ? ', representando el ' + ((val / total) * 100).toFixed(1) + '% del pipeline total.' : '.');
+  document.getElementById('journey-modal-example').textContent = exampleText;
+
+  modal.removeAttribute('hidden');
+  modal.querySelector('.journey-modal').focus();
+}
+
+/**
+ * Cierra el journey stage modal.
+ */
+function _closeJourneyModal() {
+  var modal = document.getElementById('journey-stage-modal');
+  if (modal) modal.setAttribute('hidden', '');
+}
+
+// Inicializa los listeners del journey stage modal una sola vez (overlay click + Escape + botón X).
+(function _initJourneyModalListeners() {
+  document.addEventListener('DOMContentLoaded', function() {
+    var modal    = document.getElementById('journey-stage-modal');
+    var closeBtn = document.getElementById('journey-modal-close');
+    if (!modal || !closeBtn) return;
+
+    closeBtn.addEventListener('click', _closeJourneyModal);
+
+    modal.addEventListener('click', function(e) {
+      if (e.target === modal) _closeJourneyModal();
+    });
+
+    document.addEventListener('keydown', function(e) {
+      if (e.key === 'Escape' && !modal.hasAttribute('hidden')) _closeJourneyModal();
+    });
+  });
+}());
+
+/**
+ * Calcula los insights del journey a partir de los datos reales del período.
+ * Evalúa heurísticas por severidad (warning > positivo > info).
+ * Retorna máximo 3 insights, o 1 si solo hay info.
+ *
+ * @param {string[]} labels - etiquetas del journey (ya filtradas)
+ * @param {number[]} vals   - valores correspondientes
+ * @param {number}   total  - suma de todos los vals
+ * @returns {Array<{type:string, icon:string, name:string, text:string}>}
+ */
+function _computeJourneyInsights(labels, vals, total) {
+  function getVal(lbl) {
+    var idx = labels.indexOf(lbl);
+    return idx !== -1 ? vals[idx] : 0;
+  }
+  function pctFmt(n) { return total > 0 ? ((n / total) * 100).toFixed(0) + '%' : '0%'; }
+
+  var cotAu   = getVal('Cotizados') + getVal('En Auditoria');
+  var ganadas = getVal('Ventas Ganadas');
+  var incub   = getVal('Mes que viene') + getVal('A futuro');
+  var erron   = getVal('Erroneos');
+  var entrada = getVal('Inbox') + getVal('Nuevo');
+  var seguim  = getVal('Para Hoy') + getVal('Procesando') + getVal('Contactados');
+  var altaInt = getVal('Prioritarios') + cotAu;
+
+  var warnings  = [];
+  var positives = [];
+  var infos     = [];
+
+  // Regla 1: calidad de leads
+  if (total > 0 && erron / total > 0.10) {
+    warnings.push({
+      type: 'warning', icon: '!',
+      name: 'Calidad de leads',
+      text: 'El ' + pctFmt(erron) + ' de leads son erróneos (' + fmtNumber(erron) + ' leads). Revisar segmentación de campaña para reducir tráfico no calificado.'
+    });
+  }
+
+  // Regla 2: cuello de botella en cierre
+  if (ganadas > 0 && cotAu > 2 * ganadas) {
+    warnings.push({
+      type: 'warning', icon: '!',
+      name: 'Cuello en cierre',
+      text: 'Hay ' + fmtNumber(cotAu) + ' leads cotizados/en auditoría pero solo ' + fmtNumber(ganadas) + ' ventas ganadas. Revisar fricción en la firma: precio, documentación o seguimiento tardío.'
+    });
+  }
+
+  // Regla 3: leads avanzados sin cierres
+  if (cotAu >= 5 && ganadas === 0) {
+    warnings.push({
+      type: 'warning', icon: '!',
+      name: 'Sin cierres en el período',
+      text: 'Hay ' + fmtNumber(cotAu) + ' leads avanzados (cotizados/auditoría) sin ningún cierre registrado. Acción comercial urgente recomendada.'
+    });
+  }
+
+  // Regla 4: pipeline incubando
+  if (total > 0 && incub / total > 0.30) {
+    warnings.push({
+      type: 'warning', icon: '!',
+      name: 'Pipeline incubando',
+      text: 'El ' + pctFmt(incub) + ' del total son leads pospuestos (' + fmtNumber(incub) + '). Considerar una campaña de reactivación para no perder estos contactos.'
+    });
+  }
+
+  // Regla 5: leads sin tomar
+  if (seguim > 0 && entrada > seguim * 1.5) {
+    warnings.push({
+      type: 'warning', icon: '!',
+      name: 'Leads sin tomar',
+      text: 'Hay ' + fmtNumber(entrada) + ' leads en Inbox/Nuevo versus ' + fmtNumber(seguim) + ' en seguimiento. El equipo está detrás del flujo de entrada.'
+    });
+  }
+
+  // Regla 6: conversión saludable
+  if (total > 0 && ganadas / total >= 0.05) {
+    positives.push({
+      type: 'positive', icon: '+',
+      name: 'Conversión saludable',
+      text: pctFmt(ganadas) + ' de leads cerraron como venta (' + fmtNumber(ganadas) + ' de ' + fmtNumber(total) + '). Métrica por encima del benchmark típico del sector.'
+    });
+  }
+
+  // Regla 7: sin leads erróneos
+  if (erron === 0 && total >= 10) {
+    positives.push({
+      type: 'positive', icon: '+',
+      name: 'Sin leads erróneos',
+      text: 'La calidad del tráfico es óptima en este período: ninguno de los ' + fmtNumber(total) + ' leads fue descartado por datos incorrectos.'
+    });
+  }
+
+  // Default info
+  if (warnings.length === 0 && positives.length === 0) {
+    infos.push({
+      type: 'info', icon: 'i',
+      name: 'Pipeline en operación normal',
+      text: fmtNumber(total) + ' leads en gestión, ' + fmtNumber(ganadas) + ' cerrados, ' + fmtNumber(altaInt) + ' en alta intención. Sin señales de alerta en este período.'
+    });
+  }
+
+  var combined = warnings.concat(positives).concat(infos);
+  return (warnings.length === 0 && positives.length === 0)
+    ? combined.slice(0, 1)
+    : combined.slice(0, 3);
+}
+
+/**
+ * Construye o actualiza el bloque .journey-insights debajo del journey.
+ * Reemplaza al antiguo _updateJourneyDesc / .journey-description.
+ *
+ * @param {HTMLElement} el     - el div.journey-insights a actualizar
+ * @param {string[]}    labels - etiquetas del journey (ya filtradas)
+ * @param {number[]}    vals   - valores correspondientes
+ * @param {number}      total  - suma de todos los vals
+ */
+function _updateJourneyInsights(el, labels, vals, total) {
+  var insights = _computeJourneyInsights(labels, vals, total);
+
+  var cardsHTML = insights.map(function(ins) {
+    return (
+      '<div class="journey-insight-card journey-insight-card--' + ins.type + '">' +
+        '<div class="journey-insight-badge">' + ins.icon + '</div>' +
+        '<div class="journey-insight-body">' +
+          '<div class="journey-insight-name">' + ins.name + '</div>' +
+          '<p class="journey-insight-text">' + ins.text + '</p>' +
+        '</div>' +
+      '</div>'
+    );
+  }).join('');
+
+  el.innerHTML =
+    '<div class="journey-insights-header">' +
+      '<span class="journey-insights-icon">' +
+        '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">' +
+          '<circle cx="12" cy="12" r="10"/>' +
+          '<line x1="12" y1="8" x2="12" y2="12"/>' +
+          '<line x1="12" y1="16" x2="12.01" y2="16"/>' +
+        '</svg>' +
+      '</span>' +
+      '<span class="journey-insights-title">Insights del Journey</span>' +
+    '</div>' +
+    '<div class="journey-insights-list">' + cardsHTML + '</div>';
+}
 
 /**
  * Renderiza el Customer Journey horizontal en la sección MOFU.
@@ -680,6 +1003,13 @@ function _renderJourney(data) {
   const total        = vals.reduce((a, b) => a + b, 0);
   const maxVal       = Math.max(...vals, 1);
   const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+  // Totales por sub-fase: suma de vals cuyo label pertenece a phase.sections (match por nombre, no por índice)
+  const phaseTotals = _JOURNEY_PHASES_DEF.map(function(phase) {
+    return filteredPairs.reduce(function(sum, pair) {
+      return phase.sections.indexOf(pair.label) !== -1 ? sum + pair.val : sum;
+    }, 0);
+  });
 
   /* ── RE-RENDER INCREMENTAL ──────────────────────────────────
      Si la wrap ya existe (el usuario cambió el período),
@@ -716,6 +1046,27 @@ function _renderJourney(data) {
 
     const headerVal = existingWrap.querySelector('.journey-header-value');
     if (headerVal) headerVal.textContent = fmtNumber(total);
+
+    // Actualizar totales de la banda de sub-fases
+    const phaseBands = existingWrap.querySelectorAll('.journey-phase-band');
+    phaseBands.forEach(function(band, i) {
+      const totalEl = band.querySelector('.journey-phase-total');
+      if (totalEl && phaseTotals[i] !== undefined) totalEl.textContent = fmtNumber(phaseTotals[i]);
+    });
+
+    // Actualizar el bloque de insights con los valores del período nuevo
+    const existingInsights = existingWrap.querySelector('.journey-insights');
+    if (existingInsights) _updateJourneyInsights(existingInsights, labels, vals, total);
+
+    // Re-vincular clicks con los valores actualizados del período
+    existingCols.forEach(function(col, i) {
+      if (i >= labels.length) return;
+      var lbl  = labels[i];
+      var vCur = vals[i];
+      var tot  = total;
+      col.onclick = function() { _openJourneyModal(lbl, vCur, tot); };
+    });
+
     return; // No reconstruir el DOM
   }
 
@@ -777,14 +1128,17 @@ function _renderJourney(data) {
   // Banda de sub-fases
   const phasesEl = document.createElement('div');
   phasesEl.className = 'journey-phases';
-  _JOURNEY_PHASES_DEF.forEach(function(phase) {
+  _JOURNEY_PHASES_DEF.forEach(function(phase, pi) {
     const band = document.createElement('div');
     band.className = 'journey-phase-band';
     band.style.setProperty('--phase-cols', phase.cols);
     band.style.setProperty('--phase-color', phase.color);
     band.innerHTML =
       '<div class="journey-phase-bar"></div>' +
-      '<span class="journey-phase-label">' + phase.name + '</span>';
+      '<div class="journey-phase-caption">' +
+        '<span class="journey-phase-label">' + phase.name + '</span>' +
+        '<span class="journey-phase-total">' + fmtNumber(phaseTotals[pi]) + '</span>' +
+      '</div>';
     phasesEl.appendChild(band);
   });
   wrap.appendChild(phasesEl);
@@ -824,6 +1178,9 @@ function _renderJourney(data) {
 
     col.addEventListener('mouseenter', function() { showTip(col, label, v, pctFmt); });
     col.addEventListener('mouseleave', hideTip);
+    col.addEventListener('click', (function(lbl, vv, tot) {
+      return function() { _openJourneyModal(lbl, vv, tot); };
+    }(label, v, total)));
 
     row.appendChild(col);
 
@@ -836,6 +1193,12 @@ function _renderJourney(data) {
   });
 
   wrap.appendChild(row);
+
+  const journeyInsights = document.createElement('div');
+  journeyInsights.className = 'journey-insights';
+  _updateJourneyInsights(journeyInsights, labels, vals, total);
+  wrap.appendChild(journeyInsights);
+
   ctxSt.parentElement.appendChild(wrap);
 
   // Stagger entrance: barras crecen con delay incremental
@@ -860,24 +1223,36 @@ function renderMofu(data) {
 
   const prev = data.prev || {};
 
+  // Ventas Ganadas: tomar de data.status si está disponible, o del campo directo
+  const closedWonFromStatus = (function() {
+    if (!data.status) return data.closed_won_leads || 0;
+    const idx = data.status.labels.indexOf('Ventas Ganadas');
+    return idx !== -1 ? (data.status.data[idx] || 0) : (data.closed_won_leads || 0);
+  })();
+  const prevClosedWon = prev.closed_won_leads || 0;
+
   setKPI('mofu-leads',      fmtNumber(data.total_leads));
   setKPI('mofu-cpl',        fmtCurrency(data.cpl));
   setKPI('mofu-tipif',      fmtPercent(data.tipification_rate));
   setKPI('mofu-highintent', fmtNumber(data.high_intent_leads));
+  setKPI('mofu-closedwon',  fmtNumber(closedWonFromStatus));
 
   _setDelta('delta-mofu-leads',      data.total_leads,       prev.total_leads);
   _setDelta('delta-mofu-cpl',        data.cpl,               prev.cpl,               true);
   _setDelta('delta-mofu-tipif',      data.tipification_rate, prev.tipification_rate);
   _setDelta('delta-mofu-highintent', data.high_intent_leads, prev.high_intent_leads);
+  _setDelta('delta-mofu-closedwon',  closedWonFromStatus,    prevClosedWon);
 
   /* ── MOFU sparklines ── */
   if (data.trend) {
-    const src = data.trend.sparkline || data.trend;
+    const src  = data.trend.sparkline || data.trend;
     const isUp = arr => arr[arr.length - 1] >= arr[0];
-    _renderSparkline('sparkline-mofu-leads',     src.leads, isUp(src.leads),     src.labels || []);
-    _renderSparkline('sparkline-mofu-cpl',       src.cpl,   !isUp(src.cpl),      src.labels || []);
-    _renderSparkline('sparkline-mofu-tipif',     src.leads, isUp(src.leads),     src.labels || []);
-    _renderSparkline('sparkline-mofu-highintent',src.leads, isUp(src.leads),     src.labels || []);
+    _renderSparkline('sparkline-mofu-leads',      src.leads, isUp(src.leads),  src.labels || []);
+    _renderSparkline('sparkline-mofu-cpl',        src.cpl,   !isUp(src.cpl),   src.labels || []);
+    _renderSparkline('sparkline-mofu-tipif',      src.leads, isUp(src.leads),  src.labels || []);
+    _renderSparkline('sparkline-mofu-highintent', src.leads, isUp(src.leads),  src.labels || []);
+    /* closedwon: usa la misma forma que leads — proxy directo */
+    _renderSparkline('sparkline-mofu-closedwon',  src.leads, isUp(src.leads),  src.labels || []);
   }
 
   /* ── Trend: separate bar charts for Leads and CPL ── */
@@ -1068,6 +1443,7 @@ function _renderSellersTable(sellers) {
    BOFU
 ══════════════════════════════════════════════════════════ */
 function renderBofu(data) {
+  window._bofuData = data;
   const prev = data.prev || {};
 
   setKPI('bofu-revenue',       fmtCurrency(data.total_revenue));
@@ -1108,8 +1484,17 @@ function renderBofu(data) {
   _destroyChart('chart-bofu-revenue');
   _destroyChart('chart-bofu-sales-trend');
 
+  /* F.3 — Limpiar canvas si no llegan datos de tendencia (evita residuo visual
+     del período anterior cuando el backend no devuelve trend filtrado). */
+  ['chart-bofu-revenue', 'chart-bofu-sales-trend'].forEach(id => {
+    if (!data.trend) {
+      const el = document.getElementById(id);
+      if (el) { const ctx2d = el.getContext('2d'); if (ctx2d) ctx2d.clearRect(0, 0, el.width, el.height); }
+    }
+  });
+
   const ctxBR = document.getElementById('chart-bofu-revenue');
-  if (ctxBR && data.trend) {
+  if (ctxBR && data.trend && data.trend.labels && data.trend.labels.length) {
     const axis = _axisDefaults();
     _charts['chart-bofu-revenue'] = new Chart(ctxBR, {
       type: 'bar',
@@ -1143,7 +1528,7 @@ function renderBofu(data) {
   }
 
   const ctxBS = document.getElementById('chart-bofu-sales-trend');
-  if (ctxBS && data.trend) {
+  if (ctxBS && data.trend && data.trend.labels && data.trend.labels.length) {
     const axis = _axisDefaults();
     _charts['chart-bofu-sales-trend'] = new Chart(ctxBS, {
       type: 'bar',
@@ -1192,11 +1577,12 @@ function renderBofu(data) {
     });
   }
 
-  /* Segment sales table */
+  /* Segment sales table — incluye fila TOTAL al pie para que coincida con
+     el revenue total que muestra el KPI card "Ingresos Totales" del BOFU. */
   const segBody = document.getElementById('bofu-segment-body');
   if (segBody && data.typification) {
     const total = data.typification.data.reduce((a, b) => a + b, 0);
-    segBody.innerHTML = data.typification.labels.map((label, i) => {
+    const rows = data.typification.labels.map((label, i) => {
       const val   = data.typification.data[i];
       const pct   = total > 0 ? ((val / total) * 100).toFixed(1) : '0.0';
       const color = bofuColors[i] || bofuColors[0];
@@ -1210,6 +1596,14 @@ function renderBofu(data) {
         </tr>
       `;
     }).join('');
+    const totalRow = `
+      <tr class="segment-total-row">
+        <td class="segment-name segment-total-label">Total</td>
+        <td class="segment-value segment-total-value">${fmtNumber(total)}</td>
+        <td class="segment-pct segment-total-pct">100%</td>
+      </tr>
+    `;
+    segBody.innerHTML = rows + totalRow;
   }
 
   /* Sellers ranking table */
@@ -1219,15 +1613,22 @@ function renderBofu(data) {
   _renderPendingPriceTable(data.pending_price || []);
 }
 
+/* Registry de filas pendientes para el modal de detalle de lead.
+   Se actualiza cada vez que renderBofu() llama a _renderPendingPriceTable(). */
+let _pendingRows = [];
+
 function _renderPendingPriceTable(rows) {
   const tbody = document.getElementById('pending-price-body');
   const badge = document.getElementById('pending-price-count');
   if (!tbody) return;
 
+  /* Guardar referencia para el modal */
+  _pendingRows = rows;
+
   if (badge) badge.textContent = `${rows.length} pendiente${rows.length === 1 ? '' : 's'}`;
 
   if (rows.length === 0) {
-    tbody.innerHTML = '<tr><td colspan="5" class="pending-empty">Todas las ventas tienen monto cargado.</td></tr>';
+    tbody.innerHTML = '<tr><td colspan="6" class="pending-empty">Todas las ventas tienen monto cargado.</td></tr>';
     return;
   }
 
@@ -1236,21 +1637,174 @@ function _renderPendingPriceTable(rows) {
       ? new Date(r.lead_created_at).toLocaleDateString('es-AR', { day: '2-digit', month: '2-digit', year: 'numeric' })
       : '—';
     const tip = (r.tipification && r.tipification.trim()) || '<span class="muted">Sin clasificar</span>';
-    const origin = r.is_campaign
-      ? '<span class="origin-badge origin-campaign">Campaña</span>'
-      : '<span class="origin-badge origin-vendor">Vendedor</span>';
+
+    /* F.4.b — Mostrar canal real del lead. Si no existe, fallback a Campaña / Vendedor */
+    const canalLabel = r.canal || (r.is_campaign ? 'Campaña' : 'Vendedor');
+    const canalClass = r.is_campaign ? 'origin-campaign' : 'origin-vendor';
+    const origin = `<span class="origin-badge ${canalClass}">${canalLabel}</span>`;
+
+    /* F.4.a — Etapa actual desde leads.section */
+    const stage = r.section || '—';
+
     const nombre = r.nombre || `#${r.meistertask_id}`;
     const asesor = r.assignee || '—';
+    const mid    = r.meistertask_id || '';
+
     return `
-      <tr>
+      <tr class="pending-row" data-mid="${mid}" style="cursor:pointer" role="button" tabindex="0" aria-label="Ver detalle de ${nombre}">
         <td class="pending-name">${nombre}</td>
         <td class="pending-asesor">${asesor}</td>
         <td class="pending-tip">${tip}</td>
         <td class="pending-origin">${origin}</td>
+        <td class="pending-stage">${stage}</td>
         <td class="pending-date">${fecha}</td>
       </tr>
     `;
   }).join('');
+
+  /* F.4.d — Delegar click en tbody (una sola escucha, no por fila) */
+  tbody.onclick = function(e) {
+    const tr = e.target.closest('tr.pending-row');
+    if (!tr) return;
+    const mid = tr.dataset.mid;
+    _openLeadDetailModal(mid);
+  };
+
+  /* Soporte teclado: Enter / Space abre el modal */
+  tbody.onkeydown = function(e) {
+    if (e.key !== 'Enter' && e.key !== ' ') return;
+    const tr = e.target.closest('tr.pending-row');
+    if (!tr) return;
+    e.preventDefault();
+    _openLeadDetailModal(tr.dataset.mid);
+  };
+}
+
+/* ── Modal de detalle del lead (F.4.d) ──────────────────────── */
+
+/**
+ * Abre el modal #lead-detail-modal con la data del lead identificado por meistertask_id.
+ * Usa los datos ya cargados en _pendingRows — no hace fetch adicional.
+ * @param {string|number} mid - meistertask_id del lead
+ */
+function _openLeadDetailModal(mid) {
+  const row = _pendingRows.find(r => String(r.meistertask_id) === String(mid));
+  if (!row) return;
+
+  const overlay = document.getElementById('lead-detail-modal');
+  if (!overlay) return;
+
+  /* Título */
+  const titleEl = document.getElementById('lead-modal-title');
+  if (titleEl) titleEl.textContent = `${row.nombre || '#' + mid} (${row.canal || 'sin canal'})`;
+
+  /* Calcular días en CRM */
+  const creado = row.lead_created_at ? new Date(row.lead_created_at) : null;
+  const diasCRM = creado
+    ? Math.floor((Date.now() - creado.getTime()) / 86400000)
+    : null;
+  const diasStr = diasCRM !== null ? `${diasCRM} día${diasCRM === 1 ? '' : 's'}` : '—';
+
+  const fechaStr = creado
+    ? creado.toLocaleDateString('es-AR', { day: '2-digit', month: '2-digit', year: 'numeric' })
+    : '—';
+
+  /* Grid de datos básicos */
+  const gridEl = document.getElementById('lead-modal-basics');
+  if (gridEl) {
+    gridEl.innerHTML = `
+      <div class="lead-modal-field"><span class="lead-modal-label">Canal</span><span class="lead-modal-value">${row.canal || '—'}</span></div>
+      <div class="lead-modal-field"><span class="lead-modal-label">Asesor</span><span class="lead-modal-value">${row.assignee || '—'}</span></div>
+      <div class="lead-modal-field"><span class="lead-modal-label">Tipificación</span><span class="lead-modal-value">${row.tipification || '—'}</span></div>
+      <div class="lead-modal-field"><span class="lead-modal-label">Etapa actual</span><span class="lead-modal-value">${row.section || '—'}</span></div>
+      <div class="lead-modal-field"><span class="lead-modal-label">Fecha de ingreso</span><span class="lead-modal-value">${fechaStr}</span></div>
+      <div class="lead-modal-field"><span class="lead-modal-label">Días en CRM</span><span class="lead-modal-value">${diasStr}</span></div>
+    `;
+  }
+
+  /* Historial de cambios de sección */
+  const histEl = document.getElementById('lead-modal-history');
+  if (histEl) {
+    if (row.lead_section_history && row.lead_section_history.length) {
+      histEl.innerHTML = row.lead_section_history.map(h => {
+        const d = new Date(h.date).toLocaleDateString('es-AR', { day: '2-digit', month: '2-digit', year: 'numeric' });
+        return `<li class="lead-modal-history-item"><span class="lead-modal-history-date">${d}</span><span class="lead-modal-history-move">${h.from} &rarr; ${h.to}</span></li>`;
+      }).join('');
+    } else {
+      histEl.innerHTML = '<li class="lead-modal-history-empty">Sin historial disponible.</li>';
+    }
+  }
+
+  /* Datos monetarios */
+  const moneyEl     = document.getElementById('lead-modal-monetary');
+  const moneySect   = document.getElementById('lead-modal-monetary-section');
+  if (moneyEl && moneySect) {
+    if (row.lead_monetary) {
+      const m = row.lead_monetary;
+      const updatedAt = m.updated_at
+        ? new Date(m.updated_at).toLocaleDateString('es-AR', { day: '2-digit', month: '2-digit', year: 'numeric' })
+        : '—';
+      moneyEl.innerHTML = `
+        <div class="lead-modal-field"><span class="lead-modal-label">Precio final</span><span class="lead-modal-value">${m.precio_final != null ? fmtCurrency(m.precio_final) : '—'}</span></div>
+        <div class="lead-modal-field"><span class="lead-modal-label">Capitas</span><span class="lead-modal-value">${m.capitas != null ? m.capitas : '—'}</span></div>
+        <div class="lead-modal-field"><span class="lead-modal-label">Cerrado</span><span class="lead-modal-value">${m.is_closed ? 'Si' : 'No'}</span></div>
+        <div class="lead-modal-field"><span class="lead-modal-label">Actualizado</span><span class="lead-modal-value">${updatedAt}</span></div>
+      `;
+      moneySect.hidden = false;
+    } else {
+      moneySect.hidden = true;
+    }
+  }
+
+  /* Actividad y seguimientos: viene de leads.comments — el textarea de
+     MeisterTask donde el vendedor escribe notas, llamadas, observaciones.
+     Cada bloque suele venir separado por saltos de línea o con prefijos
+     tipo "DD/MM:" — los detectamos para formatear como timeline. */
+  const actEl   = document.getElementById('lead-modal-activity');
+  const actSect = document.getElementById('lead-modal-activity-section');
+  if (actEl && actSect) {
+    const raw = (row.comments || '').trim();
+    if (!raw) {
+      actEl.innerHTML = '<p class="lead-modal-empty">Sin actividad registrada por el vendedor todavía.</p>';
+    } else {
+      // Cortar por línea/párrafo y filtrar vacíos. Cada bloque es una "entrada"
+      // del vendedor. Si el bloque arranca con un patrón fecha (DD/MM o DD-MM),
+      // lo extraemos como header del item.
+      const blocks = raw.split(/\n\s*\n|\r\n\s*\r\n/).map(b => b.trim()).filter(Boolean);
+      const entries = blocks.length ? blocks : raw.split(/\n+/).map(l => l.trim()).filter(Boolean);
+      actEl.innerHTML = '<ol class="lead-modal-activity-list">' + entries.map(text => {
+        const dateMatch = text.match(/^([0-9]{1,2}[/\-][0-9]{1,2}(?:[/\-][0-9]{2,4})?)[:\s.\-]+(.+)$/s);
+        if (dateMatch) {
+          return `<li class="lead-modal-activity-item">
+            <span class="lead-modal-activity-date">${dateMatch[1]}</span>
+            <p class="lead-modal-activity-text">${_escapeHtml(dateMatch[2].trim())}</p>
+          </li>`;
+        }
+        return `<li class="lead-modal-activity-item lead-modal-activity-item--no-date">
+          <p class="lead-modal-activity-text">${_escapeHtml(text)}</p>
+        </li>`;
+      }).join('') + '</ol>';
+    }
+  }
+
+  /* Abrir */
+  overlay.removeAttribute('hidden');
+  overlay.focus();
+}
+
+/* Escape HTML básico para inyectar texto del usuario sin crear XSS surface */
+function _escapeHtml(s) {
+  return String(s).replace(/[&<>"']/g, c => ({
+    '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;',
+  })[c]);
+}
+
+/**
+ * Cierra el modal #lead-detail-modal.
+ */
+function _closeLeadDetailModal() {
+  const overlay = document.getElementById('lead-detail-modal');
+  if (overlay) overlay.setAttribute('hidden', '');
 }
 
 /* ══════════════════════════════════════════════════════════
@@ -1371,9 +1925,39 @@ function renderSparklines(data) {
   _renderSparkline('sparkline-sales',       sales,       isUp(sales),       labels);
 }
 
+/* ── Sección Inicio ──────────────────────────────────────── */
+
+/**
+ * renderInicio(data) — sección "Inicio" simplificada: saludo + 4 accesos
+ * rápidos a las secciones del funnel (Performance / Awareness / Interest / Sales).
+ *
+ * Las cards están en el HTML estático con data-target. Acá solo bindeamos
+ * el click una vez (idempotente) para navegar a la sección correspondiente.
+ */
+function renderInicio(data) {
+  // Saludo personalizado si el endpoint o session lo trae
+  const nameEl = document.getElementById('inicio-user-name');
+  if (nameEl) {
+    const n = (data && data.user_name) || window.DASHBOARD_USERNAME || 'Franco';
+    nameEl.textContent = n;
+  }
+
+  // Click handlers en los 4 accesos rápidos (una sola vez)
+  document.querySelectorAll('.inicio-quick-card[data-target]').forEach(card => {
+    if (card._umohQuickBound) return;
+    card._umohQuickBound = true;
+    card.addEventListener('click', () => {
+      const target = card.dataset.target;
+      const navItem = document.querySelector(`.sb-nav-item[data-section="${target}"]`);
+      if (navItem) navItem.click();
+    });
+  });
+}
+
 /* ── Entry point ────────────────────────────────────────── */
 function renderSection(section, data) {
   switch (section) {
+    case 'inicio':      renderInicio(data);      break;
     case 'performance': renderPerformance(data); break;
     case 'tofu':        renderTofu(data);        break;
     case 'mofu':        renderMofu(data);        break;

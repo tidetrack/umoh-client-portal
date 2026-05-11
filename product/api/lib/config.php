@@ -105,6 +105,11 @@ function filter_range(array $by_date, string $start, string $end): array {
  * de puntos en el rango. Devuelve ['labels' => [...], ...campos].
  *
  * $fields = ['campo_salida' => fn($row) => valor_numerico, ...]
+ *
+ * La granularidad se determina en este orden de prioridad:
+ *   1. Si se pasa $_GET['granularity'] = 'dias'|'semanas'|'meses' → respeta esa elección
+ *   2. 7d / 30d / 90d → siempre día
+ *   3. custom/historical → por cantidad de puntos (auto)
  */
 function build_trend(array $filtered, string $period, array $fields): array {
     $n      = count($filtered);
@@ -114,10 +119,17 @@ function build_trend(array $filtered, string $period, array $fields): array {
 
     if ($n === 0) return $result;
 
-    // Elegir granularidad
-    if ($n <= 14) {
+    // Granularity explícita del usuario (pasa desde el historic-section o custom range)
+    $user_gran = $_GET['granularity'] ?? '';
+    $gran_map  = ['dias' => 'day', 'semanas' => 'week', 'meses' => 'month'];
+
+    if ($user_gran !== '' && isset($gran_map[$user_gran])) {
+        $mode = $gran_map[$user_gran];
+    } elseif (in_array($period, ['7d', '30d', '90d'], true)) {
         $mode = 'day';
-    } elseif ($period === '90d' || $n > 45) {
+    } elseif ($n <= 14) {
+        $mode = 'day';
+    } elseif ($n > 45) {
         $mode = 'month';
     } else {
         $mode = 'week';

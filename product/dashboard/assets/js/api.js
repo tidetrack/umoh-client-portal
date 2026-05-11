@@ -15,10 +15,12 @@
  */
 
 const USE_MOCK = {
-  summary: false,
-  tofu:    false,
-  mofu:    false,
-  bofu:    false,
+  summary:   false,
+  tofu:      false,
+  mofu:      false,
+  bofu:      false,
+  campaigns: false,  // siempre real (la lista de campañas viene de Supabase)
+  inicio:    false,  // endpoint nuevo — genera resumen heurístico desde datos reales
 };
 const API_BASE = 'api/endpoints';
 
@@ -43,6 +45,16 @@ async function fetchData(endpoint, params = {}) {
     credentials: 'same-origin',
     headers: { 'Accept': 'application/json' }
   });
+
+  // Si el servidor devuelve 401 (sin sesión válida), caer al mock para
+  // evitar pantalla en blanco — solo aplica a endpoints con mock disponible.
+  if (res.status === 401) {
+    try {
+      return await getMockData(endpoint, params);
+    } catch (_) {
+      // Si el mock tampoco tiene datos, continuar con el error normal
+    }
+  }
 
   if (!res.ok) {
     throw new Error(`API error ${res.status} on /${endpoint}`);
@@ -76,7 +88,8 @@ function getMockData(endpoint, params) {
     summary: MOCK_DATA.performance,
     tofu:    MOCK_DATA.tofu,
     mofu:    MOCK_DATA.mofu,
-    bofu:    MOCK_DATA.bofu
+    bofu:    MOCK_DATA.bofu,
+    inicio:  MOCK_DATA.inicio,
   };
 
   if (!map[endpoint]) {

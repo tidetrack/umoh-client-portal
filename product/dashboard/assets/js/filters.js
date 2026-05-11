@@ -1,11 +1,21 @@
 /**
- * filters.js — Navegación, selector de período, tema y menú de usuario.
+ * filters.js — Navegación, sidebar, selector de período, tema y menú de usuario.
  * Orquesta api.js → charts.js. No tiene lógica de datos propia.
+ *
+ * Sprint UX 2.0: sidebar lateral colapsable reemplaza al header/nav viejos.
+ * La sección "inicio" se convierte en la pantalla de entrada (default).
  */
 
-let _currentPeriod  = '30d';
-let _currentSection = 'performance';
-let _loading        = false;
+let _currentPeriod      = '30d';
+// Default a "inicio" — el cliente entra al dashboard y ve el saludo + resumen
+// IA primero, después navega a las secciones específicas (Performance/TOFU/etc.)
+let _currentSection     = 'inicio';
+let _currentGranularity = 'dias';   // última granularidad activa del historic-section
+let _loading            = false;
+// Filtro global de campaña (Fase 4 — sprint 1.8). 'all' = vista agregada.
+// Se persiste en localStorage para que la selección sobreviva entre reloads.
+let _currentCampaignId   = localStorage.getItem('umoh:campaign_id')   || 'all';
+let _currentCampaignName = localStorage.getItem('umoh:campaign_name') || '';
 
 /* ── Loader visual ──────────────────────────────────────── */
 function _setLoading(on) {
@@ -23,49 +33,64 @@ function _setSkeletons(on) {
 async function refreshDashboard(section, period, extraParams = {}) {
   if (_loading) return;
   _setLoading(true);
-  _setSkeletons(true);
 
-  const endpointMap = { performance: 'summary', tofu: 'tofu', mofu: 'mofu', bofu: 'bofu' };
+  // Inicio tiene su propio flujo de datos — no usa los KPI skeletons
+  if (section !== 'inicio') _setSkeletons(true);
+
+  const endpointMap = { performance: 'summary', tofu: 'tofu', mofu: 'mofu', bofu: 'bofu', inicio: 'inicio' };
 
   try {
-    const data = await fetchData(endpointMap[section], { period, ...extraParams });
+    const params = { period, campaign_id: _currentCampaignId, ...extraParams };
+    const data = await fetchData(endpointMap[section] || section, params);
     renderSection(section, data);
   } catch (err) {
-    console.error('[Dashboard] Error al cargar datos:', err);
+    // Error silencioso en producción (no se loga en consola)
   } finally {
     _setLoading(false);
-    _setSkeletons(false);
+    if (section !== 'inicio') _setSkeletons(false);
   }
 }
 
-/* ── Activar sección / tab / período ────────────────────── */
+/* ── Activar sección / nav-item / período ───────────────── */
 function _activateSection(section) {
   document.querySelectorAll('.dashboard-section').forEach(el => el.classList.remove('active'));
   const target = document.getElementById(`section-${section}`);
   if (target) target.classList.add('active');
 }
 
-function _activateTab(btn) {
-  document.querySelectorAll('.nav-tab').forEach(t => t.classList.remove('active'));
-  btn.classList.add('active');
+function _activateSidebarNavItem(section) {
+  document.querySelectorAll('.sb-nav-item').forEach(item => {
+    const active = item.dataset.section === section;
+    item.classList.toggle('active', active);
+    item.setAttribute('aria-current', active ? 'page' : 'false');
+  });
 }
 
 function _activatePeriod(btn) {
-  document.querySelectorAll('.period-btn').forEach(b => b.classList.remove('active'));
+  document.querySelectorAll('.period-btn, .sb-period-btn').forEach(b => b.classList.remove('active'));
   btn.classList.add('active');
+  // Sincronizar el label compacto del sidebar colapsado
+  const compact = document.getElementById('sb-period-compact-label');
+  if (compact) compact.textContent = btn.dataset.period || '30d';
 }
 
-/* ── Date picker ────────────────────────────────────────── */
+/* ── Date picker (inline panel en sidebar) ───────────────── */
+
+/**
+ * Abre el panel inline de fechas personalizadas dentro del sidebar.
+ * Pre-rellena los inputs con valores por defecto si están vacíos.
+ */
 function _openDatePicker() {
-  const popover    = document.getElementById('date-picker-popover');
+  const panel      = document.getElementById('sb-custom-date-panel');
+  const customBtn  = document.getElementById('sb-period-custom-btn');
   const startInput = document.getElementById('date-start');
   const endInput   = document.getElementById('date-end');
-  if (!popover || !startInput || !endInput) return;
+  if (!panel || !startInput || !endInput) return;
 
-  const today    = new Date();
-  const maxDate  = new Date(today); maxDate.setDate(today.getDate() - 1);
-  const minDate  = new Date(today); minDate.setDate(today.getDate() - 90);
-  const fmt      = d => d.toISOString().split('T')[0];
+  const today   = new Date();
+  const maxDate = new Date(today); maxDate.setDate(today.getDate() - 1);
+  const minDate = new Date(today); minDate.setDate(today.getDate() - 90);
+  const fmt     = d => d.toISOString().split('T')[0];
 
   startInput.min = endInput.min = fmt(minDate);
   startInput.max = endInput.max = fmt(maxDate);
@@ -76,15 +101,36 @@ function _openDatePicker() {
   }
   if (!endInput.value) endInput.value = fmt(maxDate);
 
-  popover.hidden = false;
-  popover.setAttribute('aria-hidden', 'false');
+  panel.classList.add('is-open');
+  if (customBtn) {
+    customBtn.classList.add('is-open');
+    customBtn.setAttribute('aria-expanded', 'true');
+  }
 }
 
+/**
+ * Cierra el panel inline de fechas personalizadas.
+ */
 function _closeDatePicker() {
-  const popover = document.getElementById('date-picker-popover');
-  if (!popover) return;
-  popover.hidden = true;
-  popover.setAttribute('aria-hidden', 'true');
+  const panel     = document.getElementById('sb-custom-date-panel');
+  const customBtn = document.getElementById('sb-period-custom-btn');
+  if (panel) panel.classList.remove('is-open');
+  if (customBtn) {
+    customBtn.classList.remove('is-open');
+    customBtn.setAttribute('aria-expanded', 'false');
+  }
+}
+
+/**
+ * Alterna el panel inline de fecha personalizada.
+ */
+function _toggleDatePicker() {
+  const panel = document.getElementById('sb-custom-date-panel');
+  if (panel && panel.classList.contains('is-open')) {
+    _closeDatePicker();
+  } else {
+    _openDatePicker();
+  }
 }
 
 function _applyCustomRange() {
@@ -95,7 +141,13 @@ function _applyCustomRange() {
 
   _closeDatePicker();
   _currentPeriod = 'custom';
-  refreshDashboard(_currentSection, 'custom', { start: startInput.value, end: endInput.value });
+  _updatePeriodRange('custom');
+  // Pasa la granularity activa para que build_trend la respete en el backend
+  refreshDashboard(_currentSection, 'custom', {
+    start: startInput.value,
+    end:   endInput.value,
+    granularity: _currentGranularity,
+  });
 }
 
 /* ── Theme toggle ────────────────────────────────────────── */
@@ -109,34 +161,52 @@ function _toggleTheme() {
   const next    = current === 'dark' ? 'light' : 'dark';
   document.documentElement.setAttribute('data-theme', next);
   localStorage.setItem('umoh-theme', next);
+  _syncThemeLabel();
   // Redraw charts to pick up new CSS variable colors
   refreshDashboard(_currentSection, _currentPeriod);
 }
 
-/* ── User menu ───────────────────────────────────────────── */
+/* ── User menu (sidebar) ─────────────────────────────────── */
+
+/**
+ * Actualiza el label del botón de tema en el sidebar
+ * según el tema activo actual.
+ */
+function _syncThemeLabel() {
+  const label = document.getElementById('sb-theme-label');
+  if (!label) return;
+  const isDark = document.documentElement.getAttribute('data-theme') === 'dark';
+  label.textContent = isDark ? 'Modo claro' : 'Modo oscuro';
+}
+
 function initUserMenu() {
   const name      = window.DASHBOARD_USERNAME || 'Usuario';
   const firstName = name.split(' ')[0];
 
   const setTextEl = (id, val) => { const el = document.getElementById(id); if (el) el.textContent = val; };
-  setTextEl('user-display-name', firstName);
-  setTextEl('user-menu-fullname', name);
-  /* Avatars already contain <img> tags in HTML — no text override needed */
 
-  // Click toggle (hover is handled by CSS + bridge pseudo-element)
-  const trigger  = document.querySelector('.user-menu-trigger');
-  const dropdown = document.querySelector('.user-menu-dropdown');
+  // Sidebar user elements
+  setTextEl('sb-user-name',     firstName);
+  setTextEl('sb-user-fullname', name);
+
+  // Sección Inicio: saludo personalizado
+  setTextEl('inicio-user-name', firstName);
+
+  // Sidebar user dropdown
+  const trigger  = document.getElementById('sb-user-trigger');
+  const dropdown = document.getElementById('sb-user-dropdown');
   if (!trigger || !dropdown) return;
 
-  trigger.addEventListener('click', () => {
+  trigger.addEventListener('click', e => {
+    e.stopPropagation();
     const expanded = trigger.getAttribute('aria-expanded') === 'true';
     dropdown.classList.toggle('is-open', !expanded);
     trigger.setAttribute('aria-expanded', String(!expanded));
   });
 
   document.addEventListener('click', e => {
-    const menu = document.getElementById('user-menu');
-    if (menu && !menu.contains(e.target)) {
+    const userSection = document.getElementById('sb-user');
+    if (userSection && !userSection.contains(e.target)) {
       dropdown.classList.remove('is-open');
       trigger.setAttribute('aria-expanded', 'false');
     }
@@ -279,6 +349,66 @@ const KPI_INFO = {
     desc: 'Leads en estado "En Emisión": están activamente en el proceso de firma de contrato. Son las ventas más cercanas a cerrarse y el indicador más predictivo de ingresos futuros.',
     example: '15 leads de alta intención con un ticket promedio de $31.250 representan $468.750 en ingresos potenciales próximos a materializarse en el corto plazo.'
   },
+  'mofu-closedwon': {
+    name: 'Ventas Ganadas',
+    formula: '',
+    desc: 'Leads que llegaron a la etapa "Ventas Ganadas" del CRM en el período. Es la cantidad de cierres efectivos atribuidos a la campaña.',
+    example: d => {
+      // Tomar de status si está disponible, fallback a closed_won_leads
+      let won = d.closed_won_leads || 0;
+      if (d.status) {
+        const idx = d.status.labels.indexOf('Ventas Ganadas');
+        if (idx !== -1) won = d.status.data[idx] || 0;
+      }
+      const total = d.total_leads || 0;
+      const conv = total > 0 ? (won / total * 100).toFixed(1) : '0.0';
+      return `${_fn(won)} ventas ganadas sobre ${_fn(total)} leads del período = ${conv}% de conversión bruta.`;
+    }
+  },
+  'bofu-revenue': {
+    name: 'Ingresos Totales',
+    formula: 'Suma de precio_final de las ventas cerradas en el período',
+    desc: 'Total de ingresos generados por las ventas cerradas del cliente en el período. Solo incluye ventas de leads de campaña — las del vendedor (referidos, propios) van a un bloque separado.',
+    example: d => {
+      const rev = d.total_revenue || 0;
+      const sales = d.closed_sales || 0;
+      const ticket = sales > 0 ? rev / sales : 0;
+      return `Se generaron ${_fc(rev)} con ${_fn(sales)} ventas. Ticket promedio: ${_fc(ticket)}.`;
+    }
+  },
+  'bofu-sales': {
+    name: 'Ventas Cerradas',
+    formula: 'Cantidad de leads con is_closed=true en lead_monetary',
+    desc: 'Cantidad total de ventas efectivamente cerradas en el período. Una venta se cuenta cuando el vendedor marcó la operación como concluida en MeisterTask.',
+    example: d => {
+      const sales = d.closed_sales || 0;
+      const prevSales = d.prev?.closed_sales || 0;
+      const diff = prevSales > 0 ? ((sales - prevSales) / prevSales * 100).toFixed(1) : null;
+      const diffTxt = diff !== null ? ` (${diff >= 0 ? '+' : ''}${diff}% vs período anterior)` : '';
+      return `${_fn(sales)} ventas cerradas en el período${diffTxt}.`;
+    }
+  },
+  'bofu-capitas': {
+    name: 'Cápitas Cerradas',
+    formula: 'Suma de cápitas (titulares + grupo familiar) de cada venta',
+    desc: 'Cantidad total de afiliados firmados — incluye al titular más todos los miembros del grupo familiar/empresa. Una venta puede sumar múltiples cápitas.',
+    example: d => {
+      const cap = d.capitas_closed || 0;
+      const sales = d.closed_sales || 0;
+      const ratio = sales > 0 ? (cap / sales).toFixed(2) : '0';
+      return `${_fn(cap)} cápitas cerradas en ${_fn(sales)} ventas — ${ratio} cápitas promedio por venta.`;
+    }
+  },
+  'bofu-ticket-capita': {
+    name: 'Ticket Promedio por Cápita',
+    formula: 'Ingresos totales ÷ Cápitas cerradas',
+    desc: 'Ingreso promedio que aporta cada afiliado individual. A diferencia del ticket por venta, este número refleja el valor por persona contratada — útil para benchmarking entre planes.',
+    example: d => {
+      const tpc = d.avg_ticket_per_capita || 0;
+      const cap = d.capitas_closed || 0;
+      return `Cada cápita aportó en promedio ${_fc(tpc)} de ingreso. ${_fn(cap)} cápitas en total.`;
+    }
+  },
   'bofu-ticket': {
     name: 'Ticket Promedio por Venta',
     formula: 'Ingresos totales ÷ Ventas cerradas',
@@ -290,8 +420,82 @@ const KPI_INFO = {
     formula: 'Ventas cerradas ÷ Total leads × 100',
     desc: 'Porcentaje de leads que terminaron en venta. Combina la calidad del lead generado por marketing con la eficiencia del equipo de ventas al cerrarlo.',
     example: '8 ventas de 80 leads = 10% de conversión. Si el promedio de la industria aseguradora es 5–7%, esta campaña está operando por encima del benchmark.'
+  },
+
+  /* ── Resumen Comercial (Performance) — leen de data.sellers_summary ── */
+  'cs-top-seller': {
+    name: 'Mejor Vendedor del Período',
+    formula: '',
+    desc: 'El integrante del equipo comercial que cerró más ventas en el período seleccionado. Si dos vendedores empatan en cantidad, gana el que generó mayor revenue.',
+    example: d => {
+      const ss = d.sellers_summary || {};
+      const top = ss.top_seller || '—';
+      const prev = ss.prev?.top_seller || null;
+      if (prev && prev !== top) return `${top} cerró más ventas este período. En el período anterior el top era ${prev} — el ranking del equipo se está moviendo.`;
+      return `${top} cerró más ventas este período y mantiene el primer puesto del ranking comercial.`;
+    }
+  },
+  'cs-avg-effectiveness': {
+    name: 'Efectividad Promedio del Equipo',
+    formula: 'Suma de ventas del equipo ÷ Suma de leads asignados × 100',
+    desc: 'Porcentaje agregado de leads que el equipo logró convertir en ventas. Mide la eficiencia colectiva: cuántos leads de los que entran al CRM terminan cerrados.',
+    example: d => {
+      const ss = d.sellers_summary || {};
+      const eff = ss.avg_effectiveness || 0;
+      const sales = ss.total_sales || 0;
+      return `El equipo convirtió ${eff.toFixed(1)}% de los leads en ventas. ${_fn(sales)} ventas cerradas en total.`;
+    }
+  },
+  'cs-total-sales': {
+    name: 'Ventas del Equipo',
+    formula: 'Suma de ventas cerradas por todo el equipo',
+    desc: 'Total de ventas cerradas por el equipo comercial en el período. Es el indicador agregado de productividad colectiva.',
+    example: d => {
+      const ss = d.sellers_summary || {};
+      const sales = ss.total_sales || 0;
+      const ticket = ss.avg_ticket || 0;
+      return `${_fn(sales)} ventas cerradas, con un ticket promedio de ${_fc(ticket)}. Esto suma ${_fc(sales * ticket)} en ingresos del período.`;
+    }
+  },
+  'cs-avg-cycle-days': {
+    name: 'Ciclo Promedio de Venta',
+    formula: 'Promedio (ponderado por ventas) de días entre creación del lead y cierre',
+    desc: 'Días promedio que tarda un lead desde que entra al CRM hasta que se convierte en venta cerrada. Un ciclo más corto indica mayor velocidad comercial. Promedio ponderado por ventas para representar fielmente al equipo.',
+    example: d => {
+      const ss = d.sellers_summary || {};
+      const cycle = ss.avg_cycle_days || 0;
+      return `El equipo tarda en promedio ${cycle.toFixed(1)} días en cerrar una venta desde que el lead entra al CRM. Un ciclo más corto suele correlacionar con leads de mayor calidad o procesos comerciales más ágiles.`;
+    }
+  },
+  'cs-avg-ticket': {
+    name: 'Ticket Promedio del Equipo',
+    formula: 'Revenue total del equipo ÷ Ventas totales del equipo',
+    desc: 'Valor económico promedio de cada venta cerrada por el equipo. Un ticket en alza puede indicar que se están vendiendo planes de mayor valor o cápitas más grandes.',
+    example: d => {
+      const ss = d.sellers_summary || {};
+      const ticket = ss.avg_ticket || 0;
+      return `Cada venta del equipo genera en promedio ${_fc(ticket)} de ingreso. Es la cifra clave para proyectar el revenue total a partir del volumen de ventas esperado.`;
+    }
+  },
+  'cs-avg-capitas-per-sale': {
+    name: 'Cápitas por Venta',
+    formula: 'Cápitas totales cerradas ÷ Ventas totales',
+    desc: 'Cantidad promedio de cápitas (titulares + grupo familiar) que se cierran en cada venta. Indica el tamaño promedio del grupo familiar/empresa contratante.',
+    example: d => {
+      const ss = d.sellers_summary || {};
+      const cps = ss.avg_capitas_per_sale || 0;
+      return `Cada venta del equipo suma en promedio ${cps.toFixed(2)} cápitas. Si el número crece, el equipo está cerrando ventas con grupos familiares o empresas más grandes — más revenue por venta.`;
+    }
   }
 };
+
+/** Clasifica un kpiKey por sección. Única fuente de verdad para ambos modales. */
+function _kpiSection(kpiKey) {
+  if (kpiKey.startsWith('tofu-')) return 'tofu';
+  if (kpiKey.startsWith('mofu-')) return 'mofu';
+  if (kpiKey.startsWith('bofu-') || (['revenue', 'sales'].includes(kpiKey) && _currentSection === 'bofu')) return 'bofu';
+  return 'performance';
+}
 
 function _renderModalChart(kpiKey) {
   if (window._kpiModalChartInstance) {
@@ -299,30 +503,35 @@ function _renderModalChart(kpiKey) {
     window._kpiModalChartInstance = null;
   }
   const ctx = document.getElementById('kpi-modal-chart');
-  if (!ctx) return;
+  if (!ctx) return false;
 
-  const isTofuKey = ['tofu-impressions', 'tofu-clicks', 'tofu-cpc'].includes(kpiKey);
-  const isMofuKey = ['mofu-leads', 'mofu-cpl', 'mofu-tipif', 'mofu-highintent'].includes(kpiKey);
+  const section   = _kpiSection(kpiKey);
+  const isTofuKey = section === 'tofu';
+  const isMofuKey = section === 'mofu';
+  const isBofuKey = section === 'bofu';
 
   let data;
   if (isTofuKey) {
     data = window._tofuData;
   } else if (isMofuKey) {
     data = window._mofuData;
+  } else if (isBofuKey && window._bofuData) {
+    data = window._bofuData;
   } else {
     data = window._kpiModalData;
   }
-  if (!data || !data.trend) return;
+  if (!data || !data.trend) return false;
 
   const src     = data.trend.sparkline || data.trend;
-  const labels  = src.labels || [];
-  const spend   = src.spend   || data.trend.spend;
-  const revenue = src.revenue || data.trend.revenue;
+  const labels  = src.labels || data.trend.labels || [];
+  const spend   = src.spend   || data.trend.spend   || [];
+  const revenue = src.revenue || data.trend.revenue || [];
 
   let values, color, label;
   const isUp = arr => arr[arr.length - 1] >= arr[0];
 
-  if (kpiKey === 'revenue') {
+  if (kpiKey === 'revenue' && !isBofuKey) {
+    // Performance section revenue (uses spend+revenue from summary)
     values = revenue; color = isUp(revenue) ? '#22C55E' : '#FF0040'; label = 'Ingreso';
   } else if (kpiKey === 'spend') {
     values = spend; color = !isUp(spend) ? '#22C55E' : '#EF4444'; label = 'Inversión';
@@ -337,9 +546,17 @@ function _renderModalChart(kpiKey) {
     const tot = revenue.reduce((a, b) => a + b, 0);
     values = revenue.map(r => tot > 0 ? Math.round((r / tot) * data.leads) : 0);
     color = isUp(values) ? '#22C55E' : '#FF0040'; label = 'Leads';
-  } else if (kpiKey === 'sales') {
+  } else if (kpiKey === 'sales' && !isBofuKey) {
+    // Performance section sales — usa revenue como proxy de distribución temporal.
+    // Si revenue está todo en 0 (caso sin datos reales), usa distribución uniforme.
     const tot = revenue.reduce((a, b) => a + b, 0);
-    values = revenue.map(r => tot > 0 ? Math.round((r / tot) * data.closed_sales) : 0);
+    if (tot > 0 && data.closed_sales > 0) {
+      values = revenue.map(r => Math.round((r / tot) * data.closed_sales));
+    } else {
+      const pts = labels.length || 2;
+      const perPt = data.closed_sales > 0 ? Math.round(data.closed_sales / pts) : 0;
+      values = Array(pts).fill(perPt);
+    }
     color = isUp(values) ? '#22C55E' : '#FF0040'; label = 'Ventas';
   } else if (kpiKey === 'tofu-impressions') {
     values = data.trend.impressions; color = isUp(data.trend.impressions) ? '#22C55E' : '#FF0040'; label = 'Impresiones';
@@ -360,15 +577,43 @@ function _renderModalChart(kpiKey) {
   } else if (kpiKey === 'mofu-highintent') {
     values = src.leads || data.trend.leads || [];
     color = isUp(values) ? '#22C55E' : '#FF0040'; label = 'Leads (proxy alta intención)';
+  } else if (kpiKey === 'mofu-closedwon') {
+    values = src.leads || data.trend.leads || [];
+    color = isUp(values) ? '#22C55E' : '#FF0040'; label = 'Leads (proxy ventas ganadas)';
+  } else if (kpiKey === 'bofu-revenue' || (kpiKey === 'revenue' && isBofuKey)) {
+    values = data.trend.revenue || [];
+    color = isUp(values) ? '#22C55E' : '#FF0040'; label = 'Ingresos';
+  } else if (kpiKey === 'bofu-sales' || (kpiKey === 'sales' && isBofuKey)) {
+    values = data.trend.sales || [];
+    color = isUp(values) ? '#22C55E' : '#FF0040'; label = 'Ventas';
+  } else if (kpiKey === 'bofu-ticket') {
+    // Ticket = revenue / sales por punto — si no existen ambos, usar revenue como proxy
+    const rev   = data.trend.revenue || [];
+    const sales = data.trend.sales   || [];
+    values = rev.map((r, i) => sales[i] > 0 ? Math.round(r / sales[i]) : 0);
+    color = isUp(values) ? '#22C55E' : '#FF0040'; label = 'Ticket promedio';
+  } else if (kpiKey === 'bofu-conversion') {
+    // Conversión por punto: proporción relativa de ventas
+    values = data.trend.sales || [];
+    color = isUp(values) ? '#22C55E' : '#FF0040'; label = 'Ventas (proxy conversión)';
+  } else if (kpiKey === 'bofu-capitas') {
+    // Cápitas: proporción de sales escalada por ratio total
+    const salesArr = data.trend.sales || [];
+    const ratio    = data.closed_sales > 0 ? (data.capitas_closed / data.closed_sales) : 1;
+    values = salesArr.map(s => Math.round(s * ratio));
+    color = isUp(values) ? '#22C55E' : '#FF0040'; label = 'Cápitas';
+  } else if (kpiKey === 'bofu-ticket-capita') {
+    values = data.trend.revenue || [];
+    color = isUp(values) ? '#22C55E' : '#FF0040'; label = 'Ingreso (proxy ticket/cápita)';
   } else {
-    return;
+    return false;
   }
 
-  if (!values || values.length < 2) return;
+  if (!values || values.length < 2) return false;
 
   const fill = color === '#22C55E' ? 'rgba(34,197,94,0.10)' : 'rgba(239,68,68,0.10)';
 
-  const chartLabels = (isTofuKey || isMofuKey)
+  const chartLabels = (isTofuKey || isMofuKey || isBofuKey)
     ? (data.trend.labels || values.map((_, i) => `${i + 1}`))
     : (labels.length === values.length ? labels : values.map((_, i) => `${i + 1}`));
 
@@ -399,7 +644,9 @@ function _renderModalChart(kpiKey) {
             title: items => items[0]?.label || '',
             label: c => {
               const v = c.parsed.y;
-              if (kpiKey === 'tofu-cpc' || kpiKey === 'mofu-cpl') return ` ${label}: $${Math.round(v).toLocaleString('es-AR')}`;
+              const currencyKeys = ['tofu-cpc', 'mofu-cpl', 'bofu-revenue', 'bofu-ticket', 'bofu-ticket-capita'];
+              if (currencyKeys.includes(kpiKey)) return ` ${label}: $${Math.round(v).toLocaleString('es-AR')}`;
+              if (kpiKey === 'roi') return ` ${label}: ${v.toFixed(1)}%`;
               return ` ${label}: ${Number.isInteger(v) ? v.toLocaleString('es-AR') : v.toFixed(1)}`;
             }
           }
@@ -420,7 +667,12 @@ function _renderModalChart(kpiKey) {
               if (kpiKey === 'tofu-impressions' || kpiKey === 'tofu-clicks') {
                 return v >= 1000 ? (v / 1000).toFixed(0) + 'k' : v;
               }
-              if (kpiKey === 'tofu-cpc' || kpiKey === 'mofu-cpl') return '$' + (v / 1000).toFixed(1) + 'k';
+              if (['tofu-cpc', 'mofu-cpl', 'bofu-ticket', 'bofu-ticket-capita'].includes(kpiKey)) {
+                return '$' + (v / 1000).toFixed(1) + 'k';
+              }
+              if (['bofu-revenue', 'bofu-ticket-capita'].includes(kpiKey)) {
+                return v >= 1000000 ? '$' + (v / 1000000).toFixed(1) + 'M' : '$' + (v / 1000).toFixed(0) + 'k';
+              }
               return v >= 1000000 ? '$' + (v / 1000000).toFixed(1) + 'M' : v >= 1000 ? '$' + (v / 1000).toFixed(0) + 'k' : v;
             }
           },
@@ -429,12 +681,19 @@ function _renderModalChart(kpiKey) {
       }
     }
   });
+  return true;
 }
 
 function _openKpiModal(kpiKey) {
   const info = KPI_INFO[kpiKey];
   if (!info) return;
-  const data = window._kpiModalData || {};
+
+  const _sec = _kpiSection(kpiKey);
+  let data;
+  if (_sec === 'tofu')        data = window._tofuData   || window._kpiModalData || {};
+  else if (_sec === 'mofu')   data = window._mofuData   || window._kpiModalData || {};
+  else if (_sec === 'bofu')   data = window._bofuData   || window._kpiModalData || {};
+  else                        data = window._kpiModalData || {};
 
   const modal   = document.getElementById('kpi-modal');
   const title   = document.getElementById('kpi-modal-title');
@@ -449,7 +708,13 @@ function _openKpiModal(kpiKey) {
   example.textContent = typeof info.example === 'function' ? info.example(data) : info.example;
 
   modal.hidden = false;
-  requestAnimationFrame(() => _renderModalChart(kpiKey));
+  // Renderizar el chart si aplica; si no hay datos para chart, ocultar el área
+  // entera para que el modal no muestre un espacio en blanco sin sentido.
+  const chartArea = modal.querySelector('.kpi-modal-chart-area');
+  requestAnimationFrame(() => {
+    const rendered = _renderModalChart(kpiKey);
+    if (chartArea) chartArea.hidden = !rendered;
+  });
   document.getElementById('kpi-modal-close').focus();
   document.body.style.overflow = 'hidden';
 }
@@ -470,6 +735,26 @@ function initKpiModals() {
     card.addEventListener('click', () => _openKpiModal(card.dataset.kpi));
   });
 
+  // Event delegation para .cs-item del Resumen Comercial — el bloque se
+  // re-renderiza con innerHTML cada vez que cambia el período, así que no
+  // alcanza con registrar listeners una sola vez en cada cs-item.
+  const csContainer = document.getElementById('commercial-summary');
+  if (csContainer) {
+    csContainer.addEventListener('click', e => {
+      const item = e.target.closest('.cs-item[data-cs-kpi]');
+      if (item) _openKpiModal(item.dataset.csKpi);
+    });
+    // Soporte teclado: Enter o Space activan el modal
+    csContainer.addEventListener('keydown', e => {
+      if (e.key !== 'Enter' && e.key !== ' ') return;
+      const item = e.target.closest('.cs-item[data-cs-kpi]');
+      if (item) {
+        e.preventDefault();
+        _openKpiModal(item.dataset.csKpi);
+      }
+    });
+  }
+
   const closeBtn = document.getElementById('kpi-modal-close');
   if (closeBtn) closeBtn.addEventListener('click', _closeKpiModal);
 
@@ -488,74 +773,501 @@ function initKpiModals() {
 /* ── Init all listeners ─────────────────────────────────── */
 function initFilters() {
 
-  /* Period selector */
-  document.querySelectorAll('.period-btn').forEach(btn => {
+  /* Period selector — sidebar buttons (.sb-period-btn) */
+  document.querySelectorAll('.sb-period-btn').forEach(btn => {
     btn.addEventListener('click', () => {
       const period = btn.dataset.period;
       if (period === 'custom') {
+        // Personalizado: toggle del panel inline (no activa período hasta que se aplica)
         _activatePeriod(btn);
-        _openDatePicker();
+        _toggleDatePicker();
         return;
       }
+      // Al seleccionar otro período, cerrar el panel de fechas si estaba abierto
       _closeDatePicker();
       _activatePeriod(btn);
       _currentPeriod = period;
+      _updateInicioSubtitle(period);
+      _updatePeriodRange(period);
       refreshDashboard(_currentSection, _currentPeriod);
     });
   });
 
-  /* Histórico total — granularity buttons */
-  document.querySelectorAll('.historic-btn').forEach(btn => {
-    btn.addEventListener('click', () => {
-      document.querySelectorAll('.historic-btn').forEach(b => b.classList.remove('active'));
-      btn.classList.add('active');
-      const granularity = btn.dataset.granularity;
-      _closeDatePicker();
-      _currentPeriod = 'all';
-      refreshDashboard(_currentSection, 'all', { granularity });
-    });
-  });
+  /* Histórico total — granularity buttons (eliminados del HTML; listener vacío por seguridad) */
 
   /* Apply custom date range */
   const applyBtn = document.getElementById('date-apply-btn');
   if (applyBtn) applyBtn.addEventListener('click', _applyCustomRange);
 
-  /* Close date picker on outside click */
-  document.addEventListener('click', e => {
-    const popover = document.getElementById('date-picker-popover');
-    const wrap    = document.querySelector('.period-selector-wrap');
-    if (popover && !popover.hidden && wrap && !wrap.contains(e.target)) {
-      _closeDatePicker();
-      if (_currentPeriod !== 'custom' && _currentPeriod !== 'all') {
-        const activeBtn = document.querySelector(`.period-btn[data-period="${_currentPeriod}"]`);
-        if (activeBtn) _activatePeriod(activeBtn);
-      }
-    }
-  });
+  /* Section navigation — sidebar items (.sb-nav-item) */
+  document.querySelectorAll('.sb-nav-item').forEach(item => {
+    item.addEventListener('click', () => {
+      const section = item.dataset.section;
 
-  /* Section navigation */
-  document.querySelectorAll('.nav-tab').forEach(tab => {
-    tab.addEventListener('click', () => {
-      const section = tab.dataset.section;
-      if (section === _currentSection) return;
-      _activateTab(tab);
+      if (section === _currentSection) {
+        _closeMobileDrawer();
+        return;
+      }
+      _activateSidebarNavItem(section);
       _activateSection(section);
       _currentSection = section;
       refreshDashboard(_currentSection, _currentPeriod);
-      if (section === 'tofu') setTimeout(() => { if (typeof invalidateGeoMap === 'function') invalidateGeoMap(); }, 350);
+      if (section === 'tofu') {
+        setTimeout(() => { if (typeof invalidateGeoMap === 'function') invalidateGeoMap(); }, 350);
+      }
+      _closeMobileDrawer();
     });
   });
 
-  /* Theme toggle */
+  /* Theme toggle — botón flotante (mantenido por compatibilidad, ahora oculto en sidebar layout) */
   const themeBtn = document.getElementById('theme-toggle');
   if (themeBtn) themeBtn.addEventListener('click', _toggleTheme);
+
+  /* Theme toggle — botón en sidebar */
+  const sbThemeBtn = document.getElementById('sb-theme-toggle');
+  if (sbThemeBtn) sbThemeBtn.addEventListener('click', _toggleTheme);
+
+  /* Dropdown de campañas */
+  _initCampaignsDropdown();
+}
+
+/* ── Dropdown de campañas — trigger expandir/colapsar ────── */
+function _initCampaignsDropdown() {
+  const trigger = document.getElementById('sb-campaigns-trigger');
+  const panel   = document.getElementById('sb-campaigns-panel');
+  if (!trigger || !panel) return;
+
+  trigger.addEventListener('click', e => {
+    e.stopPropagation();
+    const isOpen = trigger.classList.contains('is-open');
+    trigger.classList.toggle('is-open', !isOpen);
+    panel.classList.toggle('is-open', !isOpen);
+    trigger.setAttribute('aria-expanded', String(!isOpen));
+  });
+
+  // Click fuera cierra el dropdown
+  document.addEventListener('click', e => {
+    const section = document.getElementById('sb-campaigns-section');
+    if (section && !section.contains(e.target)) {
+      trigger.classList.remove('is-open');
+      panel.classList.remove('is-open');
+      trigger.setAttribute('aria-expanded', 'false');
+    }
+  });
+}
+
+/**
+ * Actualiza el trigger del dropdown de campañas para reflejar la campaña activa.
+ * Muestra nombre + meta (ID · Plataforma).
+ */
+function _updateCampaignsTrigger(id, name, platform) {
+  const nameEl   = document.getElementById('sb-campaigns-active-name');
+  const metaEl   = document.getElementById('sb-campaigns-active-meta');
+  const trigger  = document.getElementById('sb-campaigns-trigger');
+
+  if (id === 'all') {
+    if (nameEl) nameEl.textContent = 'Todas las campañas';
+    if (metaEl) metaEl.textContent = 'vista agregada';
+    if (trigger) trigger.classList.remove('has-campaign');
+  } else {
+    if (nameEl) nameEl.textContent = name || id;
+    const platformLabel = _platformLabel(platform || 'google_ads');
+    if (metaEl) metaEl.textContent = `${id} · ${platformLabel}`;
+    if (trigger) trigger.classList.add('has-campaign');
+  }
+}
+
+/**
+ * Convierte el valor raw de plataforma a un label legible.
+ * Fallback: 'google_ads' → 'Google Ads'.
+ * NOTA: El endpoint /api/campaigns.php no incluye `platform` en el SELECT
+ * actualmente — se necesita extender la query para incluir el campo desde
+ * tofu_facts. Mientras tanto, se usa 'google_ads' como fallback.
+ */
+function _platformLabel(raw) {
+  const map = {
+    google_ads:  'Google Ads',
+    google:      'Google Ads',
+    meta:        'Meta Ads',
+    meta_ads:    'Meta Ads',
+    facebook:    'Meta Ads',
+  };
+  return map[String(raw).toLowerCase()] || 'Google Ads';
+}
+
+/* Actualiza el subtitle de la sección Inicio según el período activo */
+function _updateInicioSubtitle(period) {
+  const el = document.getElementById('inicio-subtitle');
+  if (!el) return;
+  const labels = {
+    '7d':  'Esto es lo que pasó con tus campañas en los últimos 7 días',
+    '30d': 'Esto es lo que pasó con tus campañas en los últimos 30 días',
+    '90d': 'Esto es lo que pasó con tus campañas en los últimos 90 días',
+    'custom': 'Esto es lo que pasó con tus campañas en el período seleccionado',
+  };
+  el.textContent = labels[period] || labels['30d'];
+}
+
+/* Calcula el rango de fechas (inclusive) cubierto por el período activo
+   y lo muestra al lado del label "Período" en el sidebar. */
+const _MESES_ES = ['ene','feb','mar','abr','may','jun','jul','ago','sep','oct','nov','dic'];
+function _fmtFechaCorta(d) {
+  return d.getDate() + ' ' + _MESES_ES[d.getMonth()];
+}
+function _fmtFechaCortaConYear(d) {
+  return d.getDate() + ' ' + _MESES_ES[d.getMonth()] + ' ' + d.getFullYear();
+}
+function _updatePeriodRange(period) {
+  const el = document.getElementById('sb-period-range');
+  if (!el) return;
+  const hoy = new Date();
+  let desde, hasta;
+  if (period === 'custom') {
+    const s = document.getElementById('date-start');
+    const e = document.getElementById('date-end');
+    if (s && e && s.value && e.value) {
+      desde = new Date(s.value + 'T00:00:00');
+      hasta = new Date(e.value + 'T00:00:00');
+    } else {
+      el.textContent = '';
+      return;
+    }
+  } else {
+    const dias = parseInt(String(period).replace('d',''), 10) || 30;
+    hasta = hoy;
+    desde = new Date(hoy);
+    desde.setDate(hoy.getDate() - (dias - 1));
+  }
+  const sameYear = desde.getFullYear() === hasta.getFullYear();
+  el.textContent = sameYear
+    ? _fmtFechaCorta(desde) + ' – ' + _fmtFechaCortaConYear(hasta)
+    : _fmtFechaCortaConYear(desde) + ' – ' + _fmtFechaCortaConYear(hasta);
+}
+
+/* ── FAB scroll-to-top ──────────────────────────────────────
+   En layout de sidebar, el nav-bar ya no existe — el FAB solo
+   actúa como scroll-to-top. Aparece al superar el umbral. */
+function initScrollNavBehavior() {
+  const fab = document.getElementById('nav-fab');
+  if (!fab) return;
+
+  const SCROLL_THRESHOLD = 300;
+  let ticking = false;
+
+  function onScroll() {
+    const y = window.scrollY || document.documentElement.scrollTop;
+    if (y > SCROLL_THRESHOLD) {
+      document.body.classList.add('nav-hidden');
+    } else {
+      document.body.classList.remove('nav-hidden');
+    }
+    ticking = false;
+  }
+
+  window.addEventListener('scroll', () => {
+    if (!ticking) {
+      requestAnimationFrame(onScroll);
+      ticking = true;
+    }
+  }, { passive: true });
+
+  fab.addEventListener('click', () => {
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  });
+}
+
+/* ── Sidebar: toggle expandido / colapsado ───────────────────
+   Estado persiste en localStorage('umoh:sidebar').
+   Default: expandido ('expanded'). */
+function initSidebar() {
+  const collapseBtn = document.getElementById('sb-collapse-btn');
+  const hamburger   = document.getElementById('sb-hamburger');
+
+  // Restaurar estado (el .sidebar-collapsed ya fue aplicado en <head>
+  // antes de que el DOM cargara, para evitar flash — solo sincronizamos
+  // el aria-label del botón).
+  _syncCollapseBtn();
+
+  if (collapseBtn) {
+    collapseBtn.addEventListener('click', () => {
+      const isCollapsed = document.body.classList.toggle('sidebar-collapsed');
+      localStorage.setItem('umoh:sidebar', isCollapsed ? 'collapsed' : 'expanded');
+      _syncCollapseBtn();
+
+      // Al colapsar: limpiar los inline styles del resize para que las reglas
+      // CSS de .sidebar-collapsed tomen el control sin interferencia.
+      // Al expandir: restaurar el ancho guardado por el resize (si existe).
+      const sidebar = document.getElementById('dashboard-sidebar');
+      const content = document.getElementById('dashboard-content');
+      if (isCollapsed) {
+        if (sidebar) sidebar.style.width = '';
+        if (content) {
+          content.style.marginLeft = '';
+          content.style.width      = '';
+        }
+        document.documentElement.style.removeProperty('--sb-width');
+      } else {
+        // Expandido: restaurar el ancho de resize si hay uno guardado
+        const savedW = parseInt(localStorage.getItem('umoh:sidebar-width'), 10);
+        if (sidebar && content && savedW && savedW >= 220 && savedW <= 360) {
+          _applySidebarWidth(savedW, sidebar, content);
+        }
+      }
+      // Sincronizar visibilidad del handle de resize
+      _syncResizeHandle();
+    });
+  }
+
+  // Mobile hamburger: abre/cierra el drawer
+  if (hamburger) {
+    hamburger.addEventListener('click', e => {
+      e.stopPropagation();
+      const isOpen = document.body.classList.toggle('sidebar-mobile-open');
+      hamburger.setAttribute('aria-expanded', String(isOpen));
+    });
+  }
+
+  // Click en el overlay (::before del body) cierra el drawer en mobile
+  document.addEventListener('click', e => {
+    if (!document.body.classList.contains('sidebar-mobile-open')) return;
+    const sidebar = document.getElementById('dashboard-sidebar');
+    const hamburgerEl = document.getElementById('sb-hamburger');
+    if (sidebar && !sidebar.contains(e.target) && e.target !== hamburgerEl) {
+      _closeMobileDrawer();
+    }
+  });
+
+  // Escape cierra el drawer en mobile
+  document.addEventListener('keydown', e => {
+    if (e.key === 'Escape') _closeMobileDrawer();
+  });
+}
+
+function _syncCollapseBtn() {
+  const btn = document.getElementById('sb-collapse-btn');
+  if (!btn) return;
+  const isCollapsed = document.body.classList.contains('sidebar-collapsed');
+  btn.setAttribute('aria-label', isCollapsed ? 'Expandir sidebar' : 'Colapsar sidebar');
+  btn.setAttribute('title',      isCollapsed ? 'Expandir'         : 'Colapsar');
+}
+
+/**
+ * Oculta/muestra el resize handle según el estado colapsado del sidebar.
+ * El handle no debe ser interactuable cuando el sidebar está colapsado.
+ */
+function _syncResizeHandle() {
+  const handle = document.getElementById('sb-resize-handle');
+  if (!handle) return;
+  const isCollapsed = document.body.classList.contains('sidebar-collapsed');
+  handle.style.display = isCollapsed ? 'none' : '';
+}
+
+function _closeMobileDrawer() {
+  document.body.classList.remove('sidebar-mobile-open');
+  const hamburger = document.getElementById('sb-hamburger');
+  if (hamburger) hamburger.setAttribute('aria-expanded', 'false');
+}
+
+/* ── Selector de campaña en sidebar (Sprint UX 2.0) ─────────
+   Reemplaza el dropdown del header por una lista vertical en el sidebar.
+   Reutiliza _currentCampaignId / _currentCampaignName y localStorage.
+   Búsqueda integrada aparece automáticamente si hay >10 campañas. */
+function initCampaignSelector() {
+  const list       = document.getElementById('sb-campaign-list');
+  const searchWrap = document.getElementById('sb-campaign-search');
+  const searchInput= document.getElementById('sb-campaign-search-input');
+  if (!list) return;
+
+  function _setSelectedUI(id) {
+    list.querySelectorAll('.sb-campaign-item').forEach(item => {
+      const active = item.dataset.campaignId === id;
+      item.classList.toggle('active', active);
+      item.setAttribute('aria-selected', active ? 'true' : 'false');
+    });
+  }
+
+  function _selectCampaign(id, name, platform) {
+    _currentCampaignId   = id;
+    _currentCampaignName = name || '';
+    localStorage.setItem('umoh:campaign_id',   id);
+    localStorage.setItem('umoh:campaign_name', _currentCampaignName);
+    _setSelectedUI(id);
+    // Actualizar el trigger del dropdown con la selección
+    _updateCampaignsTrigger(id, _currentCampaignName, platform);
+    // Cerrar el panel del dropdown
+    const trigger = document.getElementById('sb-campaigns-trigger');
+    const panel   = document.getElementById('sb-campaigns-panel');
+    if (trigger) { trigger.classList.remove('is-open'); trigger.setAttribute('aria-expanded', 'false'); }
+    if (panel)   panel.classList.remove('is-open');
+
+    refreshDashboard(_currentSection, _currentPeriod);
+    _closeMobileDrawer();
+  }
+
+  // Event delegation sobre la lista de campañas
+  list.addEventListener('click', e => {
+    const item = e.target.closest('.sb-campaign-item');
+    if (!item) return;
+    const id       = item.dataset.campaignId;
+    const name     = item.dataset.campaignName || item.querySelector('.sb-campaign-name')?.textContent || '';
+    const platform = item.dataset.platform || '';
+    _selectCampaign(id, name, platform);
+  });
+
+  // Búsqueda: filtra las opciones en tiempo real
+  if (searchInput) {
+    searchInput.addEventListener('input', () => {
+      const q = searchInput.value.toLowerCase().trim();
+      list.querySelectorAll('.sb-campaign-item').forEach(item => {
+        const n = (item.querySelector('.sb-campaign-name')?.textContent || '').toLowerCase();
+        item.style.display = (!q || n.includes(q)) ? '' : 'none';
+      });
+    });
+  }
+
+  // Cargar la lista desde el backend y popular la lista del sidebar
+  fetchData('campaigns', {})
+    .then(resp => {
+      const campaigns = (resp && resp.campaigns) || [];
+      // Mostrar búsqueda si hay muchas campañas
+      if (searchWrap && campaigns.length > 10) searchWrap.style.display = '';
+
+      campaigns.forEach(c => {
+        const item = document.createElement('button');
+        item.className = 'sb-campaign-item';
+        item.type = 'button';
+        item.dataset.campaignId   = c.id;
+        item.dataset.campaignName = c.name;
+        // Incluir plataforma si el backend la provee — fallback a 'google_ads'
+        item.dataset.platform = c.platform || 'google_ads';
+        item.setAttribute('role', 'option');
+        item.setAttribute('aria-selected', 'false');
+        const platformLabel = _platformLabel(c.platform || 'google_ads');
+        item.innerHTML = `
+          <svg class="sb-campaign-icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <circle cx="12" cy="12" r="10"/>
+            <circle cx="12" cy="12" r="6"/>
+            <circle cx="12" cy="12" r="2"/>
+          </svg>
+          <div class="sb-campaign-info sb-label">
+            <span class="sb-campaign-name">${_escape(c.name)}</span>
+            <span class="sb-campaign-id">${_escape(c.id)} · ${_escape(platformLabel)}</span>
+          </div>
+        `;
+        list.appendChild(item);
+      });
+
+      // Reconciliar persistencia con la lista recibida
+      if (_currentCampaignId !== 'all') {
+        const found = campaigns.find(c => c.id === _currentCampaignId);
+        if (!found) {
+          _currentCampaignId   = 'all';
+          _currentCampaignName = '';
+          localStorage.setItem('umoh:campaign_id',   'all');
+          localStorage.setItem('umoh:campaign_name', '');
+        } else {
+          _currentCampaignName = found.name;
+          localStorage.setItem('umoh:campaign_name', found.name);
+          // Actualizar el trigger con los datos completos
+          _updateCampaignsTrigger(_currentCampaignId, found.name, found.platform || 'google_ads');
+        }
+      }
+      _setSelectedUI(_currentCampaignId);
+    })
+    .catch(() => {
+      // Fallback silencioso: solo "Todas las campañas" queda activa
+      _setSelectedUI('all');
+    });
+}
+
+function _escape(s) {
+  return String(s).replace(/[&<>"']/g, c => ({
+    '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;',
+  })[c]);
+}
+
+/* ── Sidebar resize arrastrable ─────────────────────────────
+   Permite ajustar el ancho del sidebar entre 220 y 360 px.
+   El ancho se persiste en localStorage('umoh:sidebar-width').
+   En mobile (<768px) el resize no aplica.
+   El resize NO se aplica cuando el sidebar está colapsado. */
+function initSidebarResize() {
+  const sidebar = document.getElementById('dashboard-sidebar');
+  const handle  = document.getElementById('sb-resize-handle');
+  const content = document.getElementById('dashboard-content');
+  if (!sidebar || !handle || !content) return;
+
+  const SB_MIN   = 220;
+  const SB_MAX   = 360;
+  const SB_KEY   = 'umoh:sidebar-width';
+
+  /* Sincronizar handle: ocultarlo si sidebar empieza colapsado */
+  _syncResizeHandle();
+
+  /* Restaurar ancho guardado — solo si el sidebar NO está colapsado */
+  const saved = parseInt(localStorage.getItem(SB_KEY), 10);
+  if (saved && saved >= SB_MIN && saved <= SB_MAX) {
+    if (!document.body.classList.contains('sidebar-collapsed')) {
+      _applySidebarWidth(saved, sidebar, content);
+    }
+  }
+
+  let dragging = false;
+  let startX   = 0;
+  let startW   = 0;
+
+  handle.addEventListener('mousedown', e => {
+    if (window.innerWidth <= 768) return;
+    /* No iniciar resize si el sidebar está colapsado */
+    if (document.body.classList.contains('sidebar-collapsed')) return;
+    dragging = true;
+    startX   = e.clientX;
+    startW   = sidebar.offsetWidth;
+    handle.classList.add('dragging');
+    document.body.style.cursor     = 'col-resize';
+    document.body.style.userSelect = 'none';
+    e.preventDefault();
+  });
+
+  document.addEventListener('mousemove', e => {
+    if (!dragging) return;
+    const delta = e.clientX - startX;
+    const newW  = Math.min(SB_MAX, Math.max(SB_MIN, startW + delta));
+    _applySidebarWidth(newW, sidebar, content);
+  });
+
+  document.addEventListener('mouseup', () => {
+    if (!dragging) return;
+    dragging = false;
+    handle.classList.remove('dragging');
+    document.body.style.cursor     = '';
+    document.body.style.userSelect = '';
+    localStorage.setItem(SB_KEY, sidebar.offsetWidth);
+  });
+}
+
+function _applySidebarWidth(w, sidebar, content) {
+  const px = w + 'px';
+  sidebar.style.width = px;
+  content.style.marginLeft = px;
+  content.style.width = 'calc(100% - ' + px + ')';
+  /* Actualizar la variable CSS para que elementos como el date-picker
+     que dependen de --sb-width se posicionen correctamente */
+  document.documentElement.style.setProperty('--sb-width', px);
 }
 
 /* ── Bootstrap ──────────────────────────────────────────── */
 document.addEventListener('DOMContentLoaded', () => {
   initTheme();
+  _syncThemeLabel();
+  initSidebar();
   initUserMenu();
   initFilters();
   initKpiModals();
+  initScrollNavBehavior();
+  initCampaignSelector();
+  initSidebarResize();
+  _updatePeriodRange(_currentPeriod);
+
   refreshDashboard(_currentSection, _currentPeriod);
 });

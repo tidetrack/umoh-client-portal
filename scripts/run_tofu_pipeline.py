@@ -37,8 +37,10 @@ from __future__ import annotations
 import argparse
 import json
 import logging
+import os
 import sys
 from pathlib import Path
+from typing import Any
 
 # Resolver imports del directorio data/ independientemente del cwd
 _REPO_ROOT = Path(__file__).resolve().parent.parent
@@ -47,7 +49,9 @@ sys.path.insert(0, str(_REPO_ROOT / "data"))
 from dotenv import load_dotenv
 
 # Los imports de los módulos del pipeline van después del sys.path.insert
+from connections.supabase_client import get_client as get_supabase_client
 from extractors.google_ads import run as extract_google_ads
+from loaders.supabase_search_terms_writer import write_search_terms
 from loaders.supabase_tofu_writer import write_tofu_ads
 from normalizers.canonical import normalize
 
@@ -181,10 +185,157 @@ def main() -> None:
         logger.exception("Error escribiendo en Supabase.")
 
     # ------------------------------------------------------------------
-    # Paso 5: Resumen
+    # Paso 4b: Escribir términos de búsqueda en tofu_search_terms
+    #
+    # Los raw_search_terms vienen del extractor: pueden ser de search_term_view
+    # (campañas Search tradicionales) o de campaign_search_term_insight (PMAX).
+    # El writer hace upsert idempotente por (client_slug, date, campaign_id, term).
+    # Si raw_search_terms está vacío (ambas fuentes devolvieron 0 filas), el writer
+    # loguea el hecho y retorna sin error — no bloquea el pipeline.
     # ------------------------------------------------------------------
+    search_terms_results: dict[str, Any] = {}
+    search_terms_errors: list[str] = []
+
+    for raw in raw_results:
+        client_id = raw.get("client_id", "")
+        raw_terms = raw.get("raw_search_terms", [])
+        try:
+            st_result = write_search_terms(
+                raw_terms=raw_terms,
+                client_slug=client_id,
+            )
+            search_terms_results[client_id] = st_result
+            logger.info(
+                "tofu_search_terms: cliente=%s filas_escritas=%d source_counts=%s",
+                client_id,
+                st_result.get("rows_written", 0),
+                st_result.get("source_counts", {}),
+            )
+        except Exception as exc:
+            err_msg = f"write_search_terms falló para cliente={client_id}: {exc}"
+            logger.error(err_msg)
+            search_terms_errors.append(err_msg)
+            # No se aborta el pipeline — los demás pasos continúan
+
+    # ------------------------------------------------------------------
+    # Paso 5: Poblar tofu_facts via stored procedure
+    #
+    # Se ejecuta por cada cliente procesado. Para v1 (Prepagas, campaña única)
+    # el campaign_id se toma del DataFrame si está disponible; si no, usa el
+    # placeholder 'PMAX_PREPAGAS'.
+    #
+    # El stored procedure es idempotente (UPSERT) — re-ejecutarlo es seguro.
+    # Si el upsert a tofu_ads_daily falló (supabase_error), igual intentamos
+    # compute_tofu_facts para actualizar con los datos que sí llegaron.
+    # ------------------------------------------------------------------
+    facts_errors: list[str] = []
+
+    try:
+        sb = get_supabase_client()
+
+        for raw in raw_results:
+            client_id = raw.get("client_id", "")
+            date_start = raw.get("date_start", "")
+            date_end = raw.get("date_end", "")
+
+            # Determinar campaign_id y campaign_name del run.
+            # Si el extractor trajo campaign_id reales, usamos el primer valor
+            # encontrado en raw_metrics (en v1 siempre hay una sola campaña).
+            raw_metrics_list = raw.get("raw_metrics", [])
+            if raw_metrics_list and raw_metrics_list[0].get("campaign_id"):
+                campaign_id = raw_metrics_list[0]["campaign_id"]
+                campaign_name = raw_metrics_list[0].get("campaign_name", "PMAX Prevención Salud")
+            else:
+                campaign_id = "PMAX_PREPAGAS"
+                campaign_name = "PMAX Prevención Salud"
+
+            logger.info(
+                "Calculando tofu_facts — cliente=%s rango=%s a %s campaign_id=%s",
+                client_id, date_start, date_end, campaign_id,
+            )
+
+            try:
+                result = sb.rpc("compute_tofu_facts", {
+                    "p_client_slug":   client_id,
+                    "p_date_start":    date_start,
+                    "p_date_end":      date_end,
+                    "p_campaign_id":   campaign_id,
+                    "p_campaign_name": campaign_name,
+                }).execute()
+                rows_computed = result.data if result.data is not None else 0
+                logger.info(
+                    "compute_tofu_facts completado — cliente=%s filas_upserted=%s",
+                    client_id, rows_computed,
+                )
+            except Exception as exc:
+                err_msg = f"compute_tofu_facts falló para cliente={client_id}: {exc}"
+                logger.error(err_msg)
+                facts_errors.append(err_msg)
+
+    except Exception as exc:
+        err_msg = f"Error inicializando Supabase para compute_tofu_facts: {exc}"
+        logger.error(err_msg)
+        facts_errors.append(err_msg)
+
+    # ------------------------------------------------------------------
+    # Paso 6: Espejo de las 3 facts a Google Sheets (Fase 3 — sprint 1.7)
+    # ------------------------------------------------------------------
+    # Lee tofu_facts + mofu_facts + bofu_facts desde Supabase y las replica
+    # en las 3 pestañas correspondientes de la Sheet del cliente. Aunque el
+    # TOFU pipeline solo actualiza tofu_facts, espejamos también las otras
+    # dos para que la Sheet quede sincronizada en cada cron run (los datos
+    # de MOFU/BOFU vienen del último run del MeisterTask pipeline; el upsert
+    # es idempotente — re-mirrorearlos no rompe nada).
+    #
+    # Independiente del flag --no-sheets (que controla el flujo legacy
+    # tofu_raw). Se saltea si falta el secret GOOGLE_SHEETS_SA_JSON.
+    # No bloquea el pipeline si falla.
+    sheets_mirror_results: dict[str, dict] = {}
+    sheets_mirror_errors: list[str] = []
+
+    if not facts_errors and "GOOGLE_SHEETS_SA_JSON" in os.environ:
+        try:
+            from loaders.supabase_writer import SupabaseWriter
+            # Reutilizamos sb (cliente Supabase) ya inicializado en el Paso 5
+            writer = SupabaseWriter(sb)
+
+            for raw in raw_results:
+                client_id = raw.get("client_id", "")
+                sheet_id = raw.get("sheets_output_id", "")
+                if not sheet_id or str(sheet_id).startswith("REEMPLAZAR"):
+                    logger.info(
+                        "Mirror sheets — sheet_id no configurado para cliente=%s, se omite.",
+                        client_id,
+                    )
+                    continue
+                try:
+                    mirror = writer.mirror_facts_to_sheets(
+                        client_slug=client_id,
+                        spreadsheet_id=str(sheet_id),
+                        mirror_tofu=True,
+                        mirror_mofu=True,
+                        mirror_bofu=True,
+                    )
+                    sheets_mirror_results[client_id] = mirror
+                except Exception as exc:
+                    err_msg = f"Mirror sheets falló para cliente={client_id}: {exc}"
+                    logger.error(err_msg)
+                    sheets_mirror_errors.append(err_msg)
+        except Exception as exc:
+            err_msg = f"Error inicializando mirror_facts_to_sheets: {exc}"
+            logger.error(err_msg)
+            sheets_mirror_errors.append(err_msg)
+    elif "GOOGLE_SHEETS_SA_JSON" not in os.environ:
+        logger.info("Mirror sheets — GOOGLE_SHEETS_SA_JSON ausente, se omite.")
+
+    # ------------------------------------------------------------------
+    # Paso 7: Resumen
+    # ------------------------------------------------------------------
+    has_errors = bool(
+        supabase_error or facts_errors or sheets_mirror_errors or search_terms_errors
+    )
     summary = {
-        "status": "ok" if not supabase_error else "partial_failure",
+        "status": "ok" if not has_errors else "partial_failure",
         "days_back": days_back,
         "clients_processed": [r.get("client_id") for r in raw_results],
         "clients_failed_normalization": failed_clients,
@@ -195,11 +346,16 @@ def main() -> None:
         "supabase_clients": supabase_result.get("clients", []),
         "supabase_platforms": supabase_result.get("platforms", []),
         "supabase_error": supabase_error,
+        "search_terms": search_terms_results,
+        "search_terms_errors": search_terms_errors,
+        "facts_errors": facts_errors,
+        "sheets_mirror": sheets_mirror_results,
+        "sheets_mirror_errors": sheets_mirror_errors,
     }
 
     print(json.dumps(summary, indent=2, ensure_ascii=False))
 
-    if supabase_error:
+    if has_errors:
         sys.exit(1)
 
 

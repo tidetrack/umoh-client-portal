@@ -26,7 +26,13 @@ $_asset_v = defined('ASSET_VERSION') ? ASSET_VERSION : filemtime(__DIR__ . '/ass
   <!-- Fonts -->
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet">
+
+  <!-- Material Symbols Outlined — íconos de secciones del sidebar -->
+  <!-- Nota: se carga la familia completa sin restricción de icon_names.
+       El parámetro icon_names combinado con axes (opsz,wght,FILL,GRAD) causa
+       que Google Fonts devuelva CSS vacío. La familia completa pesa ~35 KB gzip. -->
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined" />
 
   <!-- Leaflet CSS -->
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.css" crossorigin="">
@@ -39,6 +45,10 @@ $_asset_v = defined('ASSET_VERSION') ? ASSET_VERSION : filemtime(__DIR__ . '/ass
     (function () {
       var t = localStorage.getItem('umoh-theme') || 'light';
       document.documentElement.setAttribute('data-theme', t);
+      /* Sidebar collapsed state: applied early to avoid layout flash */
+      if (localStorage.getItem('umoh:sidebar') === 'collapsed') {
+        document.body.classList.add('sidebar-collapsed');
+      }
     }());
   </script>
 
@@ -48,109 +58,248 @@ $_asset_v = defined('ASSET_VERSION') ? ASSET_VERSION : filemtime(__DIR__ . '/ass
     window.DASHBOARD_ROLE     = <?php echo json_encode($_SESSION['umoh_role'] ?? 'client'); ?>;
   </script>
 </head>
-<body>
+<body class="sidebar-layout">
 
   <!-- ══════════════════════════════════════════════
-       DASHBOARD WRAPPER
+       HAMBURGER — Mobile only
   ══════════════════════════════════════════════ -->
-  <div id="dashboard-wrapper" class="dashboard-wrapper">
+  <button id="sb-hamburger" class="sb-hamburger" aria-label="Abrir menú" aria-expanded="false">
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+      <line x1="3" y1="6"  x2="21" y2="6"/>
+      <line x1="3" y1="12" x2="21" y2="12"/>
+      <line x1="3" y1="18" x2="21" y2="18"/>
+    </svg>
+  </button>
 
   <!-- ══════════════════════════════════════════════
-       HEADER
+       SIDEBAR
   ══════════════════════════════════════════════ -->
-  <header class="site-header">
-    <div class="header-inner">
+  <aside class="dashboard-sidebar" id="dashboard-sidebar" aria-label="Panel de navegación">
 
-      <!-- Brand -->
-      <div class="header-brand">
-        <div class="brand-mark" aria-hidden="true">
-          <img src="assets/img/asterisco.png" alt="" width="22" height="22">
+    <!-- A. Header del sidebar: logo PNG asterisco UMOH + nombre + botón colapsar -->
+    <div class="sb-header">
+      <div class="sb-brand">
+        <!-- Logo del cliente — ocupa el lugar del asterisco UMOH en el header del sidebar.
+             El asterisco UMOH se mantiene disponible para uso en login/loading screens.
+             TODO Fase 4 multi-cliente: resolver client-logo.webp dinámicamente via CLIENT_SLUG -->
+        <div class="sb-client-logo-wrap" aria-hidden="true">
+          <img src="assets/img/client-logo.webp" alt="Logo cliente" class="sb-client-logo">
         </div>
-        <div class="brand-info">
-          <span class="brand-agency">umoh</span>
-          <span class="brand-client">Prevención Salud</span>
+        <div class="sb-brand-text sb-label">
+          <span class="sb-brand-agency">umoh</span>
+          <span class="sb-brand-client">Prevención Salud</span>
+        </div>
+      </div>
+      <button class="sb-collapse-btn" id="sb-collapse-btn" aria-label="Colapsar sidebar" title="Colapsar">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <polyline points="15 18 9 12 15 6"/>
+        </svg>
+      </button>
+    </div>
+
+    <!-- Scrollable body del sidebar -->
+    <div class="sb-body">
+
+      <!-- B. Selector de campañas — dropdown expandible -->
+      <div class="sb-section" id="sb-campaigns-section">
+        <!-- Trigger del dropdown: muestra la campaña activa -->
+        <button class="sb-dropdown-trigger" id="sb-campaigns-trigger" aria-expanded="false" aria-controls="sb-campaigns-panel" type="button">
+          <svg class="sb-dt-icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <circle cx="12" cy="12" r="10"/>
+            <circle cx="12" cy="12" r="6"/>
+            <circle cx="12" cy="12" r="2"/>
+          </svg>
+          <div class="sb-dt-text sb-label">
+            <span class="sb-dt-name" id="sb-campaigns-active-name">Todas las campañas</span>
+            <span class="sb-dt-meta" id="sb-campaigns-active-meta">vista agregada</span>
+          </div>
+          <!-- Chevron: apunta abajo cuando cerrado -->
+          <svg class="sb-dt-chevron sb-label" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <polyline points="6 9 12 15 18 9"/>
+          </svg>
+          <!-- Dot activo en modo colapsado -->
+          <span class="sb-campaign-dot" aria-hidden="true"></span>
+        </button>
+
+        <!-- Panel expandible -->
+        <div class="sb-dropdown-panel" id="sb-campaigns-panel">
+          <!-- Búsqueda (visible solo si hay >10 campañas — JS la muestra) -->
+          <div class="sb-campaign-search sb-label" id="sb-campaign-search" style="display:none;">
+            <svg class="sb-campaign-search-icon" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <circle cx="11" cy="11" r="8"/>
+              <line x1="21" y1="21" x2="16.65" y2="16.65"/>
+            </svg>
+            <input type="search" class="sb-campaign-search-input" id="sb-campaign-search-input" placeholder="Buscar campaña..." aria-label="Buscar campaña">
+          </div>
+          <!-- Lista de campañas -->
+          <div class="sb-campaign-list" id="sb-campaign-list" role="listbox" aria-label="Campañas disponibles">
+            <button class="sb-campaign-item active" data-campaign-id="all" data-campaign-name="" role="option" aria-selected="true">
+              <svg class="sb-campaign-icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                <circle cx="12" cy="12" r="10"/>
+                <circle cx="12" cy="12" r="6"/>
+                <circle cx="12" cy="12" r="2"/>
+              </svg>
+              <div class="sb-campaign-info sb-label">
+                <span class="sb-campaign-name">Todas las campañas</span>
+                <span class="sb-campaign-id">vista agregada</span>
+              </div>
+            </button>
+            <!-- Campañas adicionales se inyectan por JS -->
+          </div>
         </div>
       </div>
 
-      <!-- Controls -->
-      <div class="header-controls">
+      <!-- C. Navegación de secciones — lista fija siempre visible -->
+      <div class="sb-section sb-section--nav">
+        <nav class="sb-nav-list" id="sb-nav-list" role="navigation" aria-label="Secciones del dashboard">
+          <button class="sb-nav-item active" data-section="inicio" aria-current="page">
+            <svg class="sb-nav-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/>
+              <polyline points="9 22 9 12 15 12 15 22"/>
+            </svg>
+            <span class="sb-label">Inicio</span>
+            <span class="sb-tooltip" aria-hidden="true">Inicio</span>
+          </button>
+          <button class="sb-nav-item" data-section="performance" aria-current="false">
+            <span class="material-symbols-outlined sb-nav-icon" aria-hidden="true">bar_chart_4_bars</span>
+            <span class="sb-label">Performance</span>
+            <span class="sb-tooltip" aria-hidden="true">Performance</span>
+          </button>
+          <button class="sb-nav-item" data-section="tofu" aria-current="false">
+            <span class="material-symbols-outlined sb-nav-icon" aria-hidden="true">visibility</span>
+            <span class="sb-label">I. Awareness</span>
+            <span class="sb-tooltip" aria-hidden="true">I. Awareness</span>
+          </button>
+          <button class="sb-nav-item" data-section="mofu" aria-current="false">
+            <span class="material-symbols-outlined sb-nav-icon" aria-hidden="true">psychology_alt</span>
+            <span class="sb-label">II. Interest</span>
+            <span class="sb-tooltip" aria-hidden="true">II. Interest</span>
+          </button>
+          <button class="sb-nav-item" data-section="bofu" aria-current="false">
+            <span class="material-symbols-outlined sb-nav-icon" aria-hidden="true">add_shopping_cart</span>
+            <span class="sb-label">III. Sales</span>
+            <span class="sb-tooltip" aria-hidden="true">III. Sales</span>
+          </button>
+        </nav>
+      </div>
 
-        <!-- Period selector + date picker -->
-        <div class="period-selector-wrap">
-          <div class="period-selector" role="group" aria-label="Selector de período">
-            <button class="period-btn" data-period="7d">7 días</button>
-            <button class="period-btn active" data-period="30d">30 días</button>
-            <button class="period-btn" data-period="90d">90 días</button>
-            <button class="period-btn" data-period="custom">Personalizado</button>
-          </div>
-          <div id="date-picker-popover" class="date-picker-popover" hidden aria-hidden="true">
-            <div class="date-picker-inner">
-              <div id="historic-section" class="historic-section">
-                <span class="historic-label">Histórico total</span>
-                <div class="historic-granularity" role="group" aria-label="Granularidad del histórico">
-                  <button class="historic-btn" data-granularity="dias">Días</button>
-                  <button class="historic-btn" data-granularity="semanas">Semanas</button>
-                  <button class="historic-btn active" data-granularity="meses">Meses</button>
-                </div>
-              </div>
-              <div class="date-picker-divider"></div>
-              <div class="date-picker-row">
-                <label class="date-picker-label" for="date-start">Desde</label>
-                <input type="date" id="date-start" class="date-picker-input">
-              </div>
-              <div class="date-picker-row">
-                <label class="date-picker-label" for="date-end">Hasta</label>
-                <input type="date" id="date-end" class="date-picker-input">
-              </div>
-              <button id="date-apply-btn" class="date-apply-btn">Aplicar</button>
-            </div>
-          </div>
+      <!-- D. Selector de período -->
+      <div class="sb-period-wrap" id="sb-period-wrap">
+        <div class="sb-period-header">
+          <span class="sb-period-label">Período</span>
+          <span class="sb-period-range" id="sb-period-range" aria-live="polite"></span>
         </div>
-
-        <!-- User menu -->
-        <div class="user-menu" id="user-menu">
-          <button class="user-menu-trigger" aria-haspopup="true" aria-expanded="false">
-            <div class="user-avatar" id="user-avatar"><img src="assets/img/icon-asterisco-1.png" alt=""></div>
-            <span class="user-greeting">Hola, <strong id="user-display-name">Usuario</strong></span>
-            <svg class="user-chevron" width="12" height="12" viewBox="0 0 12 12" fill="none">
-              <path d="M2 4l4 4 4-4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+        <div class="sb-period-selector" role="group" aria-label="Selector de período">
+          <button class="sb-period-btn" data-period="7d">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+            7 días
+          </button>
+          <button class="sb-period-btn active" data-period="30d">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+            30 días
+          </button>
+          <button class="sb-period-btn" data-period="90d">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+            90 días
+          </button>
+          <!-- Personalizado: toggle inline con chevron -->
+          <button class="sb-period-btn sb-period-btn--custom" data-period="custom" id="sb-period-custom-btn" aria-expanded="false" aria-controls="sb-custom-date-panel">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+            Personalizado
+            <!-- Chevron integrado: apunta abajo cerrado -->
+            <svg class="sb-period-chevron" width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <polyline points="6 9 12 15 18 9"/>
             </svg>
           </button>
-          <div class="user-menu-dropdown" role="menu">
-            <div class="user-menu-header">
-              <div class="user-menu-avatar-lg" id="user-avatar-lg"><img src="assets/img/icon-asterisco-1.png" alt=""></div>
-              <div>
-                <div class="user-menu-fullname" id="user-menu-fullname">Usuario</div>
-                <div class="user-menu-role">Administrador</div>
-              </div>
+        </div>
+
+        <!-- Panel inline del date picker — se expande dentro del sidebar -->
+        <div class="sb-custom-date-panel" id="sb-custom-date-panel">
+          <div class="date-picker-inner">
+            <div class="date-picker-row">
+              <label class="date-picker-label" for="date-start">Desde</label>
+              <input type="date" id="date-start" class="date-picker-input">
             </div>
-            <div class="user-menu-divider"></div>
-            <a href="logout.php" class="user-menu-item user-menu-item--danger" role="menuitem">
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/>
-                <polyline points="16 17 21 12 16 7"/>
-                <line x1="21" y1="12" x2="9" y2="12"/>
-              </svg>
-              Cerrar sesión
-            </a>
+            <div class="date-picker-row">
+              <label class="date-picker-label" for="date-end">Hasta</label>
+              <input type="date" id="date-end" class="date-picker-input">
+            </div>
+            <button id="date-apply-btn" class="date-apply-btn">Aplicar</button>
           </div>
         </div>
 
+        <!-- Popover flotante: mantenido para compatibilidad pero no usado por el sidebar -->
+        <div id="date-picker-popover" class="date-picker-popover sb-inline-hidden" hidden aria-hidden="true"></div>
+
+        <!-- Ícono compacto visible solo en modo colapsado -->
+        <div class="sb-period-compact" id="sb-period-compact">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color:var(--umoh-accent)" aria-hidden="true">
+            <rect x="3" y="4" width="18" height="18" rx="2" ry="2"/>
+            <line x1="16" y1="2" x2="16" y2="6"/>
+            <line x1="8" y1="2" x2="8" y2="6"/>
+            <line x1="3" y1="10" x2="21" y2="10"/>
+          </svg>
+          <span class="sb-period-compact-label" id="sb-period-compact-label">30d</span>
+        </div>
       </div>
+
+    </div><!-- /.sb-body -->
+
+    <!-- E. Perfil de usuario al fondo (el tema va adentro del dropdown) -->
+    <div class="sb-user" id="sb-user">
+      <!-- Dropdown: sale hacia arriba -->
+      <div class="sb-user-dropdown" id="sb-user-dropdown" role="menu">
+        <div class="user-menu-header">
+          <div class="user-menu-avatar-lg">
+            <!-- Avatar real del usuario -->
+            <!-- TODO: cuando tengamos roles, condicionar avatar admin aquí -->
+            <div class="sb-user-avatar sb-user-avatar--lg" id="sb-user-avatar-menu">
+              <img src="assets/img/umoh-asterisk-light.png" alt="Avatar" class="avatar-light">
+              <img src="assets/img/umoh-asterisk-dark.png"  alt="Avatar" class="avatar-dark">
+            </div>
+          </div>
+          <div>
+            <div class="user-menu-fullname" id="sb-user-fullname">Usuario</div>
+            <div class="user-menu-role">Administrador</div>
+          </div>
+        </div>
+        <div class="user-menu-divider"></div>
+        <a href="logout.php" class="user-menu-item user-menu-item--danger" role="menuitem">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/>
+            <polyline points="16 17 21 12 16 7"/>
+            <line x1="21" y1="12" x2="9" y2="12"/>
+          </svg>
+          Cerrar sesión
+        </a>
+      </div>
+      <!-- Trigger -->
+      <button class="sb-user-trigger" id="sb-user-trigger" aria-haspopup="true" aria-expanded="false">
+        <!-- TODO: cuando tengamos roles, condicionar avatar admin aquí -->
+        <div class="sb-user-avatar" id="sb-user-avatar">
+          <img src="assets/img/umoh-asterisk-light.png" alt="Avatar" class="avatar-light">
+          <img src="assets/img/umoh-asterisk-dark.png"  alt="Avatar" class="avatar-dark">
+        </div>
+        <div class="sb-user-info sb-label">
+          <span class="sb-user-name" id="sb-user-name">Usuario</span>
+          <span class="sb-user-role">Administrador</span>
+        </div>
+        <!-- Chevron: apunta abajo cuando cerrado, arriba cuando abierto -->
+        <svg class="sb-user-chevron sb-label" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <polyline points="6 9 12 15 18 9"/>
+        </svg>
+      </button>
     </div>
-  </header>
+
+    <!-- Resize handle — arrastrar para ajustar el ancho del sidebar -->
+    <div class="sb-resize-handle" id="sb-resize-handle" aria-hidden="true" title="Arrastrar para redimensionar"></div>
+
+  </aside><!-- /#dashboard-sidebar -->
 
   <!-- ══════════════════════════════════════════════
-       NAVIGATION
+       CONTENT AREA
   ══════════════════════════════════════════════ -->
-  <nav class="dashboard-nav" role="navigation" aria-label="Secciones del dashboard">
-    <div class="nav-inner">
-      <button class="nav-tab active" data-section="performance">Performance</button>
-      <button class="nav-tab" data-section="tofu">Awareness / TOFU</button>
-      <button class="nav-tab" data-section="mofu">Interest / MOFU</button>
-      <button class="nav-tab" data-section="bofu">Sales / BOFU</button>
-    </div>
-  </nav>
+  <div class="dashboard-content" id="dashboard-content">
 
   <!-- ══════════════════════════════════════════════
        MAIN
@@ -158,9 +307,51 @@ $_asset_v = defined('ASSET_VERSION') ? ASSET_VERSION : filemtime(__DIR__ . '/ass
   <main class="dashboard-main">
 
     <!-- ────────────────────────────────────────
+         INICIO — nueva sección default
+    ──────────────────────────────────────────── -->
+    <section id="section-inicio" class="dashboard-section active" aria-label="Inicio">
+
+      <!-- Header con saludo -->
+      <div class="inicio-header">
+        <div class="inicio-greeting-block">
+          <h1 class="inicio-saludo">Hola, <span id="inicio-user-name">Franco</span></h1>
+          <p class="inicio-subtitle">Elegí una sección para ver el detalle</p>
+        </div>
+      </div>
+
+      <!-- Accesos rápidos a las 4 secciones del funnel -->
+      <div class="inicio-quick-grid">
+        <button type="button" class="inicio-quick-card" data-target="performance">
+          <span class="inicio-quick-icon material-symbols-outlined">bar_chart_4_bars</span>
+          <span class="inicio-quick-title">Performance</span>
+          <span class="inicio-quick-desc">Resumen comercial y KPIs principales</span>
+        </button>
+
+        <button type="button" class="inicio-quick-card" data-target="tofu">
+          <span class="inicio-quick-icon material-symbols-outlined">visibility</span>
+          <span class="inicio-quick-title">Awareness</span>
+          <span class="inicio-quick-desc">Top of Funnel — impresiones y alcance</span>
+        </button>
+
+        <button type="button" class="inicio-quick-card" data-target="mofu">
+          <span class="inicio-quick-icon material-symbols-outlined">psychology_alt</span>
+          <span class="inicio-quick-title">Interest</span>
+          <span class="inicio-quick-desc">Middle of Funnel — leads y journey</span>
+        </button>
+
+        <button type="button" class="inicio-quick-card" data-target="bofu">
+          <span class="inicio-quick-icon material-symbols-outlined">add_shopping_cart</span>
+          <span class="inicio-quick-title">Sales</span>
+          <span class="inicio-quick-desc">Bottom of Funnel — ventas e ingresos</span>
+        </button>
+      </div>
+
+    </section>
+
+    <!-- ────────────────────────────────────────
          PERFORMANCE
     ──────────────────────────────────────────── -->
-    <section id="section-performance" class="dashboard-section active" aria-label="Performance">
+    <section id="section-performance" class="dashboard-section" aria-label="Performance">
 
       <div class="section-header">
         <h2 class="section-title">Performance</h2>
@@ -250,7 +441,8 @@ $_asset_v = defined('ASSET_VERSION') ? ASSET_VERSION : filemtime(__DIR__ . '/ass
     <section id="section-tofu" class="dashboard-section" aria-label="Awareness TOFU">
 
       <div class="section-header">
-        <h2 class="section-title">Awareness / TOFU</h2>
+        <h2 class="section-title--hero">Top of Funnel</h2>
+        <p class="section-title--sub">Awareness</p>
         <p class="section-subtitle">Impacto inicial y alcance de la marca en Google</p>
       </div>
 
@@ -275,7 +467,6 @@ $_asset_v = defined('ASSET_VERSION') ? ASSET_VERSION : filemtime(__DIR__ . '/ass
         </div>
       </div>
 
-      <!-- Trend charts: split into 2 bar charts side by side -->
       <div class="charts-grid charts-grid--2col">
         <div class="chart-card">
           <div class="chart-card-header">
@@ -299,7 +490,6 @@ $_asset_v = defined('ASSET_VERSION') ? ASSET_VERSION : filemtime(__DIR__ . '/ass
 
       <div class="charts-grid charts-grid--2col">
 
-        <!-- Search terms — spans 2 cols -->
         <div class="chart-card chart-card--wide">
           <div class="chart-card-header">
             <h3 class="chart-title">Top Términos de Búsqueda</h3>
@@ -324,7 +514,6 @@ $_asset_v = defined('ASSET_VERSION') ? ASSET_VERSION : filemtime(__DIR__ . '/ass
           </div>
         </div>
 
-        <!-- Channels donut -->
         <div class="chart-card">
           <div class="chart-card-header">
             <h3 class="chart-title">Canal</h3>
@@ -338,7 +527,6 @@ $_asset_v = defined('ASSET_VERSION') ? ASSET_VERSION : filemtime(__DIR__ . '/ass
           </div>
         </div>
 
-        <!-- Devices donut -->
         <div class="chart-card">
           <div class="chart-card-header">
             <h3 class="chart-title">Dispositivos</h3>
@@ -352,7 +540,6 @@ $_asset_v = defined('ASSET_VERSION') ? ASSET_VERSION : filemtime(__DIR__ . '/ass
           </div>
         </div>
 
-        <!-- Geo: tabla ranking de ciudades por clicks -->
         <div class="chart-card chart-card--wide">
           <div class="chart-card-header">
             <h3 class="chart-title">Clicks por Ciudad</h3>
@@ -382,11 +569,12 @@ $_asset_v = defined('ASSET_VERSION') ? ASSET_VERSION : filemtime(__DIR__ . '/ass
     <section id="section-mofu" class="dashboard-section" aria-label="Interest MOFU">
 
       <div class="section-header">
-        <h2 class="section-title">Interest / MOFU</h2>
+        <h2 class="section-title--hero">Middle of Funnel</h2>
+        <p class="section-title--sub">Interest</p>
         <p class="section-subtitle">Efectividad de la estrategia para filtrar y calificar interesados</p>
       </div>
 
-      <div class="kpi-grid kpi-grid--4">
+      <div class="kpi-grid kpi-grid--5">
         <div class="kpi-card" data-kpi="mofu-leads">
           <span class="kpi-label">Leads Totales</span>
           <span class="kpi-value" id="mofu-leads">—</span>
@@ -411,9 +599,14 @@ $_asset_v = defined('ASSET_VERSION') ? ASSET_VERSION : filemtime(__DIR__ . '/ass
           <span class="kpi-delta" id="delta-mofu-highintent"></span>
           <canvas class="kpi-sparkline" id="sparkline-mofu-highintent" aria-hidden="true"></canvas>
         </div>
+        <div class="kpi-card" data-kpi="mofu-closedwon">
+          <span class="kpi-label">Ventas Ganadas</span>
+          <span class="kpi-value" id="mofu-closedwon">—</span>
+          <span class="kpi-delta" id="delta-mofu-closedwon"></span>
+          <canvas class="kpi-sparkline" id="sparkline-mofu-closedwon" aria-hidden="true"></canvas>
+        </div>
       </div>
 
-      <!-- Trend charts: split into 2 bar charts side by side -->
       <div class="charts-grid charts-grid--2col">
         <div class="chart-card">
           <div class="chart-card-header">
@@ -435,7 +628,6 @@ $_asset_v = defined('ASSET_VERSION') ? ASSET_VERSION : filemtime(__DIR__ . '/ass
         </div>
       </div>
 
-      <!-- Customer Journey — card full-width (13 etapas activas de MeisterTask) -->
       <div class="charts-grid charts-grid--full">
         <div class="chart-card">
           <div class="chart-card-header">
@@ -448,8 +640,7 @@ $_asset_v = defined('ASSET_VERSION') ? ASSET_VERSION : filemtime(__DIR__ . '/ass
         </div>
       </div>
 
-      <!-- Distribución por Segmento — donut centrado, fila propia -->
-      <div class="charts-grid charts-grid--donut-solo">
+      <div class="charts-grid charts-grid--2col">
         <div class="chart-card">
           <div class="chart-card-header">
             <h3 class="chart-title">Distribución por Segmento</h3>
@@ -467,7 +658,8 @@ $_asset_v = defined('ASSET_VERSION') ? ASSET_VERSION : filemtime(__DIR__ . '/ass
     <section id="section-bofu" class="dashboard-section" aria-label="Sales BOFU">
 
       <div class="section-header">
-        <h2 class="section-title">Sales / BOFU</h2>
+        <h2 class="section-title--hero">Bottom of Funnel</h2>
+        <p class="section-title--sub">Sales</p>
         <p class="section-subtitle">Resultado del trabajo conjunto entre Marketing y Ventas</p>
       </div>
 
@@ -513,7 +705,6 @@ $_asset_v = defined('ASSET_VERSION') ? ASSET_VERSION : filemtime(__DIR__ . '/ass
         </div>
       </div>
 
-      <!-- Trend charts — split into 2 independent charts -->
       <div class="charts-grid charts-grid--2col">
         <div class="chart-card">
           <div class="chart-card-header">
@@ -566,7 +757,6 @@ $_asset_v = defined('ASSET_VERSION') ? ASSET_VERSION : filemtime(__DIR__ . '/ass
         </div>
       </div>
 
-      <!-- Ranking de vendedores -->
       <div class="charts-grid charts-grid--full">
         <div class="chart-card">
           <div class="chart-card-header">
@@ -595,7 +785,6 @@ $_asset_v = defined('ASSET_VERSION') ? ASSET_VERSION : filemtime(__DIR__ . '/ass
         </div>
       </div>
 
-      <!-- Ventas pendientes de cargar monto -->
       <div class="charts-grid charts-grid--full">
         <div class="chart-card">
           <div class="chart-card-header">
@@ -610,6 +799,7 @@ $_asset_v = defined('ASSET_VERSION') ? ASSET_VERSION : filemtime(__DIR__ . '/ass
                   <th>Asesor</th>
                   <th>Tipificación</th>
                   <th>Origen</th>
+                  <th>Etapa actual</th>
                   <th class="th-num">Fecha ingreso</th>
                 </tr>
               </thead>
@@ -635,18 +825,44 @@ $_asset_v = defined('ASSET_VERSION') ? ASSET_VERSION : filemtime(__DIR__ . '/ass
     </div>
   </footer>
 
-  <!-- ══════════════════════════════════════════════
-       /DASHBOARD WRAPPER
-  ══════════════════════════════════════════════ -->
-  </div><!-- /#dashboard-wrapper -->
+  </div><!-- /.dashboard-content -->
 
   <!-- ══════════════════════════════════════════════
-       SCRIPTS — order matters
+       MODALES (fuera del content para evitar z-index issues)
   ══════════════════════════════════════════════ -->
-  <!-- Chart.js -->
-  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.3/dist/chart.umd.min.js"></script>
-  <!-- Leaflet JS -->
-  <script src="https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.js" crossorigin=""></script>
+
+  <!-- Journey Stage Modal -->
+  <div id="journey-stage-modal" class="journey-modal-overlay" role="dialog" aria-modal="true" aria-labelledby="journey-modal-title" hidden>
+    <div class="journey-modal">
+      <button class="journey-modal-close" id="journey-modal-close" aria-label="Cerrar">&times;</button>
+      <div class="journey-modal-phase-badge" id="journey-modal-phase-badge">
+        <span class="journey-modal-phase-dot" id="journey-modal-phase-dot"></span>
+        <span id="journey-modal-phase-name"></span>
+      </div>
+      <h2 class="journey-modal-title" id="journey-modal-title">—</h2>
+      <div class="journey-modal-metric">
+        <span class="journey-modal-metric-value" id="journey-modal-metric-value">—</span>
+        <span class="journey-modal-metric-label">leads</span>
+        <span class="journey-modal-metric-pct" id="journey-modal-metric-pct"></span>
+      </div>
+      <div class="journey-modal-section">
+        <span class="journey-modal-section-label">Que significa esta etapa</span>
+        <p class="journey-modal-section-text" id="journey-modal-description"></p>
+      </div>
+      <div class="journey-modal-section">
+        <span class="journey-modal-section-label">Como interpretar el volumen</span>
+        <p class="journey-modal-section-text" id="journey-modal-interpretation"></p>
+      </div>
+      <div class="journey-modal-action">
+        <span class="journey-modal-action-label">Accion sugerida</span>
+        <p class="journey-modal-action-text" id="journey-modal-action"></p>
+      </div>
+      <div class="journey-modal-example">
+        <span class="journey-modal-example-label">Ejemplo aplicado</span>
+        <p class="journey-modal-example-text" id="journey-modal-example"></p>
+      </div>
+    </div>
+  </div>
 
   <!-- KPI Info Modal -->
   <div id="kpi-modal" class="kpi-modal-overlay" role="dialog" aria-modal="true" aria-labelledby="kpi-modal-title" hidden>
@@ -665,7 +881,43 @@ $_asset_v = defined('ASSET_VERSION') ? ASSET_VERSION : filemtime(__DIR__ . '/ass
     </div>
   </div>
 
-  <!-- Theme toggle pill switch (position: fixed top-right) -->
+  <!-- Lead Detail Modal -->
+  <div id="lead-detail-modal" class="kpi-modal-overlay" role="dialog" aria-modal="true" aria-labelledby="lead-modal-title" tabindex="-1" hidden>
+    <div class="kpi-modal lead-modal">
+      <button class="kpi-modal-close" id="lead-modal-close" aria-label="Cerrar">&times;</button>
+      <h2 class="kpi-modal-title" id="lead-modal-title">—</h2>
+
+      <div class="lead-modal-section">
+        <span class="lead-modal-section-label">Datos del lead</span>
+        <div class="lead-modal-basics-grid" id="lead-modal-basics"></div>
+      </div>
+
+      <div class="lead-modal-section">
+        <span class="lead-modal-section-label">Historial de etapas</span>
+        <ul class="lead-modal-history-list" id="lead-modal-history"></ul>
+      </div>
+
+      <div class="lead-modal-section" id="lead-modal-monetary-section" hidden>
+        <span class="lead-modal-section-label">Datos monetarios</span>
+        <div class="lead-modal-basics-grid" id="lead-modal-monetary"></div>
+      </div>
+
+      <div class="lead-modal-section" id="lead-modal-activity-section">
+        <span class="lead-modal-section-label">Actividad y seguimientos</span>
+        <div class="lead-modal-activity" id="lead-modal-activity"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- FAB scroll-to-top -->
+  <button id="nav-fab" class="nav-fab" aria-label="Volver arriba" title="Volver arriba">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+      <line x1="12" y1="19" x2="12" y2="5"/>
+      <polyline points="5 12 12 5 19 12"/>
+    </svg>
+  </button>
+
+  <!-- Theme toggle pill switch -->
   <button id="theme-toggle" class="theme-toggle-switch" title="Cambiar tema" aria-label="Cambiar modo claro/oscuro">
     <span class="theme-switch-track">
       <span class="theme-switch-thumb">
@@ -679,11 +931,112 @@ $_asset_v = defined('ASSET_VERSION') ? ASSET_VERSION : filemtime(__DIR__ . '/ass
     </span>
   </button>
 
-  <!-- Dashboard scripts -->
+  <!-- ══════════════════════════════════════════════
+       SCRIPTS — order matters
+  ══════════════════════════════════════════════ -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.3/dist/chart.umd.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.js" crossorigin=""></script>
+
   <script src="assets/js/mockdata.js?v=<?php echo $_asset_v; ?>"></script>
   <script src="assets/js/api.js?v=<?php echo $_asset_v; ?>"></script>
   <script src="assets/js/charts.js?v=<?php echo $_asset_v; ?>"></script>
   <script src="assets/js/filters.js?v=<?php echo $_asset_v; ?>"></script>
+
+  <!-- Lead Detail Modal wiring -->
+  <script>
+  (function() {
+    var overlay  = document.getElementById('lead-detail-modal');
+    var closeBtn = document.getElementById('lead-modal-close');
+
+    function closeLead() { if (overlay) overlay.setAttribute('hidden', ''); }
+
+    if (closeBtn) closeBtn.addEventListener('click', closeLead);
+    if (overlay) {
+      overlay.addEventListener('click', function(e) {
+        if (e.target === overlay) closeLead();
+      });
+    }
+    document.addEventListener('keydown', function(e) {
+      if (e.key === 'Escape' && overlay && !overlay.hasAttribute('hidden')) closeLead();
+    });
+  })();
+  </script>
+
+  <!-- ══════════════════════════════════════════════
+       MODAL: Comando CLI para regenerar el análisis de Inicio
+       Se activa desde el botón "Regenerar" en la sección Inicio.
+  ══════════════════════════════════════════════ -->
+  <div id="regen-modal-overlay" class="regen-modal-overlay" hidden role="dialog" aria-modal="true" aria-labelledby="regen-modal-title">
+    <div class="regen-modal">
+      <div class="regen-modal-header">
+        <h3 class="regen-modal-title" id="regen-modal-title">Regenerar análisis</h3>
+        <button class="regen-modal-close" id="regen-modal-close" aria-label="Cerrar">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
+          </svg>
+        </button>
+      </div>
+      <p class="regen-modal-body">Corré este comando en tu terminal local para generar un resumen fresco. Una vez ejecutado, recargá el dashboard para ver el análisis actualizado.</p>
+      <div class="regen-modal-cmd-wrap">
+        <code class="regen-modal-cmd" id="regen-modal-cmd">python scripts/run_inicio_summary.py --client-slug prepagas --period 30d</code>
+        <button class="regen-modal-copy" id="regen-modal-copy" type="button" aria-label="Copiar comando">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <rect x="9" y="9" width="13" height="13" rx="2" ry="2"/>
+            <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/>
+          </svg>
+          Copiar
+        </button>
+      </div>
+      <p class="regen-modal-note">El período del comando se actualiza según el selector activo.</p>
+    </div>
+  </div>
+
+  <script>
+  (function () {
+    const overlay   = document.getElementById('regen-modal-overlay');
+    const closeBtn  = document.getElementById('regen-modal-close');
+    const copyBtn   = document.getElementById('regen-modal-copy');
+    const cmdEl     = document.getElementById('regen-modal-cmd');
+
+    function openRegenModal(period) {
+      if (!overlay || !cmdEl) return;
+      const slug = 'prepagas';
+      cmdEl.textContent = `python scripts/run_inicio_summary.py --client-slug ${slug} --period ${period}`;
+      overlay.removeAttribute('hidden');
+      document.body.style.overflow = 'hidden';
+    }
+
+    function closeRegenModal() {
+      if (!overlay) return;
+      overlay.setAttribute('hidden', '');
+      document.body.style.overflow = '';
+    }
+
+    if (closeBtn) closeBtn.addEventListener('click', closeRegenModal);
+    if (overlay) {
+      overlay.addEventListener('click', function (e) {
+        if (e.target === overlay) closeRegenModal();
+      });
+    }
+    document.addEventListener('keydown', function (e) {
+      if (e.key === 'Escape' && overlay && !overlay.hasAttribute('hidden')) closeRegenModal();
+    });
+
+    if (copyBtn && cmdEl) {
+      copyBtn.addEventListener('click', function () {
+        navigator.clipboard.writeText(cmdEl.textContent).then(() => {
+          copyBtn.textContent = 'Copiado';
+          setTimeout(() => {
+            copyBtn.innerHTML = `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg> Copiar`;
+          }, 2000);
+        });
+      });
+    }
+
+    // Exponer openRegenModal al scope global para que charts.js lo llame
+    window._openRegenModal = openRegenModal;
+  })();
+  </script>
 
 </body>
 </html>

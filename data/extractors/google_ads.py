@@ -121,6 +121,8 @@ def load_active_clients(config_dir: str = "config/clients") -> list[dict[str, An
 
 _TOFU_METRICS_QUERY = """
 SELECT
+  campaign.id,
+  campaign.name,
   segments.date,
   metrics.impressions,
   metrics.clicks,
@@ -140,6 +142,35 @@ SELECT
   metrics.clicks,
   metrics.impressions
 FROM search_term_view
+WHERE
+  segments.date BETWEEN '{date_start}' AND '{date_end}'
+ORDER BY metrics.clicks DESC
+LIMIT 500
+"""
+
+# query para campañas Performance Max (PMAX).
+#
+# Las campañas PMAX no exponen búsquedas individuales vía search_term_view.
+# Google las protege por privacidad y las agrupa en "category labels" accesibles
+# desde campaign_search_term_insight. Estos labels son agrupaciones semánticas
+# (ej: "prepagas médicas mendoza") y no términos de búsqueda literales.
+#
+# Mapeo de campos:
+#   campaign_search_term_insight.category_label → search_term  (agrupación semántica)
+#   campaign.id                                 → campaign_id
+#   campaign.name                               → campaign_name
+#   segments.date                               → date
+#   metrics.clicks                              → clicks
+#   metrics.impressions                         → impressions
+_PMAX_SEARCH_INSIGHTS_QUERY = """
+SELECT
+  campaign_search_term_insight.category_label,
+  metrics.clicks,
+  metrics.impressions,
+  segments.date,
+  campaign.id,
+  campaign.name
+FROM campaign_search_term_insight
 WHERE
   segments.date BETWEEN '{date_start}' AND '{date_end}'
 ORDER BY metrics.clicks DESC
@@ -194,8 +225,19 @@ def extract_tofu_metrics(
     para el customer_id dado en el rango de fechas indicado.
 
     Los cost_micros de Google se convierten a la unidad monetaria real dividiendo por 1e6.
-    El desglose por canal (ad_network_type) y dispositivo (device) se construye
-    sumando sobre todas las campanas del dia.
+    Devuelve una fila por (date, campaign_id, ad_network_type, device), con el ID y
+    nombre real de la campaña. El normalizador y el loader agregan por fecha antes de
+    escribir en tofu_ads_daily (que tiene PK por date+platform, sin campaign_id).
+
+    Mapeo de campos de la API Google Ads:
+        campaign.id             → campaign_id   (str del ID numerico de Google)
+        campaign.name           → campaign_name (nombre legible de la campaña)
+        segments.date           → date          (YYYY-MM-DD)
+        metrics.impressions     → impressions
+        metrics.clicks          → clicks
+        metrics.cost_micros / 1e6 → spend_micros  (unidad monetaria real)
+        segments.ad_network_type.name → channel
+        segments.device.name    → device
 
     Args:
         client: GoogleAdsClient autenticado contra el MCC.
@@ -204,7 +246,7 @@ def extract_tofu_metrics(
         date_end: Fecha fin en formato YYYY-MM-DD.
 
     Returns:
-        Lista de dicts con una entrada por (date, platform, network_type, device).
+        Lista de dicts con una entrada por (date, campaign_id, network_type, device).
     """
     ga_service = client.get_service("GoogleAdsService")
     query = _TOFU_METRICS_QUERY.format(date_start=date_start, date_end=date_end)
@@ -217,6 +259,10 @@ def extract_tofu_metrics(
                 rows.append({
                     "date": row.segments.date,
                     "platform": "google",
+                    # campaign.id devuelve un entero; lo convertimos a str para consistencia
+                    # con el placeholder 'PMAX_PREPAGAS' y para el upsert en Supabase.
+                    "campaign_id": str(row.campaign.id),
+                    "campaign_name": row.campaign.name,
                     "impressions": row.metrics.impressions,
                     "clicks": row.metrics.clicks,
                     # cost_micros: Google almacena el costo multiplicado por 1_000_000
@@ -295,6 +341,100 @@ def extract_search_terms(
         )
 
     return terms
+
+
+def extract_pmax_search_insights(
+    client: GoogleAdsClient,
+    customer_id: str,
+    date_start: str,
+    date_end: str,
+) -> list[dict[str, Any]]:
+    """
+    Extrae category labels de búsqueda para campañas Performance Max (PMAX).
+
+    Las campañas PMAX no exponen términos individuales vía search_term_view.
+    Google los agrupa en "category labels" accesibles desde
+    campaign_search_term_insight. Cada category_label es una agrupación
+    semántica de términos de búsqueda (no un término exacto).
+
+    Esta función es el complemento de extract_search_terms(): se llama cuando
+    esa devuelve 0 filas para cuentas que solo tienen campañas PMAX.
+
+    Mapeo de campos de la API:
+        campaign_search_term_insight.category_label → search_term (tratado como término)
+        campaign.id                                 → campaign_id
+        campaign.name                               → campaign_name
+        segments.date                               → date
+        metrics.clicks                              → clicks
+        metrics.impressions                         → impressions
+        source                                      → 'campaign_search_term_insight' (fijo)
+
+    Args:
+        client: GoogleAdsClient autenticado.
+        customer_id: ID de la cuenta del cliente (sin guiones ni espacios).
+        date_start: Fecha inicio en formato YYYY-MM-DD.
+        date_end: Fecha fin en formato YYYY-MM-DD.
+
+    Returns:
+        Lista de dicts {date, search_term, clicks, impressions,
+        campaign_id, campaign_name, source} ordenada por clicks desc.
+        Si la query falla o devuelve 0 filas, retorna lista vacía sin lanzar excepción.
+    """
+    ga_service = client.get_service("GoogleAdsService")
+    query = _PMAX_SEARCH_INSIGHTS_QUERY.format(date_start=date_start, date_end=date_end)
+
+    logger.info(
+        "Ejecutando query de campaign_search_term_insight (PMAX) para "
+        "customer_id=%s rango=%s a %s",
+        customer_id, date_start, date_end,
+    )
+
+    insights: list[dict[str, Any]] = []
+    try:
+        response = ga_service.search_stream(customer_id=customer_id, query=query)
+        for batch in response:
+            for row in batch.results:
+                category_label = row.campaign_search_term_insight.category_label
+                if not category_label:
+                    continue
+                insights.append({
+                    "date": row.segments.date,
+                    # category_label se usa como si fuera un search_term para
+                    # mantener compatibilidad con el schema downstream (normalizer,
+                    # writer). El campo source permite distinguirlos si es necesario.
+                    "search_term": category_label,
+                    "clicks": row.metrics.clicks,
+                    "impressions": row.metrics.impressions,
+                    "campaign_id": str(row.campaign.id),
+                    "campaign_name": row.campaign.name,
+                    "source": "campaign_search_term_insight",
+                })
+    except GoogleAdsException as ex:
+        _log_google_ads_exception(ex, customer_id, "PMAX search insights")
+        logger.warning(
+            "No se pudieron extraer PMAX search insights para customer_id=%s. "
+            "Posible causa: developer token en nivel BASIC (requiere STANDARD "
+            "o TEST_ACCOUNT). Ver riesgo abierto en docs/plan-implementacion.md. "
+            "Se continua sin términos de búsqueda.",
+            customer_id,
+        )
+        return []
+
+    if not insights:
+        logger.warning(
+            "campaign_search_term_insight devolvió 0 filas para customer_id=%s. "
+            "Posibles causas: (1) no hay campañas PMAX activas en el rango, "
+            "(2) volumen insuficiente para que Google genere category labels, "
+            "(3) developer token sin acceso (BASIC vs STANDARD).",
+            customer_id,
+        )
+    else:
+        logger.info(
+            "PMAX search insights: %d filas extraídas para customer_id=%s.",
+            len(insights), customer_id,
+        )
+
+    return insights
 
 
 def extract_geographic(
@@ -443,8 +583,11 @@ def extract_client(
           - customer_id: str
           - date_start: str
           - date_end: str
-          - raw_metrics: list[dict]   (una fila por date+channel+device)
-          - raw_search_terms: list[dict]
+          - raw_metrics: list[dict]   (una fila por date+campaign_id+channel+device,
+                                       incluye campaign_id y campaign_name reales de Google Ads)
+          - raw_search_terms: list[dict]  (puede mezclar fuentes: search_term_view y/o
+                                           campaign_search_term_insight según el tipo de campaña)
+          - raw_geo: list[dict]
     """
     date_start, date_end = _date_range(days_back)
     customer_id = client_config["customer_id"]
@@ -458,13 +601,46 @@ def extract_client(
     )
 
     metrics = extract_tofu_metrics(client, customer_id, date_start, date_end)
+
+    # Estrategia de extracción de términos de búsqueda:
+    # 1. Intentar search_term_view (campañas Search tradicionales).
+    # 2. Si devuelve 0 filas, hacer fallback a campaign_search_term_insight (PMAX).
+    # 3. Si ambas devuelven 0, loguear warning y continuar con lista vacía.
+    #
+    # Nota: los términos de search_term_view no llevan campaign_id/name porque
+    # la view no los expone directamente. Se les asigna source='search_term_view'
+    # para que el writer los distinga. Si en el futuro la query se actualiza para
+    # incluir campaign_id, el schema ya lo soporta.
     terms = extract_search_terms(client, customer_id, date_start, date_end)
+    if not terms:
+        logger.info(
+            "search_term_view sin datos — intentando PMAX search insights "
+            "para customer_id=%s",
+            customer_id,
+        )
+        terms = extract_pmax_search_insights(client, customer_id, date_start, date_end)
+        if not terms:
+            logger.warning(
+                "Ambas fuentes de términos (search_term_view y "
+                "campaign_search_term_insight) devolvieron 0 filas "
+                "para customer_id=%s. top_search_terms quedará vacío.",
+                customer_id,
+            )
+    else:
+        # Search tradicional encontró términos. Agregar source para el writer.
+        for t in terms:
+            t.setdefault("source", "search_term_view")
+            t.setdefault("campaign_id", "")
+            t.setdefault("campaign_name", "")
+
     geo = extract_geographic(client, customer_id, date_start, date_end)
 
     logger.info(
-        "Extraccion completada: %d filas de metricas, %d terminos de busqueda, %d filas geo.",
+        "Extraccion completada: %d filas de metricas, %d terminos de busqueda "
+        "(source=%s), %d filas geo.",
         len(metrics),
         len(terms),
+        terms[0].get("source", "desconocido") if terms else "ninguno",
         len(geo),
     )
 

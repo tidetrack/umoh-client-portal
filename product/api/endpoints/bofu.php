@@ -27,6 +27,13 @@ if (empty($_SESSION['umoh_user'])) api_error('No autenticado', 401);
 const CLIENT_SLUG = 'prepagas';
 
 try {
+    // Filtro global de campaña (Fase 4 — sprint 1.8). Para Prepagas hoy con
+    // una sola campaña activa, "all" y el ID real producen el mismo dataset
+    // (todas las filas de leads/lead_monetary pertenecen a esa campaña). Cuando
+    // haya multi-campaña, las queries directas a `leads` deberán cambiar a usar
+    // las facts tables que ya están filtradas por campaign_id. Por ahora el
+    // único bloque que sí filtra realmente es sellers (via seller_facts).
+    $campaign_filter = $_GET['campaign_id'] ?? '';
     // 1. Ventas cerradas: lead_monetary con is_closed=true
     $closed = supabase_query('lead_monetary', [
         'client_slug' => 'eq.' . CLIENT_SLUG,
@@ -35,7 +42,10 @@ try {
         'limit'       => '5000',
     ]);
 
-    // 2. Leads — para enriquecer con tipification + saber si la venta es de campaña.
+    // 2. Leads — enriquecimiento para el modal de detalle del lead.
+    //    Nota: `comments` no existe en la tabla `leads` de Supabase — los comentarios
+    //    están en `lead_activity` (migración 007). El historial de actividad se lee
+    //    desde ese endpoint, no desde leads.
     $leads = supabase_query('leads', [
         'client_slug' => 'eq.' . CLIENT_SLUG,
         'select'      => 'meistertask_id,nombre,tipification,canal,is_campaign_lead,assignee,section,lead_created_at',
@@ -115,9 +125,14 @@ try {
     $period = $_GET['period'] ?? '30d';
     $dates  = array_keys($by_date);
     $last   = end($dates);
-    $prev_d = count($dates) >= 2 ? $dates[count($dates) - 2] : null;
 
     [$start, $end] = period_dates($period, $last, $dates[0] ?? null);
+
+    // Período previo: mismo length, terminando el día antes de $start
+    $period_days = (strtotime($end) - strtotime($start)) / 86400 + 1;
+    $prev_end    = date('Y-m-d', strtotime($start) - 86400);
+    $prev_start  = date('Y-m-d', strtotime($prev_end) - ($period_days - 1) * 86400);
+
     $selected = filter_range($by_date, $start, $end);
 
     // 6. Agregar
@@ -150,22 +165,25 @@ try {
         'sales'   => fn($r) => (int)$r['closed_sales'],
     ]);
 
-    // 8. Prev day
-    $prev = null;
-    if ($prev_d && isset($by_date[$prev_d])) {
-        $pr = $by_date[$prev_d];
-        $pr_rev = $pr['total_revenue']; $pr_sales = $pr['closed_sales'];
-        $pr_cap = $pr['capitas'];
-        $pr_impr = $impr_by_date[$prev_d] ?? 0;
-        $prev = [
-            'total_revenue'         => round($pr_rev, 2),
-            'closed_sales'          => $pr_sales,
-            'avg_ticket'            => $pr_sales > 0 ? round($pr_rev / $pr_sales, 2) : 0,
-            'conversion_rate'       => $pr_impr > 0 ? round($pr_sales / $pr_impr * 100, 4) : 0,
-            'capitas_closed'        => $pr_cap,
-            'avg_ticket_per_capita' => $pr_cap > 0 ? round($pr_rev / $pr_cap, 2) : 0,
-        ];
+    // 8. Prev — suma del período previo (mismo length que el actual), para deltas correctos.
+    $prev_selected = filter_range($by_date, $prev_start, $prev_end);
+    $pr_rev = 0.0; $pr_sales = 0; $pr_cap = 0; $pr_impr = 0;
+    foreach ($prev_selected as $r) {
+        $pr_rev   += $r['total_revenue'];
+        $pr_sales += $r['closed_sales'];
+        $pr_cap   += $r['capitas'];
     }
+    foreach ($impr_by_date as $d => $n) {
+        if ($d >= $prev_start && $d <= $prev_end) $pr_impr += $n;
+    }
+    $prev = [
+        'total_revenue'         => round($pr_rev, 2),
+        'closed_sales'          => $pr_sales,
+        'avg_ticket'            => $pr_sales > 0 ? round($pr_rev / $pr_sales, 2) : 0,
+        'conversion_rate'       => $pr_impr > 0 ? round($pr_sales / $pr_impr * 100, 4) : 0,
+        'capitas_closed'        => $pr_cap,
+        'avg_ticket_per_capita' => $pr_cap > 0 ? round($pr_rev / $pr_cap, 2) : 0,
+    ];
 
     // 9. Tipification breakdown — top 5 operatorias por revenue
     $C = COLORS;
@@ -178,45 +196,76 @@ try {
     }
     $type_colors = [$C['navy'], $C['slate'], $C['silver'], $C['mist'], $C['light']];
 
-    // 10. Ranking de vendedores (mismas métricas que summary.php — ver allí
-    //     para definiciones). Replicado acá para que la sección BOFU sea
-    //     autosuficiente en una sola request.
-    $sales_by_lead = [];
-    foreach ($closed as $c) {
-        $sales_by_lead[$c['meistertask_id']] = [
-            'price' => (float)($c['precio_final'] ?? 0),
-            'date'  => substr($c['updated_at'] ?? '', 0, 10),
+    // 10. Ranking de vendedores — lee de la tabla seller_facts (migración 012)
+    //     en lugar de calcular en runtime. Esto unifica la fuente de verdad
+    //     con la Sheet espejo, incluye capitas y cycle_days reales (antes en 0)
+    //     y elimina la duplicación de lógica de filtrado por campaign_lead.
+    //
+    //     Período actual: $start..$end (calculado arriba via period_dates).
+    //     Período previo: reutiliza $prev_start / $prev_end calculados en el bloque 5.
+
+    // Helper interno: lee seller_facts en un rango y agrega por seller_name.
+    // avg_cycle_days se calcula como weighted avg por sales_count (matemática-
+    // mente correcto cuando se promedian días de ciclo de varios cierres).
+    $aggregate_sellers = function(string $rs, string $re) use ($campaign_filter) {
+        $q = [
+            'client_slug' => 'eq.' . CLIENT_SLUG,
+            'date'        => 'gte.' . $rs,
+            'select'      => 'seller_name,leads_assigned,sales_count,revenue,capitas_closed,avg_cycle_days,date',
+            'limit'       => '5000',
         ];
-    }
-    $sellers_agg = [];
-    foreach ($leads as $l) {
-        if (empty($l['is_campaign_lead'])) continue;
-        $name = trim($l['assignee'] ?? '');
-        if ($name === '' || strtolower($name) === 'umoh crew') continue;
-        $created = substr($l['lead_created_at'] ?? '', 0, 10);
-        if ($created === '' || $created < $start || $created > $end) continue;
-        if (!isset($sellers_agg[$name])) {
-            $sellers_agg[$name] = ['leads' => 0, 'sales' => 0, 'revenue' => 0.0, 'capitas' => 0, 'cycle_sum' => 0, 'cycle_count' => 0];
+        if ($campaign_filter !== '' && $campaign_filter !== 'all') {
+            $q['campaign_id'] = 'eq.' . $campaign_filter;
         }
-        $sellers_agg[$name]['leads']++;
-        $sale = $sales_by_lead[$l['meistertask_id']] ?? null;
-        if ($sale && $sale['date'] >= $start && $sale['date'] <= $end) {
-            $sellers_agg[$name]['sales']++;
-            $sellers_agg[$name]['revenue'] += $sale['price'];
+        $rows = supabase_query('seller_facts', $q);
+        // Filtrar manualmente la cota superior (PostgREST no permite 2x date= en una sola query).
+        $rows = array_filter($rows, fn($r) => ($r['date'] ?? '') <= $re);
+
+        $agg = [];
+        foreach ($rows as $r) {
+            $name = $r['seller_name'] ?? '';
+            if ($name === '') continue;
+            if (!isset($agg[$name])) {
+                $agg[$name] = [
+                    'leads' => 0, 'sales' => 0, 'revenue' => 0.0,
+                    'capitas' => 0, 'cycle_weighted' => 0.0,
+                ];
+            }
+            $sales = (int)($r['sales_count'] ?? 0);
+            $agg[$name]['leads']          += (int)($r['leads_assigned'] ?? 0);
+            $agg[$name]['sales']          += $sales;
+            $agg[$name]['revenue']        += (float)($r['revenue'] ?? 0);
+            $agg[$name]['capitas']        += (int)($r['capitas_closed'] ?? 0);
+            $agg[$name]['cycle_weighted'] += (float)($r['avg_cycle_days'] ?? 0) * $sales;
         }
-    }
-    $sellers = [];
-    foreach ($sellers_agg as $name => $s) {
-        $sellers[] = [
+        return $agg;
+    };
+
+    $curr_sellers = $aggregate_sellers($start, $end);
+    $prev_sellers = $aggregate_sellers($prev_start, $prev_end);
+
+    $build_seller_row = function(string $name, array $s) {
+        $cycle = $s['sales'] > 0 ? round($s['cycle_weighted'] / $s['sales'], 1) : 0.0;
+        return [
             'name'           => $name,
             'leads'          => $s['leads'],
             'sales'          => $s['sales'],
             'revenue'        => round($s['revenue'], 2),
             'effectiveness'  => $s['leads'] > 0 ? round($s['sales'] / $s['leads'] * 100, 1) : 0,
             'avg_ticket'     => $s['sales'] > 0 ? round($s['revenue'] / $s['sales'], 2) : 0,
-            'capitas'        => 0,  // pendiente: capitas vienen NULL del extractor
-            'avg_cycle_days' => 0,  // pendiente
+            'capitas'        => $s['capitas'],
+            'cycle_days'     => $cycle,        // nombre que usa la tabla en charts.js
+            'avg_cycle_days' => $cycle,        // alias de compatibilidad para la card MVP
         ];
+    };
+
+    $sellers = [];
+    foreach ($curr_sellers as $name => $s) {
+        $row = $build_seller_row($name, $s);
+        if (isset($prev_sellers[$name])) {
+            $row['prev'] = $build_seller_row($name, $prev_sellers[$name]);
+        }
+        $sellers[] = $row;
     }
     usort($sellers, fn($a, $b) => $b['sales'] <=> $a['sales'] ?: $b['revenue'] <=> $a['revenue']);
 
@@ -249,6 +298,8 @@ try {
             'nombre'          => $l['nombre'] ?? '',
             'assignee'        => $l['assignee'] ?? '',
             'tipification'    => $l['tipification'] ?? '',
+            'canal'           => $l['canal'] ?? '',
+            'section'         => $l['section'] ?? '',
             'lead_created_at' => $l['lead_created_at'] ?? '',
             'is_campaign'     => !empty($l['is_campaign_lead']),
         ];

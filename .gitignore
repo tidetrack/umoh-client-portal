@@ -44,6 +44,7 @@ scripts/*
 !.github/scripts/
 !scripts/run_*.py
 !scripts/sync_*.py
+!scripts/backfill_*.py
 
 # OS
 .DS_Store
@@ -51,3 +52,27 @@ Thumbs.db
 
 # Logs
 *.log
+
+# Docs internas (operativa privada — no va al repo)
+docs-internal/
+
+# MCP config local (entorno de desarrollo, no del repo)
+.mcp.json
+
+# Supabase temp/local
+supabase/.temp/
+
+# MeisterTask — data de cliente (CSVs exports). El template JSON sí va al repo.
+Meistertask/**/*.csv
+Meistertask/*.csv
+
+# Inbox de ingesta manual — CSVs de cliente, jamás al repo
+data/inbox/**/*.csv
+data/inbox/processed/**
+!data/inbox/README.md
+!data/inbox/**/.gitkeep
+
+# Assets de cliente sueltos en root (deben ir a clients/{slug}/assets/)
+/prepaga_logo.webp
+/*.webp
+/*.psd

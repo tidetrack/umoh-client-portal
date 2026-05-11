@@ -34,11 +34,19 @@ if (empty($_SESSION['umoh_user'])) {
 const CLIENT_SLUG = 'prepagas';
 
 try {
-    $rows = supabase_query('tofu_ads_daily', [
+    // Filtro de campaña activa: si viene ?campaign_id=X, agregamos el filtro
+    // a la query. Si está vacío o "all", no se filtra (vista agregada de
+    // todas las campañas activas del cliente).
+    $campaign_filter = $_GET['campaign_id'] ?? '';
+    $tofu_query_params = [
         'client_slug' => 'eq.' . CLIENT_SLUG,
         'order'       => 'date.asc',
         'limit'       => '1000',
-    ]);
+    ];
+    if ($campaign_filter !== '' && $campaign_filter !== 'all') {
+        $tofu_query_params['campaign_id'] = 'eq.' . $campaign_filter;
+    }
+    $rows = supabase_query('tofu_ads_daily', $tofu_query_params);
 
     if (empty($rows)) api_error('Sin datos en tofu_ads_daily para ' . CLIENT_SLUG, 404);
 
@@ -89,9 +97,14 @@ try {
     $period = $_GET['period'] ?? '30d';
     $dates  = array_keys($by_date);
     $last   = end($dates);
-    $prev_d = count($dates) >= 2 ? $dates[count($dates) - 2] : null;
 
     [$start, $end] = period_dates($period, $last, $dates[0] ?? null);
+
+    // Período previo: mismo length, terminando el día antes de $start
+    $period_days = (strtotime($end) - strtotime($start)) / 86400 + 1;
+    $prev_end    = date('Y-m-d', strtotime($start) - 86400);
+    $prev_start  = date('Y-m-d', strtotime($prev_end) - ($period_days - 1) * 86400);
+
     $selected = filter_range($by_date, $start, $end);
 
     // Agregar el período. Para channels/devices guardamos clicks Y impressions
@@ -129,12 +142,63 @@ try {
 
     $cpc = $clicks > 0 ? round($spend / $clicks, 2) : 0;
 
-    arsort($all_terms_clicks);
-    $max_terms_clicks = max(array_values($all_terms_clicks) ?: [1]);
-    $max_terms_imp    = max(array_values($all_terms_imp) ?: [1]);
+    // Términos de búsqueda: leer desde tofu_search_terms (tabla dedicada).
+    // Esta tabla consolida términos de search_term_view (campañas Search) y
+    // category labels de campaign_search_term_insight (campañas PMAX).
+    // Si no hay datos en la tabla dedicada, hacemos fallback al campo JSONB
+    // top_search_terms de tofu_ads_daily (comportamiento anterior).
+    //
+    // El filtro de fecha usa el rango $start/$end del período seleccionado.
+    // El filtro de campaign_id se aplica solo si hay filtro activo (igual que
+    // el filtro de la query principal de tofu_ads_daily).
+    $st_query_params = [
+        'client_slug' => 'eq.' . CLIENT_SLUG,
+        'date'        => 'gte.' . $start,
+        'order'       => 'clicks.desc',
+        'limit'       => '500',
+        'select'      => 'date,term,clicks,impressions',
+    ];
+    // Supabase REST usa "lte" en un segundo filtro del mismo campo como "and":
+    // no hay soporte nativo de BETWEEN via query params, se usa gte + lte separados.
+    // La librería supabase_query del proyecto pasa los params tal como vienen;
+    // para el segundo bound usamos el header Range o lo manejamos en PHP filtrando.
+    // Solución: traer con gte=$start y filtrar por date <= $end en PHP (el limit=500
+    // es más que suficiente para 7-90 días de términos).
+    if ($campaign_filter !== '' && $campaign_filter !== 'all') {
+        $st_query_params['campaign_id'] = 'eq.' . $campaign_filter;
+    }
+    $raw_st_rows = supabase_query('tofu_search_terms', $st_query_params);
+
+    // Filtrar por end date en PHP (supabase_query no soporta doble filtro mismo campo)
+    $st_rows_filtered = array_filter(
+        is_array($raw_st_rows) ? $raw_st_rows : [],
+        fn($r) => isset($r['date']) && $r['date'] >= $start && $r['date'] <= $end,
+    );
+
+    // Agregar clicks e impressions por término (puede haber el mismo término en
+    // múltiples días o campañas dentro del período seleccionado).
+    $st_clicks_agg = [];
+    $st_imp_agg    = [];
+    foreach ($st_rows_filtered as $r) {
+        $t = $r['term'] ?? null;
+        if ($t === null || $t === '') continue;
+        $st_clicks_agg[$t] = ($st_clicks_agg[$t] ?? 0) + (int)($r['clicks'] ?? 0);
+        $st_imp_agg[$t]    = ($st_imp_agg[$t]    ?? 0) + (int)($r['impressions'] ?? 0);
+    }
+
+    // Si tofu_search_terms está vacío para este período, usar fallback al JSONB inline.
+    // El fallback usa $all_terms_clicks/$all_terms_imp que ya están acumulados arriba.
+    if (empty($st_clicks_agg)) {
+        $st_clicks_agg = $all_terms_clicks;
+        $st_imp_agg    = $all_terms_imp;
+    }
+
+    arsort($st_clicks_agg);
+    $max_terms_clicks = max(array_values($st_clicks_agg) ?: [1]);
+    $max_terms_imp    = max(array_values($st_imp_agg) ?: [1]);
     $search_terms = [];
-    foreach (array_slice($all_terms_clicks, 0, 10, true) as $term => $cl) {
-        $imp = $all_terms_imp[$term] ?? 0;
+    foreach (array_slice($st_clicks_agg, 0, 10, true) as $term => $cl) {
+        $imp = $st_imp_agg[$term] ?? 0;
         $search_terms[] = [
             'term'        => $term,
             'clicks'      => $cl,
@@ -185,18 +249,20 @@ try {
                                     : 0,
     ]);
 
-    // Prev: el día inmediatamente anterior al último, para mostrar delta puntual.
-    $prev = null;
-    if ($prev_d && isset($by_date[$prev_d])) {
-        $pr    = $by_date[$prev_d];
-        $pr_cl = (int)   $pr['clicks'];
-        $pr_sp = (float) $pr['spend'];
-        $prev  = [
-            'impressions' => (int)$pr['impressions'],
-            'clicks'      => $pr_cl,
-            'cpc'         => $pr_cl > 0 ? round($pr_sp / $pr_cl, 2) : 0,
-        ];
+    // Prev — suma del período previo (mismo length que el actual), para deltas correctos.
+    $prev_impressions_p = 0; $prev_clicks_p = 0; $prev_spend_p = 0.0;
+    $prev_selected = filter_range($by_date, $prev_start, $prev_end);
+    foreach ($prev_selected as $r) {
+        $prev_impressions_p += (int)   $r['impressions'];
+        $prev_clicks_p      += (int)   $r['clicks'];
+        $prev_spend_p       += (float) $r['spend'];
     }
+    $prev = [
+        'impressions' => $prev_impressions_p,
+        'clicks'      => $prev_clicks_p,
+        'cpc'         => $prev_clicks_p > 0 ? round($prev_spend_p / $prev_clicks_p, 2) : 0,
+        'spend'       => round($prev_spend_p, 2),
+    ];
 
     // Geo: normalizar nombres de Google Ads → labels del GeoJSON Gran Mendoza.
     // Google Ads reporta sin acentos y "Mendoza" para Capital Mendoza; el GeoJSON

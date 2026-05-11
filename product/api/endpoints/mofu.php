@@ -27,6 +27,13 @@ if (empty($_SESSION['umoh_user'])) api_error('No autenticado', 401);
 const CLIENT_SLUG = 'prepagas';
 
 try {
+    // Filtro global de campaña (Fase 4 — sprint 1.8). Aceptamos el parámetro
+    // por contrato del frontend, pero las queries de MOFU leen directamente de
+    // `leads` que no tiene campaign_id (los leads de MeisterTask no traen ese
+    // campo). Para Prepagas hoy con una sola campaña activa, todos los
+    // is_campaign_lead=true son de esa campaña — sin diferencia funcional.
+    // TODO multi-campaña: refactor a leer de mofu_facts con filtro campaign_id.
+    $campaign_filter = $_GET['campaign_id'] ?? '';
     // 1. Funnel stages config: section_name → flags (high_intent, lost, incubating, etc.)
     //    Incluye display_order para construir el journey en el mismo orden que el CRM.
     $stages = supabase_query('funnel_stages', [
@@ -96,10 +103,15 @@ try {
     $period = $_GET['period'] ?? '30d';
     $dates  = array_keys($by_date);
     if (empty($dates)) api_error('Sin leads en Supabase para ' . CLIENT_SLUG, 404);
-    $last   = end($dates);
-    $prev_d = count($dates) >= 2 ? $dates[count($dates) - 2] : null;
+    $last = end($dates);
 
     [$start, $end] = period_dates($period, $last, $dates[0] ?? null);
+
+    // Período previo: mismo length, terminando el día antes de $start
+    $period_days = (strtotime($end) - strtotime($start)) / 86400 + 1;
+    $prev_end    = date('Y-m-d', strtotime($start) - 86400);
+    $prev_start  = date('Y-m-d', strtotime($prev_end) - ($period_days - 1) * 86400);
+
     $selected = filter_range($by_date, $start, $end);
 
     // 6. Helper para clasificar un lead en sus buckets
@@ -122,6 +134,7 @@ try {
     $total_leads = 0;
     $leads_alta_intencion = 0; $leads_contactado = 0; $leads_a_futuro = 0;
     $leads_en_emision = 0; $leads_erroneo = 0; $leads_no_prospera = 0;
+    $leads_closed_won = 0; $leads_typified = 0;
     $segs = [];   // {operatoria_label: count}
 
     foreach ($selected as $d => $bucket) {
@@ -134,8 +147,10 @@ try {
             if ($c['en_emision'])  $leads_en_emision++;
             if ($c['excluded'])    $leads_erroneo++;
             if ($c['lost'])        $leads_no_prospera++;
+            if ($c['closed_won'])  $leads_closed_won++;
 
             $tip = trim($l['tipification'] ?? '');
+            if ($tip !== '') $leads_typified++;
             if ($tip === '') $tip = 'Sin clasificar';
             $segs[$tip] = ($segs[$tip] ?? 0) + 1;
         }
@@ -146,11 +161,12 @@ try {
     foreach ($selected as $d => $_) $period_spend += $spend_by_date[$d] ?? 0;
     $cpl = $total_leads > 0 ? round($period_spend / $total_leads, 2) : 0;
 
-    // En blanco: leads que no encajan en ninguna categoría tipificada
-    $en_blanco = max(0, $total_leads - ($leads_contactado + $leads_no_prospera + $leads_a_futuro
-                   + $leads_en_emision + $leads_erroneo + $leads_alta_intencion));
+    // Tipification rate = leads con campo tipification no vacío / total.
+    // (Antes se usaba "en_blanco" como proxy, pero leads con stage='closed_won'
+    //  no caían en ningún bucket nominado y se contaban como tipificados aunque
+    //  no lo estuvieran — inflaba el rate ~10pts. Ver auditoría 2026-05-05.)
     $tipification_rate = $total_leads > 0
-        ? round(($total_leads - $en_blanco) / $total_leads * 100, 1) : 0;
+        ? round($leads_typified / $total_leads * 100, 1) : 0;
 
     // 8. Trend: leads y CPL por día
     $trend_data = [];
@@ -163,25 +179,26 @@ try {
         'cpl'   => fn($r) => (float)$r['cpl'],
     ]);
 
-    // 9. Prev day
-    $prev = null;
-    if ($prev_d && isset($by_date[$prev_d])) {
-        $pr = $by_date[$prev_d];
-        $pr_total = $pr['total_leads'];
-        $pr_high = 0; $pr_typified = 0;
-        foreach ($pr['leads'] as $l) {
+    // 9. Prev — suma del período previo (mismo length que el actual), para deltas correctos.
+    $prev_selected = filter_range($by_date, $prev_start, $prev_end);
+    $pr_total = 0; $pr_high = 0; $pr_typified = 0; $pr_closed_won = 0; $pr_spend_total = 0.0;
+    foreach ($prev_selected as $d => $bucket) {
+        $pr_total      += $bucket['total_leads'];
+        $pr_spend_total += $spend_by_date[$d] ?? 0;
+        foreach ($bucket['leads'] as $l) {
             $c = $classify($l);
             if ($c['high_intent']) $pr_high++;
             if ($c['typified'])    $pr_typified++;
+            if ($c['closed_won'])  $pr_closed_won++;
         }
-        $prev_spend = $spend_by_date[$prev_d] ?? 0;
-        $prev = [
-            'total_leads'       => $pr_total,
-            'cpl'               => $pr_total > 0 ? round($prev_spend / $pr_total, 2) : 0,
-            'tipification_rate' => $pr_total > 0 ? round($pr_typified / $pr_total * 100, 1) : 0,
-            'high_intent_leads' => $pr_high,
-        ];
     }
+    $prev = [
+        'total_leads'       => $pr_total,
+        'cpl'               => $pr_total > 0 ? round($pr_spend_total / $pr_total, 2) : 0,
+        'tipification_rate' => $pr_total > 0 ? round($pr_typified / $pr_total * 100, 1) : 0,
+        'high_intent_leads' => $pr_high,
+        'closed_won_leads'  => $pr_closed_won,
+    ];
 
     // 10. Status breakdown — 14 columnas literales de MeisterTask, en orden del journey.
     //    Se construye a partir de $stage_by_section (ya ordenado por display_order.asc).
@@ -242,6 +259,7 @@ try {
         'cpl'               => $cpl,
         'tipification_rate' => $tipification_rate,
         'high_intent_leads' => $leads_alta_intencion,
+        'closed_won_leads'  => $leads_closed_won,
         'trend' => $trend,
         'status' => [
             'labels' => $status_labels,

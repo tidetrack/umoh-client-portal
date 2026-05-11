@@ -219,6 +219,158 @@ body {
 }
 
 /* Period selector */
+/* ── Selector de campaña (Fase 4 — sprint 1.8) ──────────────
+   Filtro global visible en el header. Estado persistido en localStorage
+   para que la selección sobreviva entre navegaciones de pestañas y reloads. */
+.campaign-selector-wrap {
+  position: relative;
+}
+
+.campaign-selector-btn {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 8px;
+  padding: 6px var(--sp-3);
+  color: rgba(255, 255, 255, 0.92);
+  font-family: var(--font);
+  font-size: 12.5px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background 0.15s, border-color 0.15s;
+  max-width: 280px;
+}
+
+.campaign-selector-btn:hover {
+  background: rgba(255, 255, 255, 0.12);
+  border-color: rgba(255, 255, 255, 0.18);
+}
+
+.campaign-selector-btn[aria-expanded="true"] {
+  background: rgba(255, 255, 255, 0.14);
+  border-color: var(--umoh-accent);
+}
+
+.cs-btn-icon {
+  flex-shrink: 0;
+  color: var(--umoh-accent);
+}
+
+.cs-btn-text {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 1px;
+  min-width: 0;
+}
+
+.cs-btn-name {
+  font-weight: 600;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 200px;
+  line-height: 1.2;
+}
+
+.cs-btn-id {
+  font-size: 10px;
+  font-weight: 400;
+  opacity: 0.65;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0.02em;
+  line-height: 1;
+}
+
+.cs-btn-id:empty {
+  display: none;
+}
+
+.cs-btn-chevron {
+  flex-shrink: 0;
+  opacity: 0.6;
+  transition: transform 0.15s;
+}
+
+.campaign-selector-btn[aria-expanded="true"] .cs-btn-chevron {
+  transform: rotate(180deg);
+}
+
+.campaign-selector-popover {
+  position: absolute;
+  top: calc(100% + 6px);
+  right: 0;
+  min-width: 280px;
+  max-width: 360px;
+  background: var(--bg-card);
+  border: 1px solid var(--border-subtle);
+  border-radius: 10px;
+  box-shadow: 0 12px 28px rgba(0, 0, 0, 0.18), 0 4px 8px rgba(0, 0, 0, 0.08);
+  padding: var(--sp-2);
+  z-index: 95;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  max-height: 320px;
+  overflow-y: auto;
+}
+
+/* El selector de clase tiene mayor especificidad que el atributo [hidden]
+   (que UA-stylesheet aplica display:none). Sin esta regla, popover.hidden
+   = true no oculta el popover porque display:flex de arriba lo sobreescribe. */
+.campaign-selector-popover[hidden] {
+  display: none;
+}
+
+.campaign-option {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  background: transparent;
+  border: none;
+  text-align: left;
+  padding: var(--sp-2) var(--sp-3);
+  border-radius: 6px;
+  font-family: var(--font);
+  cursor: pointer;
+  transition: background 0.12s;
+  color: var(--text-primary);
+}
+
+.campaign-option:hover {
+  background: rgba(255, 0, 64, 0.06);
+}
+
+.campaign-option.active {
+  background: rgba(255, 0, 64, 0.10);
+}
+
+.campaign-option.active .cs-opt-name {
+  color: var(--umoh-accent);
+}
+
+.cs-opt-name {
+  font-size: 13px;
+  font-weight: 600;
+  line-height: 1.3;
+}
+
+.cs-opt-id {
+  font-size: 11px;
+  font-weight: 400;
+  color: var(--text-muted);
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0.02em;
+}
+
+@media (max-width: 768px) {
+  .campaign-selector-btn { max-width: 200px; padding: 6px 10px; font-size: 12px; }
+  .cs-btn-name { max-width: 140px; }
+  .campaign-selector-popover { min-width: 240px; right: auto; left: 0; }
+}
+
 .period-selector-wrap {
   position: relative;
 }
@@ -687,8 +839,33 @@ body {
   z-index: 90;
   background: var(--bg-nav);
   height: var(--nav-h);
-  border-bottom: 1px solid rgba(255, 255, 255, 0.05);
-  transition: background 0.2s;
+  transition: background 0.25s, transform 0.25s ease, opacity 0.25s ease;
+}
+
+/* Línea sutil UMOH como separador del "hero" (header + nav) y el body —
+   atraviesa todo el ancho del nav. La pestaña activa la "interrumpe"
+   visualmente porque su bg se extiende hacia abajo y tapa la línea solo
+   en su porción. 1px con opacidad reducida para que se sienta como una
+   sombra/separador y no compita visualmente con el contenido. */
+.dashboard-nav::after {
+  content: "";
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 1px;
+  background: rgba(255, 0, 64, 0.45);
+  z-index: 0;
+  pointer-events: none;
+}
+
+/* Auto-hide: cuando el usuario hace scroll para abajo, el nav se desvanece
+   hacia arriba. El FAB flotante aparece en la esquina inferior derecha
+   para cambiar de sección sin scrollear hasta arriba. */
+body.nav-hidden .dashboard-nav {
+  transform: translateY(-100%);
+  opacity: 0;
+  pointer-events: none;
 }
 
 .nav-inner {
@@ -697,32 +874,106 @@ body {
   padding: 0 var(--content-pad);
   height: 100%;
   display: flex;
-  align-items: stretch;
+  align-items: flex-end;
+  gap: 4px;
 }
 
+/* Pestañas estilo Chrome — el tab activo "se conecta" al contenido de abajo */
 .nav-tab {
   font-family: var(--font);
   font-size: 13px;
   font-weight: 500;
-  color: rgba(255, 255, 255, 0.5);
+  color: rgba(255, 255, 255, 0.55);
   background: transparent;
   border: none;
-  border-bottom: 2px solid transparent;
+  border-radius: 12px 12px 0 0;
   padding: 0 var(--sp-5);
+  height: calc(var(--nav-h) - 4px);
+  display: flex;
+  align-items: center;
   cursor: pointer;
-  transition: color 0.15s, border-color 0.15s;
+  transition: color 0.15s, background 0.15s;
   white-space: nowrap;
   letter-spacing: 0.01em;
+  position: relative;
 }
 
-.nav-tab:hover {
-  color: rgba(255, 255, 255, 0.8);
+.nav-tab:hover:not(.active) {
+  background: rgba(255, 255, 255, 0.08);
+  color: rgba(255, 255, 255, 0.9);
 }
 
 .nav-tab.active {
-  color: #fff;
-  border-bottom-color: var(--umoh-accent);
+  background: var(--bg-page);
+  color: var(--text-primary);
   font-weight: 600;
+  /* Borde sutil UMOH en TOP + LEFT + RIGHT (1px, baja opacidad). Los
+     bordes laterales descienden y se conectan con la línea horizontal
+     del nav formando un contorno continuo en U invertida. El bottom no
+     tiene border porque la pestaña se conecta al contenido. */
+  border-top:    1px solid rgba(255, 0, 64, 0.45);
+  border-left:   1px solid rgba(255, 0, 64, 0.45);
+  border-right:  1px solid rgba(255, 0, 64, 0.45);
+  border-bottom: none;
+  /* La pestaña activa es 1px más alta que las inactivas (el border-top
+     extra hace de "elevación" mínima). */
+  height: calc(var(--nav-h) - 3px);
+  /* margin-bottom -1px: el tab muerde 1px del bottom del nav, cubriendo
+     la línea horizontal en su porción y conectando los bordes laterales
+     con la línea continua del nav. */
+  margin-bottom: -1px;
+  padding-bottom: 1px;
+  z-index: 2;
+  box-shadow: 0 6px 0 var(--bg-page);
+}
+
+/* ── FAB scroll-to-top — aparece cuando el nav está oculto ─── */
+.nav-fab {
+  position: fixed;
+  bottom: 28px;
+  right: 28px;
+  width: 52px;
+  height: 52px;
+  border-radius: 50%;
+  background: var(--umoh-accent);
+  color: #fff;
+  border: none;
+  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.18), 0 2px 4px rgba(0, 0, 0, 0.1);
+  cursor: pointer;
+  z-index: 110;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  opacity: 0;
+  transform: scale(0.6) translateY(20px);
+  pointer-events: none;
+  transition: opacity 0.25s, transform 0.25s cubic-bezier(0.34, 1.56, 0.64, 1),
+              background 0.15s, box-shadow 0.15s;
+}
+
+body.nav-hidden .nav-fab {
+  opacity: 1;
+  transform: scale(1) translateY(0);
+  pointer-events: auto;
+}
+
+.nav-fab:hover {
+  background: #d6002f;
+  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.25), 0 2px 6px rgba(0, 0, 0, 0.15);
+  transform: scale(1.06);
+}
+
+.nav-fab:active {
+  transform: scale(0.96);
+}
+
+.nav-fab svg {
+  width: 22px;
+  height: 22px;
+}
+
+@media (max-width: 768px) {
+  .nav-fab { bottom: 20px; right: 20px; width: 48px; height: 48px; }
 }
 
 /* ── 5. Main Layout ────────────────────────────────────────── */
@@ -731,7 +982,9 @@ body {
   max-width: var(--content-max);
   width: 100%;
   margin: 0 auto;
-  padding: var(--sp-8) var(--content-pad) var(--sp-12);
+  /* Padding top reducido para que la sección activa quede pegada al tab
+     (la pestaña se conecta visualmente con el contenido). */
+  padding: var(--sp-5) var(--content-pad) var(--sp-12);
 }
 
 .dashboard-section {
@@ -786,7 +1039,7 @@ body {
 }
 
 .kpi-grid--5 {
-  grid-template-columns: repeat(6, 1fr);
+  grid-template-columns: repeat(5, 1fr);
 }
 
 .kpi-grid--4 {
@@ -879,6 +1132,10 @@ body {
 
 .delta--bad {
   color: var(--umoh-accent);
+}
+
+.delta--neutral {
+  color: var(--text-muted);
 }
 
 /* KPI formula hint */
@@ -1125,6 +1382,14 @@ body {
   color: var(--text-secondary);
   font-weight: 500;
   white-space: nowrap;
+}
+
+.terms-empty {
+  text-align: center;
+  color: var(--text-muted);
+  padding: var(--sp-6) var(--sp-4);
+  font-style: italic;
+  font-size: 13px;
 }
 
 /* ── 9. Geo: tabla ranking (reemplaza al mapa Leaflet) ────────── */
@@ -1523,6 +1788,33 @@ body {
   white-space: nowrap;
 }
 
+/* Fila TOTAL al pie de la tabla — coincide con el revenue agregado del KPI
+   "Ingresos Totales" del BOFU. Tipografía más prominente y border superior
+   para separarla del cuerpo. */
+.segment-table .segment-total-row {
+  border-top: 2px solid var(--border-subtle);
+  background: var(--bg-page);
+}
+
+.segment-total-label {
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  font-size: 12px;
+  color: var(--text-secondary);
+}
+
+.segment-total-value {
+  font-weight: 800;
+  color: var(--text-primary);
+  font-size: 15px;
+}
+
+.segment-total-pct {
+  font-weight: 700;
+  color: var(--text-secondary);
+}
+
 [data-theme="dark"] .segment-table tbody tr:hover {
   background: rgba(255, 255, 255, 0.03);
 }
@@ -1531,16 +1823,16 @@ body {
 .sellers-table {
   width: 100%;
   border-collapse: collapse;
-  font-size: 15px;
+  font-size: 17px;
 }
 
 .sellers-table thead th {
-  font-size: 11px;
+  font-size: 12px;
   font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 0.08em;
   color: var(--text-muted);
-  padding: var(--sp-3) var(--sp-4);
+  padding: var(--sp-4) var(--sp-4);
   border-bottom: 2px solid var(--border-subtle);
   white-space: nowrap;
 }
@@ -1586,21 +1878,21 @@ body {
 
 .sellers-table .td-name {
   font-weight: 700;
-  font-size: 16px;
+  font-size: 18px;
 }
 
 .sellers-table .td-num {
   text-align: right;
   font-variant-numeric: tabular-nums;
-  font-size: 15px;
+  font-size: 17px;
 }
 
 .sellers-table .seller-delta {
   display: block;
-  font-size: 11px;
+  font-size: 12px;
   font-weight: 600;
   line-height: 1.3;
-  margin-top: 2px;
+  margin-top: 3px;
 }
 
 .sellers-table .delta-up   { color: #22C55E; }
@@ -1823,6 +2115,28 @@ body {
   display: flex;
   flex-direction: column;
   gap: var(--sp-1);
+  padding: var(--sp-2) var(--sp-3);
+  border-radius: var(--r-md);
+  transition: background 0.15s, transform 0.15s;
+}
+
+/* Hover + click affordance solo cuando el item es interactivo (data-cs-kpi) */
+.cs-item[data-cs-kpi] {
+  cursor: pointer;
+}
+
+.cs-item[data-cs-kpi]:hover {
+  background: var(--bg-card-hover, rgba(0, 0, 0, 0.04));
+  transform: translateY(-1px);
+}
+
+[data-theme="dark"] .cs-item[data-cs-kpi]:hover {
+  background: rgba(255, 255, 255, 0.05);
+}
+
+.cs-item[data-cs-kpi]:focus-visible {
+  outline: 2px solid var(--umoh-accent);
+  outline-offset: 2px;
 }
 
 .cs-label {
@@ -1929,6 +2243,14 @@ body {
   opacity: 0.55;
 }
 
+/* Contenedor inline: label + total lado a lado */
+.journey-phase-caption {
+  display: flex;
+  align-items: baseline;
+  gap: 4px;
+  min-width: 0;
+}
+
 .journey-phase-label {
   font-size: 9px;
   font-weight: 700;
@@ -1939,6 +2261,19 @@ body {
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+  flex-shrink: 1;
+  min-width: 0;
+}
+
+/* Total acumulado de leads por sub-fase */
+.journey-phase-total {
+  font-size: 10px;
+  font-weight: 800;
+  color: var(--phase-color, var(--text-muted));
+  opacity: 1;
+  white-space: nowrap;
+  flex-shrink: 0;
+  letter-spacing: 0;
 }
 
 /* Fila de columnas: scroll horizontal si no caben */
@@ -2135,6 +2470,355 @@ body {
   display: block;
 }
 
+/* ── Insights del Journey (reemplaza el bloque .journey-description/.jd-grid) ──
+   Interpreta los datos reales del período y detecta cuellos de botella,
+   señales positivas e información de contexto de forma automática.
+   Máximo 3 insights ordenados por severidad: warning > positivo > info. */
+
+.journey-insights {
+  border-top: 1px solid var(--border-subtle);
+  padding: var(--sp-5) var(--sp-6);
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-4);
+}
+
+.journey-insights-header {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+}
+
+.journey-insights-icon {
+  flex-shrink: 0;
+  width: 20px;
+  height: 20px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 14px;
+  line-height: 1;
+}
+
+.journey-insights-title {
+  font-size: 12px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--text-muted);
+}
+
+.journey-insights-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-3);
+}
+
+/* Card base para cada insight */
+.journey-insight-card {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--sp-3);
+  padding: var(--sp-3) var(--sp-4);
+  border-radius: var(--r-lg);
+  border-left: 3px solid transparent;
+  background: var(--bg-page);
+}
+
+/* Warning: amber */
+.journey-insight-card--warning {
+  border-left-color: #f59e0b;
+  background: rgba(245, 158, 11, 0.06);
+}
+
+/* Positivo: green */
+.journey-insight-card--positive {
+  border-left-color: #22c55e;
+  background: rgba(34, 197, 94, 0.06);
+}
+
+/* Info: blue */
+.journey-insight-card--info {
+  border-left-color: #3b82f6;
+  background: rgba(59, 130, 246, 0.06);
+}
+
+.journey-insight-badge {
+  flex-shrink: 0;
+  width: 24px;
+  height: 24px;
+  border-radius: var(--r-md);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 13px;
+  line-height: 1;
+  margin-top: 1px;
+}
+
+.journey-insight-card--warning  .journey-insight-badge { background: rgba(245,158,11,0.15); }
+.journey-insight-card--positive .journey-insight-badge { background: rgba(34,197,94,0.15); }
+.journey-insight-card--info     .journey-insight-badge { background: rgba(59,130,246,0.15); }
+
+.journey-insight-body {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  min-width: 0;
+}
+
+.journey-insight-name {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--text-primary);
+  line-height: 1.3;
+}
+
+.journey-insight-card--warning  .journey-insight-name { color: #92400e; }
+.journey-insight-card--positive .journey-insight-name { color: #166534; }
+.journey-insight-card--info     .journey-insight-name { color: #1e40af; }
+
+[data-theme="dark"] .journey-insight-card--warning  .journey-insight-name { color: #fcd34d; }
+[data-theme="dark"] .journey-insight-card--positive .journey-insight-name { color: #86efac; }
+[data-theme="dark"] .journey-insight-card--info     .journey-insight-name { color: #93c5fd; }
+
+.journey-insight-text {
+  margin: 0;
+  font-size: 12px;
+  line-height: 1.55;
+  color: var(--text-secondary);
+}
+
+[data-theme="dark"] .journey-insight-card {
+  background: rgba(255,255,255,0.03);
+}
+[data-theme="dark"] .journey-insight-card--warning  { background: rgba(245,158,11,0.08); }
+[data-theme="dark"] .journey-insight-card--positive { background: rgba(34,197,94,0.08); }
+[data-theme="dark"] .journey-insight-card--info     { background: rgba(59,130,246,0.08); }
+
+/* ── Journey column: micro-feedback al click ── */
+.journey-col:active {
+  transform: translateY(1px);
+}
+
+/* ── Journey Stage Modal (popup didáctico) ── */
+.journey-modal-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 1010;
+  background: rgba(10, 16, 28, 0.72);
+  backdrop-filter: blur(4px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: var(--sp-4);
+  animation: overlayIn 0.15s ease;
+}
+
+.journey-modal-overlay[hidden] {
+  display: none;
+}
+
+.journey-modal {
+  background: var(--bg-card);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--r-xl);
+  box-shadow: var(--shadow-lg);
+  max-width: 540px;
+  width: 100%;
+  max-height: 90vh;
+  overflow-y: auto;
+  padding: var(--sp-8) var(--sp-8) var(--sp-6);
+  position: relative;
+  animation: journeyModalIn 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+@keyframes journeyModalIn {
+  from {
+    opacity: 0;
+    transform: scale(0.93) translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+  }
+}
+
+.journey-modal-close {
+  position: absolute;
+  top: var(--sp-4);
+  right: var(--sp-4);
+  width: 28px;
+  height: 28px;
+  border-radius: var(--r-md);
+  border: 1px solid var(--border-subtle);
+  background: transparent;
+  color: var(--text-muted);
+  font-size: 16px;
+  line-height: 1;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background 0.1s, color 0.1s;
+}
+
+.journey-modal-close:hover {
+  background: var(--bg-page);
+  color: var(--text-primary);
+}
+
+/* Etiqueta de sub-fase (badge coloreado) */
+.journey-modal-phase-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 3px 10px 3px 8px;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.07em;
+  margin-bottom: var(--sp-3);
+}
+
+.journey-modal-phase-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+/* Título de la etapa */
+.journey-modal-title {
+  font-size: 22px;
+  font-weight: 800;
+  color: var(--text-primary);
+  letter-spacing: -0.4px;
+  margin-bottom: var(--sp-2);
+  line-height: 1.2;
+  padding-right: var(--sp-8);
+}
+
+/* Métrica destacada (valor + porcentaje) */
+.journey-modal-metric {
+  display: flex;
+  align-items: baseline;
+  gap: var(--sp-2);
+  margin-bottom: var(--sp-5);
+  padding-bottom: var(--sp-4);
+  border-bottom: 1px solid var(--border-subtle);
+}
+
+.journey-modal-metric-value {
+  font-size: 32px;
+  font-weight: 800;
+  color: var(--text-primary);
+  letter-spacing: -0.5px;
+  line-height: 1;
+}
+
+.journey-modal-metric-label {
+  font-size: 13px;
+  color: var(--text-muted);
+  font-weight: 500;
+}
+
+.journey-modal-metric-pct {
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--text-secondary);
+  margin-left: var(--sp-1);
+}
+
+/* Secciones de contenido */
+.journey-modal-section {
+  margin-bottom: var(--sp-4);
+}
+
+.journey-modal-section-label {
+  display: block;
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: var(--text-muted);
+  margin-bottom: var(--sp-2);
+}
+
+.journey-modal-section-text {
+  margin: 0;
+  font-size: 13px;
+  line-height: 1.65;
+  color: var(--text-secondary);
+}
+
+/* Accion sugerida */
+.journey-modal-action {
+  background: rgba(37, 48, 64, 0.04);
+  border-left: 3px solid var(--umoh-accent);
+  border-radius: 0 var(--r-md) var(--r-md) 0;
+  padding: var(--sp-4);
+  margin-top: var(--sp-5);
+}
+
+[data-theme="dark"] .journey-modal-action {
+  background: rgba(255, 255, 255, 0.04);
+}
+
+.journey-modal-action-label {
+  display: block;
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: var(--umoh-accent);
+  margin-bottom: var(--sp-2);
+}
+
+.journey-modal-action-text {
+  margin: 0;
+  font-size: 13px;
+  color: var(--text-primary);
+  line-height: 1.55;
+}
+
+/* Ejemplo aplicado con datos reales */
+.journey-modal-example {
+  margin-top: var(--sp-3);
+  padding: var(--sp-3) var(--sp-4);
+  background: var(--bg-page);
+  border-radius: var(--r-md);
+  border: 1px solid var(--border-subtle);
+}
+
+.journey-modal-example-label {
+  display: block;
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: var(--text-muted);
+  margin-bottom: var(--sp-2);
+}
+
+.journey-modal-example-text {
+  margin: 0;
+  font-size: 12px;
+  color: var(--text-secondary);
+  line-height: 1.55;
+  font-style: italic;
+}
+
+@media (max-width: 600px) {
+  .journey-modal {
+    padding: var(--sp-6) var(--sp-5) var(--sp-5);
+    max-height: 85vh;
+  }
+  .journey-modal-metric-value { font-size: 26px; }
+  .journey-modal-title { font-size: 18px; }
+}
+
 /* ── Dark theme overrides ── */
 [data-theme="dark"] .journey-header {
   border-bottom-color: rgba(255,255,255,0.08);
@@ -2184,32 +2868,76 @@ body {
 
 .cs-flat { color: var(--text-muted); }
 /* ── Pending Price Table — Ventas sin monto cargado ─────────── */
+/* Tipografía alineada al ranking de vendedores (.sellers-table) para que las
+   dos tablas tengan jerarquía visual consistente en BOFU. */
 .pending-table {
   width: 100%;
   border-collapse: separate;
-  border-spacing: 0 4px;
+  border-spacing: 0 8px;
   font-family: var(--font);
-  font-size: 13px;
+  font-size: 17px;
 }
 .pending-table thead th {
-  font-size: 11px;
-  font-weight: 600;
-  letter-spacing: 0.06em;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
   text-transform: uppercase;
   color: var(--text-muted);
-  padding: 8px 10px;
+  padding: var(--sp-4) var(--sp-4);
   text-align: left;
 }
-.pending-table tbody td {
-  padding: 10px;
-  vertical-align: middle;
-  background: var(--card-bg, transparent);
+
+/* La columna "Fecha ingreso" usa class="th-num" en el HTML — alineamos su
+   header con el contenido del td (.pending-date también está right-aligned). */
+.pending-table thead th.th-num {
+  text-align: right;
 }
-.pending-table .pending-name { font-weight: 500; color: var(--text-primary); }
-.pending-table .pending-asesor { color: var(--text-secondary); }
-.pending-table .pending-tip { color: var(--text-secondary); }
+
+/* F.4.c — Tarjetas con mayor contraste y profundidad */
+.pending-table tbody tr {
+  background: var(--bg-card);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08), 0 1px 2px rgba(0, 0, 0, 0.04);
+  border: 1px solid var(--border-subtle);
+  border-radius: 10px;
+  transition: box-shadow 0.18s ease, transform 0.18s ease, border-color 0.18s ease;
+}
+.pending-table tbody tr:hover {
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.12), 0 2px 6px rgba(0, 0, 0, 0.06);
+  border-color: rgba(0, 0, 0, 0.12);
+  transform: translateY(-2px);
+}
+[data-theme="dark"] .pending-table tbody tr {
+  background: var(--bg-card);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.30), 0 1px 2px rgba(0, 0, 0, 0.18);
+  border: 1px solid rgba(255, 255, 255, 0.09);
+}
+[data-theme="dark"] .pending-table tbody tr:hover {
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.50), 0 2px 6px rgba(0, 0, 0, 0.28);
+  border-color: rgba(255, 255, 255, 0.15);
+  transform: translateY(-2px);
+}
+
+.pending-table tbody td {
+  padding: var(--sp-4) var(--sp-4);
+  vertical-align: middle;
+  background: transparent;
+}
+
+/* Redondear solo las celdas de los extremos para que coincidan con el tr */
+.pending-table tbody td:first-child {
+  border-radius: 10px 0 0 10px;
+}
+.pending-table tbody td:last-child {
+  border-radius: 0 10px 10px 0;
+}
+/* Tipografía y pesos al nivel de .sellers-table — la fila pending se siente
+   ahora una "tarjeta" con la misma jerarquía visual que la tabla de ranking. */
+.pending-table .pending-name   { font-weight: 700; font-size: 18px; color: var(--text-primary); }
+.pending-table .pending-asesor { color: var(--text-secondary); font-size: 15px; }
+.pending-table .pending-tip    { color: var(--text-secondary); font-size: 15px; }
 .pending-table .pending-tip .muted { color: var(--text-muted); font-style: italic; }
-.pending-table .pending-date { color: var(--text-muted); font-variant-numeric: tabular-nums; text-align: right; }
+.pending-table .th-num       { text-align: right; }
+.pending-table .pending-date { color: var(--text-muted); font-variant-numeric: tabular-nums; text-align: right; font-size: 14px; }
 .pending-empty {
   text-align: center;
   color: var(--text-muted);
@@ -2228,6 +2956,196 @@ body {
 .origin-badge.origin-vendor   { background: rgba(255, 191, 36, 0.14); color: #b78104; }
 [data-theme="dark"] .origin-badge.origin-campaign { color: #6dd9a4; }
 [data-theme="dark"] .origin-badge.origin-vendor   { color: #f5c150; }
+
+/* F.4.a — Etapa actual */
+.pending-table .pending-stage {
+  color: var(--text-secondary);
+  font-size: 14px;
+  font-weight: 600;
+}
+
+/* ── Lead Detail Modal (F.4.d) ─────────────────────────────── */
+
+/* Reutiliza .kpi-modal-overlay y .kpi-modal — solo extiende con .lead-modal */
+.lead-modal {
+  max-width: 680px;
+}
+
+.lead-modal-section {
+  margin-bottom: var(--sp-6);
+}
+
+.lead-modal-section:last-child {
+  margin-bottom: 0;
+}
+
+.lead-modal-section-label {
+  display: block;
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: var(--text-muted);
+  margin-bottom: var(--sp-3);
+  padding-bottom: var(--sp-2);
+  border-bottom: 1px solid var(--border-subtle);
+}
+
+/* Grid 2 columnas para datos básicos y monetarios */
+.lead-modal-basics-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--sp-3);
+}
+
+.lead-modal-field {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.lead-modal-label {
+  font-size: 10px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--text-muted);
+}
+
+.lead-modal-value {
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--text-primary);
+}
+
+/* Lista de historial de secciones */
+.lead-modal-history-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-2);
+}
+
+.lead-modal-history-item {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-3);
+  font-size: 13px;
+  padding: var(--sp-2) var(--sp-3);
+  background: var(--bg-page);
+  border-radius: var(--r-md);
+  border: 1px solid var(--border-subtle);
+}
+
+.lead-modal-history-date {
+  font-size: 11px;
+  color: var(--text-muted);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+  min-width: 80px;
+}
+
+.lead-modal-history-move {
+  color: var(--text-secondary);
+}
+
+.lead-modal-history-empty {
+  font-size: 13px;
+  color: var(--text-muted);
+  font-style: italic;
+}
+
+/* Nota de pendiente (actividad/seguimientos) */
+.lead-modal-pending-note .lead-modal-section-label {
+  color: var(--text-muted);
+}
+
+.lead-modal-pending-text {
+  font-size: 13px;
+  color: var(--text-muted);
+  font-style: italic;
+  margin: 0;
+  line-height: 1.55;
+}
+
+.lead-modal-pending-text code {
+  font-size: 11px;
+  background: var(--bg-page);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--r-sm);
+  padding: 1px 6px;
+  font-family: 'Courier New', monospace;
+  font-style: normal;
+  color: var(--umoh-slate);
+}
+
+/* Lista de actividad (leads.comments parseado por bloques) */
+.lead-modal-activity-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-2);
+  max-height: 320px;
+  overflow-y: auto;
+}
+
+.lead-modal-activity-item {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: var(--sp-3) var(--sp-3);
+  background: var(--bg-page);
+  border-radius: var(--r-md);
+  border-left: 3px solid var(--umoh-accent);
+}
+
+.lead-modal-activity-item--no-date {
+  border-left-color: var(--border-subtle);
+}
+
+.lead-modal-activity-date {
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--umoh-accent);
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.lead-modal-activity-text {
+  margin: 0;
+  font-size: 13px;
+  line-height: 1.5;
+  color: var(--text-primary);
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.lead-modal-empty {
+  margin: 0;
+  font-size: 13px;
+  color: var(--text-muted);
+  font-style: italic;
+}
+
+[data-theme="dark"] .lead-modal-history-item {
+  background: rgba(255, 255, 255, 0.04);
+}
+
+[data-theme="dark"] .lead-modal-pending-text code {
+  background: rgba(255, 255, 255, 0.06);
+  border-color: rgba(255, 255, 255, 0.12);
+  color: var(--umoh-silver);
+}
+
+@media (max-width: 600px) {
+  .lead-modal-basics-grid {
+    grid-template-columns: 1fr;
+  }
+}
 
 /* ─────────────────────────────────────────────────────────────
    MOBILE RESPONSIVE — iPhone 14 Pro Max (430px) y menores
@@ -2348,5 +3266,2061 @@ body {
   .kpi-value { font-size: 20px; }
   .chart-title { font-size: 13px; }
   .nav-tab { padding: 8px 10px; font-size: 12px; }
+}
+
+/* ══════════════════════════════════════════════════════════════
+   SPRINT UX 2.0 — SIDEBAR LATERAL + SECCIÓN INICIO
+   ══════════════════════════════════════════════════════════════ */
+
+/* ── Variables del sidebar ────────────────────────────────────── */
+:root {
+  --sb-width:          240px;
+  --sb-width-collapsed: 76px;
+  --sb-transition:     0.25s ease;
+}
+
+/* ── Layout raíz: body pasa a flex-row ───────────────────────── */
+body.sidebar-layout {
+  flex-direction: row;
+  min-height: 100vh;
+  overflow-x: hidden;
+}
+
+/* ── Sidebar ────────────────────────────────────────────────── */
+.dashboard-sidebar {
+  position: fixed;
+  left:   0;
+  top:    0;
+  width:  var(--sb-width);
+  height: 100vh;
+  background:   var(--bg-card);
+  border-right: 1px solid var(--border-subtle);
+  display:      flex;
+  flex-direction: column;
+  z-index:      100;
+  overflow:     hidden;
+  transition:   width var(--sb-transition);
+  box-shadow:   2px 0 12px rgba(0,0,0,0.06);
+}
+
+[data-theme="dark"] .dashboard-sidebar {
+  box-shadow: 2px 0 20px rgba(0,0,0,0.35);
+}
+
+body.sidebar-collapsed .dashboard-sidebar {
+  width: var(--sb-width-collapsed);
+}
+
+/* ── Sidebar header ─────────────────────────────────────────── */
+.sb-header {
+  display:         flex;
+  align-items:     center;
+  justify-content: space-between;
+  gap:             var(--sp-2);
+  padding:         var(--sp-4) var(--sp-3) var(--sp-3);
+  border-bottom:   1px solid var(--border-subtle);
+  flex-shrink:     0;
+  min-height:      64px;
+}
+
+.sb-brand {
+  display:     flex;
+  align-items: center;
+  gap:         var(--sp-2);
+  min-width:   0;
+  overflow:    hidden;
+}
+
+/* Logo del cliente — elemento principal del sidebar header (reemplaza al asterisco UMOH) */
+.sb-client-logo-wrap {
+  display:         flex;
+  align-items:     center;
+  height:          32px;
+  flex-shrink:     0;
+}
+
+.sb-client-logo {
+  height:      32px;
+  width:       auto;
+  max-width:   120px;
+  object-fit:  contain;
+  display:     block;
+}
+
+/* Ocultar el logo del cliente en modo colapsado (no hay espacio) */
+body.sidebar-collapsed .sb-client-logo-wrap {
+  display: none;
+}
+
+.sb-brand-mark {
+  width:           32px;
+  height:          32px;
+  background:      var(--umoh-primary);
+  border-radius:   var(--r-sm);
+  display:         flex;
+  align-items:     center;
+  justify-content: center;
+  flex-shrink:     0;
+  padding:         5px;
+}
+
+.sb-brand-mark img {
+  width:        100%;
+  height:       100%;
+  object-fit:   contain;
+  filter:       invert(1);
+}
+
+[data-theme="dark"] .sb-brand-mark {
+  background: var(--bg-card-header);
+}
+
+[data-theme="dark"] .sb-brand-mark img {
+  filter: none;
+}
+
+.sb-brand-text {
+  display:       flex;
+  flex-direction: column;
+  line-height:   1.2;
+  min-width:     0;
+  overflow:      hidden;
+}
+
+.sb-brand-agency {
+  font-size:       15px;
+  font-weight:     700;
+  letter-spacing:  -0.02em;
+  color:           var(--text-primary);
+  white-space:     nowrap;
+}
+
+.sb-brand-client {
+  font-size:   11px;
+  font-weight: 500;
+  color:       var(--text-muted);
+  white-space: nowrap;
+  overflow:    hidden;
+  text-overflow: ellipsis;
+}
+
+.sb-collapse-btn {
+  width:           28px;
+  height:          28px;
+  border:          1px solid var(--border-subtle);
+  border-radius:   var(--r-sm);
+  background:      transparent;
+  color:           var(--text-muted);
+  display:         flex;
+  align-items:     center;
+  justify-content: center;
+  cursor:          pointer;
+  flex-shrink:     0;
+  transition:      background 0.15s, color 0.15s, border-color 0.15s;
+}
+
+.sb-collapse-btn:hover {
+  background:    rgba(255,0,64,0.07);
+  color:         var(--umoh-accent);
+  border-color:  var(--umoh-accent);
+}
+
+.sb-collapse-btn svg {
+  transition: transform var(--sb-transition);
+}
+
+body.sidebar-collapsed .sb-collapse-btn svg {
+  transform: rotate(180deg);
+}
+
+/* Sidebar colapsado: el header pierde el brand y el botón queda solo —
+   centrarlo horizontalmente en el ancho colapsado. */
+body.sidebar-collapsed .sb-header {
+  justify-content: center;
+  padding-left:  0;
+  padding-right: 0;
+}
+body.sidebar-collapsed .sb-brand {
+  display: none;
+}
+
+/* ── Sidebar scrollable body ─────────────────────────────────── */
+.sb-body {
+  flex:            1;
+  overflow-y:          auto;
+  overflow-x:          hidden;
+  display:             flex;
+  flex-direction:      column;
+  scrollbar-width:     thin;
+  scrollbar-color:     var(--border-subtle) transparent;
+  overscroll-behavior: contain;
+}
+
+.sb-body::-webkit-scrollbar { width: 4px; }
+.sb-body::-webkit-scrollbar-track { background: transparent; }
+.sb-body::-webkit-scrollbar-thumb { background: var(--border-subtle); border-radius: 2px; }
+
+/* ── sb-label: oculto en modo colapsado ─────────────────────── */
+.sb-label {
+  white-space: nowrap;
+  overflow:    hidden;
+  text-overflow: ellipsis;
+  transition: opacity 0.15s;
+}
+
+body.sidebar-collapsed .sb-label {
+  display: none;
+}
+
+/* ── Sección de campañas ─────────────────────────────────────── */
+.sb-section {
+  padding:      var(--sp-3) var(--sp-3) var(--sp-2);
+  border-bottom: 1px solid var(--border-subtle);
+}
+
+.sb-section--nav {
+  flex: 1;
+  border-bottom: none;
+  padding-bottom: 0;
+}
+
+.sb-section-label {
+  font-size:       10px;
+  font-weight:     700;
+  letter-spacing:  0.09em;
+  text-transform:  uppercase;
+  color:           var(--text-muted);
+  padding:         0 var(--sp-2) var(--sp-2);
+  white-space:     nowrap;
+}
+
+/* Búsqueda de campañas */
+.sb-campaign-search {
+  position:    relative;
+  margin-bottom: var(--sp-2);
+}
+
+.sb-campaign-search-input {
+  width:         100%;
+  padding:       6px var(--sp-2) 6px 30px;
+  font-family:   var(--font);
+  font-size:     12px;
+  border:        1px solid var(--border-subtle);
+  border-radius: var(--r-sm);
+  background:    var(--bg-page);
+  color:         var(--text-primary);
+  outline:       none;
+  transition:    border-color 0.15s;
+}
+
+.sb-campaign-search-input:focus {
+  border-color: var(--umoh-accent);
+}
+
+.sb-campaign-search-icon {
+  position:  absolute;
+  left:      8px;
+  top:       50%;
+  transform: translateY(-50%);
+  color:     var(--text-muted);
+  pointer-events: none;
+}
+
+/* Lista de campañas */
+.sb-campaign-list {
+  display:        flex;
+  flex-direction: column;
+  gap:            2px;
+  max-height:     200px;
+  overflow-y:     auto;
+  scrollbar-width: thin;
+  scrollbar-color: var(--border-subtle) transparent;
+}
+
+.sb-campaign-list::-webkit-scrollbar { width: 3px; }
+.sb-campaign-list::-webkit-scrollbar-thumb { background: var(--border-subtle); border-radius: 2px; }
+
+.sb-campaign-item {
+  display:       flex;
+  align-items:   center;
+  gap:           var(--sp-2);
+  padding:       7px var(--sp-2);
+  border-radius: var(--r-sm);
+  border:        none;
+  background:    transparent;
+  color:         var(--text-secondary);
+  font-family:   var(--font);
+  cursor:        pointer;
+  text-align:    left;
+  width:         100%;
+  transition:    background 0.12s, color 0.12s;
+  position:      relative;
+}
+
+.sb-campaign-item:hover {
+  background: rgba(255,0,64,0.06);
+  color:      var(--text-primary);
+}
+
+.sb-campaign-item.active {
+  background: rgba(255,0,64,0.10);
+  color:      var(--umoh-accent);
+}
+
+.sb-campaign-icon {
+  flex-shrink: 0;
+  color:       inherit;
+}
+
+.sb-campaign-info {
+  flex:     1;
+  min-width: 0;
+  overflow: hidden;
+}
+
+.sb-campaign-name {
+  font-size:     12.5px;
+  font-weight:   600;
+  line-height:   1.2;
+  white-space:   nowrap;
+  overflow:      hidden;
+  text-overflow: ellipsis;
+}
+
+.sb-campaign-id {
+  font-size:   10.5px;
+  font-weight: 400;
+  opacity:     0.6;
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
+}
+
+/* Dot activo en modo colapsado */
+.sb-campaign-dot {
+  position:      absolute;
+  top:           4px;
+  right:         4px;
+  width:         7px;
+  height:        7px;
+  border-radius: 50%;
+  background:    var(--umoh-accent);
+  display:       none;
+}
+
+body.sidebar-collapsed .sb-campaign-item.active .sb-campaign-dot {
+  display: block;
+}
+
+/* Dot en el trigger del dropdown de campañas — visible en colapsado cuando hay campaña específica activa */
+body.sidebar-collapsed #sb-campaigns-trigger.has-campaign .sb-campaign-dot {
+  display: block;
+}
+
+/* ── Navegación de secciones ─────────────────────────────────── */
+.sb-nav-list {
+  display:        flex;
+  flex-direction: column;
+  gap:            2px;
+  padding:        var(--sp-2) 0;
+}
+
+.sb-nav-item {
+  display:       flex;
+  align-items:   center;
+  gap:           var(--sp-3);
+  padding:       9px var(--sp-3);
+  border-radius: var(--r-sm);
+  border:        none;
+  border-left:   3px solid transparent;
+  background:    transparent;
+  color:         var(--text-secondary);
+  font-family:   var(--font);
+  font-size:     13.5px;
+  font-weight:   500;
+  cursor:        pointer;
+  text-align:    left;
+  width:         100%;
+  transition:    background 0.12s, color 0.12s, border-left-color 0.12s;
+  white-space:   nowrap;
+  position:      relative;
+}
+
+.sb-nav-item:hover {
+  background: rgba(255,0,64,0.05);
+  color:      var(--text-primary);
+}
+
+.sb-nav-item.active {
+  background:         rgba(255,0,64,0.09);
+  color:              var(--umoh-accent);
+  border-left-color:  var(--umoh-accent);
+  font-weight:        600;
+}
+
+.sb-nav-icon {
+  flex-shrink: 0;
+  color:       inherit;
+}
+
+/* Material Symbols en items de nav del sidebar */
+.sb-nav-item .material-symbols-outlined.sb-nav-icon {
+  font-size:   22px;
+  line-height: 1;
+  font-variation-settings: 'FILL' 0, 'wght' 300, 'GRAD' 0, 'opsz' 24;
+  width:       22px;
+  height:      22px;
+  display:     flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* Tooltip en modo colapsado */
+.sb-nav-item .sb-tooltip {
+  position:       absolute;
+  left:           calc(var(--sb-width-collapsed) + 8px);
+  top:            50%;
+  transform:      translateY(-50%);
+  background:     var(--umoh-primary);
+  color:          #fff;
+  font-size:      12px;
+  font-weight:    600;
+  padding:        5px 10px;
+  border-radius:  var(--r-sm);
+  white-space:    nowrap;
+  pointer-events: none;
+  opacity:        0;
+  transition:     opacity 0.15s;
+  z-index:        200;
+  box-shadow:     var(--shadow-md);
+}
+
+body.sidebar-collapsed .sb-nav-item:hover .sb-tooltip {
+  opacity: 1;
+}
+
+/* ── Selector de período en sidebar ─────────────────────────── */
+.sb-period-wrap {
+  padding:       var(--sp-3);
+  border-top:    1px solid var(--border-subtle);
+}
+
+.sb-period-label {
+  font-size:       10px;
+  font-weight:     700;
+  letter-spacing:  0.09em;
+  text-transform:  uppercase;
+  color:           var(--text-muted);
+  padding:         0 var(--sp-2) var(--sp-2);
+  display:         block;
+  white-space:     nowrap;
+}
+
+/* Header del selector: label "PERÍODO" a la izquierda, rango de fechas a la derecha */
+.sb-period-header {
+  display:         flex;
+  align-items:     baseline;
+  justify-content: space-between;
+  gap:             var(--sp-2);
+  padding:         0 var(--sp-2) var(--sp-2);
+}
+.sb-period-header .sb-period-label {
+  padding:         0;
+}
+.sb-period-range {
+  font-size:       10.5px;
+  font-weight:     500;
+  color:           var(--text-muted);
+  white-space:     nowrap;
+  letter-spacing:  0.01em;
+  font-variant-numeric: tabular-nums;
+}
+body.sidebar-collapsed .sb-period-header,
+body.sidebar-collapsed .sb-period-range {
+  display: none;
+}
+
+/* Los period-btn en sidebar se apilan verticalmente */
+.sb-period-selector {
+  display:        flex;
+  flex-direction: column;
+  gap:            2px;
+}
+
+.sb-period-btn {
+  display:       flex;
+  align-items:   center;
+  gap:           var(--sp-2);
+  padding:       7px var(--sp-2);
+  border-radius: var(--r-sm);
+  border:        none;
+  background:    transparent;
+  color:         var(--text-secondary);
+  font-family:   var(--font);
+  font-size:     12.5px;
+  font-weight:   500;
+  cursor:        pointer;
+  text-align:    left;
+  width:         100%;
+  transition:    background 0.12s, color 0.12s;
+  white-space:   nowrap;
+}
+
+.sb-period-btn:hover {
+  background: var(--bg-page);
+  color:      var(--text-primary);
+}
+
+.sb-period-btn.active {
+  background: rgba(255,0,64,0.09);
+  color:      var(--umoh-accent);
+  font-weight: 600;
+}
+
+/* Período activo compacto (modo colapsado): ícono + texto de 2 letras */
+.sb-period-compact {
+  display:     none;
+  flex-direction: column;
+  align-items: center;
+  gap:         4px;
+  padding:     var(--sp-2) 0;
+}
+
+.sb-period-compact-label {
+  font-size:   9px;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  color:       var(--umoh-accent);
+}
+
+body.sidebar-collapsed .sb-period-wrap .sb-period-selector {
+  display: none;
+}
+body.sidebar-collapsed .sb-period-wrap .sb-period-label {
+  display: none;
+}
+body.sidebar-collapsed .sb-period-compact {
+  display: flex;
+}
+
+/* El date-picker-popover del sidebar se abre hacia la derecha */
+.sb-period-wrap .date-picker-popover {
+  position: fixed;
+  top:      auto;
+  right:    auto;
+  left:     calc(var(--sb-width) + 8px);
+  bottom:   auto;
+  z-index:  500;
+}
+
+body.sidebar-collapsed .sb-period-wrap .date-picker-popover {
+  left: calc(var(--sb-width-collapsed) + 8px);
+}
+
+/* ── Perfil de usuario (fondo del sidebar) ──────────────────── */
+.sb-user {
+  border-top:  1px solid var(--border-subtle);
+  padding:     var(--sp-3);
+  flex-shrink: 0;
+}
+
+.sb-user-trigger {
+  display:       flex;
+  align-items:   center;
+  gap:           var(--sp-2);
+  padding:       7px var(--sp-2);
+  border-radius: var(--r-sm);
+  border:        none;
+  background:    transparent;
+  color:         var(--text-secondary);
+  font-family:   var(--font);
+  cursor:        pointer;
+  text-align:    left;
+  width:         100%;
+  transition:    background 0.12s, color 0.12s;
+}
+
+.sb-user-trigger:hover {
+  background: rgba(255,0,64,0.05);
+  color:      var(--text-primary);
+}
+
+.sb-user-avatar {
+  width:           28px;
+  height:          28px;
+  border-radius:   50%;
+  background:      var(--umoh-primary);
+  border:          2px solid var(--border-subtle);
+  display:         flex;
+  align-items:     center;
+  justify-content: center;
+  flex-shrink:     0;
+  overflow:        hidden;
+  padding:         3px;
+}
+
+.sb-user-avatar img {
+  width:        100%;
+  height:       100%;
+  object-fit:   contain;
+  border-radius: 50%;
+  filter:       invert(1);
+}
+
+[data-theme="dark"] .sb-user-avatar img {
+  filter: none;
+}
+
+.sb-user-info {
+  flex:     1;
+  min-width: 0;
+  overflow: hidden;
+}
+
+.sb-user-name {
+  font-size:     13px;
+  font-weight:   600;
+  color:         var(--text-primary);
+  white-space:   nowrap;
+  overflow:      hidden;
+  text-overflow: ellipsis;
+  line-height:   1.2;
+}
+
+.sb-user-role {
+  font-size:  11px;
+  color:      var(--text-muted);
+  white-space: nowrap;
+}
+
+/* Dropdown del usuario: sale hacia arriba */
+.sb-user-dropdown {
+  position:  absolute;
+  bottom:    calc(100% + 6px);
+  left:      var(--sp-3);
+  right:     var(--sp-3);
+  background: var(--umoh-primary);
+  border:     1px solid rgba(255,255,255,0.12);
+  border-radius: var(--r-lg);
+  box-shadow:  var(--shadow-lg);
+  overflow:   hidden;
+  visibility: hidden;
+  opacity:    0;
+  pointer-events: none;
+  transform:  translateY(6px);
+  transition: opacity 0.15s, transform 0.15s, visibility 0s linear 0.15s;
+  z-index:    200;
+}
+
+.sb-user-dropdown.is-open {
+  visibility:     visible;
+  opacity:        1;
+  pointer-events: auto;
+  transform:      translateY(0);
+  transition:     opacity 0.15s, transform 0.15s;
+}
+
+[data-theme="dark"] .sb-user-dropdown {
+  background:   #1A2332;
+  border-color: rgba(255,255,255,0.08);
+}
+
+/* ── Dashboard content area ─────────────────────────────────── */
+.dashboard-content {
+  margin-left: var(--sb-width);
+  min-height:  100vh;
+  width:       calc(100% - var(--sb-width));
+  display:     flex;
+  flex-direction: column;
+  transition:  margin-left var(--sb-transition), width var(--sb-transition);
+}
+
+body.sidebar-collapsed .dashboard-content {
+  margin-left: var(--sb-width-collapsed);
+  width:       calc(100% - var(--sb-width-collapsed));
+}
+
+/* ── Hamburger button (mobile only) ─────────────────────────── */
+.sb-hamburger {
+  display:         none;
+  position:        fixed;
+  top:             12px;
+  left:            12px;
+  z-index:         200;
+  width:           44px;   /* Apple HIG mínimo táctil */
+  height:          44px;
+  border-radius:   var(--r-md);
+  background:      var(--umoh-primary);
+  border:          none;
+  color:           #fff;
+  cursor:          pointer;
+  align-items:     center;
+  justify-content: center;
+  box-shadow:      var(--shadow-md);
+  transition:      background 0.15s, opacity 0.2s;
+}
+
+.sb-hamburger:hover {
+  background: var(--umoh-dark);
+}
+
+/* ── Mobile: sidebar como drawer ─────────────────────────────── */
+@media (max-width: 768px) {
+  body.sidebar-layout {
+    flex-direction: column;
+  }
+
+  .sb-hamburger {
+    display: flex;
+  }
+
+  /* Drawer: off-screen a la izquierda por defecto.
+     Solo se anima transform — ancho es fijo, no hay width transition en mobile. */
+  .dashboard-sidebar {
+    transform:  translateX(-100%);
+    transition: transform 0.22s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+    width:      var(--sb-width);
+    box-shadow: none;
+    /* Scroll del body del sidebar no se propaga al documento */
+    overscroll-behavior: contain;
+  }
+
+  /* Sidebar abierto: slide-in con sombra pronunciada */
+  body.sidebar-mobile-open .dashboard-sidebar {
+    transform:  translateX(0);
+    box-shadow: 6px 0 32px rgba(0,0,0,0.3);
+  }
+
+  /* Hamburger: se oculta cuando el drawer está abierto */
+  body.sidebar-mobile-open .sb-hamburger {
+    opacity:        0;
+    pointer-events: none;
+  }
+
+  /* Botón colapsar: no aplica en mobile — el drawer no se minimiza */
+  .sb-collapse-btn {
+    display: none;
+  }
+
+  /* Overlay detrás del drawer: blur para aislar el sidebar del contenido */
+  body.sidebar-mobile-open::before {
+    content:         '';
+    position:        fixed;
+    inset:           0;
+    background:      rgba(0,0,0,0.5);
+    backdrop-filter: blur(3px);
+    -webkit-backdrop-filter: blur(3px);
+    z-index:         99;
+    /* Fade suave con la misma duración que el slide */
+    animation: overlayIn 0.22s ease forwards;
+  }
+
+  /* Items de nav en mobile: touch targets mínimos 48px */
+  .sb-nav-item {
+    min-height:  48px;
+    font-size:   15px;
+  }
+
+  /* Labels de nav: tamaño algo mayor en mobile para legibilidad táctil */
+  .sb-nav-item .sb-label {
+    font-size: 15px;
+  }
+
+  /* Contenido principal */
+  .dashboard-content {
+    margin-left: 0;
+    width:       100%;
+    padding-top: 64px; /* hamburger (44px) + margen cómodo */
+  }
+
+  body.sidebar-collapsed .dashboard-content {
+    margin-left: 0;
+    width:       100%;
+  }
+
+  /* Collapsed en mobile no aplica — el drawer es siempre full-width */
+  body.sidebar-collapsed .dashboard-sidebar {
+    width: var(--sb-width);
+  }
+
+  /* Logo del cliente: siempre visible dentro del drawer (es el único logo de marca) */
+  .sb-client-logo-wrap {
+    display: flex;
+  }
+}
+
+/* ── Sección Inicio ─────────────────────────────────────────── */
+.inicio-header {
+  display:     flex;
+  align-items: flex-start;
+  gap:         var(--sp-5);
+  margin-bottom: var(--sp-8);
+}
+
+.inicio-avatar {
+  width:           52px;
+  height:          52px;
+  border-radius:   50%;
+  background:      transparent;
+  border:          3px solid var(--border-subtle);
+  display:         flex;
+  align-items:     center;
+  justify-content: center;
+  flex-shrink:     0;
+  overflow:        hidden;
+}
+
+[data-theme="dark"] .inicio-avatar {
+  background: transparent;
+}
+
+.inicio-greeting-block {
+  flex: 1;
+}
+
+.inicio-saludo {
+  font-size:      28px;
+  font-weight:    700;
+  letter-spacing: -0.5px;
+  color:          var(--text-primary);
+  line-height:    1.1;
+}
+
+.inicio-saludo span {
+  color: var(--umoh-accent);
+}
+
+.inicio-subtitle {
+  font-size:   14px;
+  color:       var(--text-secondary);
+  margin-top:  var(--sp-2);
+}
+
+/* ── AI Summary card ────────────────────────────────────────── */
+.inicio-ai-card {
+  background:    var(--bg-card);
+  border:        1px solid var(--border-subtle);
+  border-radius: var(--r-xl);
+  padding:       var(--sp-6);
+  margin-bottom: var(--sp-6);
+  box-shadow:    var(--shadow-sm);
+  position:      relative;
+  overflow:      hidden;
+}
+
+/* Barra accent top */
+.inicio-ai-card::before {
+  content:       '';
+  position:      absolute;
+  top:           0;
+  left:          0;
+  right:         0;
+  height:        3px;
+  background:    linear-gradient(90deg, var(--umoh-accent), var(--umoh-accent-mid));
+  border-radius: var(--r-xl) var(--r-xl) 0 0;
+}
+
+.inicio-ai-header {
+  display:         flex;
+  align-items:     center;
+  gap:             var(--sp-3);
+  margin-bottom:   var(--sp-4);
+  justify-content: space-between;
+}
+
+/* Botón Regenerar análisis */
+.inicio-ai-refresh-btn {
+  display:      flex;
+  align-items:  center;
+  gap:          var(--sp-1);
+  font-size:    12px;
+  font-weight:  500;
+  color:        var(--text-muted);
+  background:   transparent;
+  border:       1px solid var(--border-subtle);
+  border-radius: var(--r-sm);
+  padding:      4px 10px;
+  cursor:       pointer;
+  transition:   color 0.15s, border-color 0.15s, background 0.15s;
+  flex-shrink:  0;
+}
+
+.inicio-ai-refresh-btn:hover {
+  color:         var(--umoh-accent);
+  border-color:  var(--umoh-accent);
+  background:    rgba(255,0,64,0.04);
+}
+
+.inicio-ai-refresh-btn.loading svg {
+  animation: spinRefresh 0.8s linear infinite;
+}
+
+@keyframes spinRefresh {
+  from { transform: rotate(0deg); }
+  to   { transform: rotate(360deg); }
+}
+
+/* Timestamp de última actualización */
+.inicio-ai-timestamp {
+  font-size:   11px;
+  color:       var(--text-muted);
+  margin-top:  var(--sp-3);
+  text-align:  right;
+}
+
+.inicio-ai-badge {
+  display:       flex;
+  align-items:   center;
+  gap:           var(--sp-1);
+  font-size:     10px;
+  font-weight:   700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color:         var(--umoh-accent);
+  background:    rgba(255,0,64,0.08);
+  border:        1px solid rgba(255,0,64,0.2);
+  border-radius: 20px;
+  padding:       3px 10px;
+}
+
+.inicio-ai-headline {
+  font-size:      18px;
+  font-weight:    700;
+  color:          var(--text-primary);
+  line-height:    1.35;
+  margin-bottom:  var(--sp-4);
+}
+
+.inicio-ai-highlights {
+  list-style:   none;
+  display:      flex;
+  flex-direction: column;
+  gap:          var(--sp-2);
+  margin-bottom: var(--sp-4);
+}
+
+.inicio-ai-highlights li {
+  display:     flex;
+  align-items: flex-start;
+  gap:         var(--sp-2);
+  font-size:   14px;
+  color:       var(--text-secondary);
+  line-height: 1.5;
+}
+
+.inicio-ai-highlights li::before {
+  content:     '';
+  display:     block;
+  width:       6px;
+  height:      6px;
+  border-radius: 50%;
+  background:  var(--umoh-accent);
+  margin-top:  8px;
+  flex-shrink: 0;
+}
+
+.inicio-ai-recommendation {
+  display:       flex;
+  align-items:   flex-start;
+  gap:           var(--sp-3);
+  background:    var(--bg-page);
+  border-radius: var(--r-md);
+  padding:       var(--sp-3) var(--sp-4);
+  border-left:   3px solid var(--umoh-accent);
+}
+
+.inicio-ai-recommendation p {
+  font-size:   13.5px;
+  color:       var(--text-primary);
+  line-height: 1.55;
+}
+
+/* Skeleton del resumen AI */
+.inicio-ai-skeleton {
+  display:        flex;
+  flex-direction: column;
+  gap:            var(--sp-3);
+  animation:      skeletonPulse 1.6s ease infinite;
+}
+
+.inicio-ai-skeleton .sk-line {
+  background:    var(--border-subtle);
+  border-radius: var(--r-sm);
+  height:        14px;
+}
+
+.inicio-ai-skeleton .sk-line--title  { height: 22px; width: 70%; }
+.inicio-ai-skeleton .sk-line--short  { width: 55%; }
+.inicio-ai-skeleton .sk-line--medium { width: 80%; }
+.inicio-ai-skeleton .sk-line--long   { width: 95%; }
+
+@keyframes skeletonPulse {
+  0%,100% { opacity: 1; }
+  50%      { opacity: 0.45; }
+}
+
+/* ── Quick access cards grid ────────────────────────────────── */
+.inicio-quick-grid {
+  display:  grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap:      var(--sp-4);
+  margin-bottom: var(--sp-4);
+}
+
+/* Sección Inicio: padding-bottom reducido — el contenido es corto y
+   el sp-12 global genera scroll vacío debajo del footer. */
+#section-inicio {
+  padding-bottom: var(--sp-6);
+}
+
+/* Acceso rápido a sección — botón cuadrado, ícono grande, título + descripción */
+.inicio-quick-card {
+  background:    var(--bg-card);
+  border:        1px solid var(--border-subtle);
+  border-radius: var(--r-lg);
+  padding:       var(--sp-6) var(--sp-5);
+  cursor:        pointer;
+  transition:    box-shadow 0.18s, transform 0.18s, border-color 0.18s;
+  position:      relative;
+  overflow:      hidden;
+  display:       flex;
+  flex-direction: column;
+  align-items:   flex-start;
+  gap:           var(--sp-3);
+  box-shadow:    var(--shadow-sm);
+  text-align:    left;
+  font:          inherit;
+  color:         inherit;
+  min-height:    180px;
+}
+
+.inicio-quick-card:hover {
+  box-shadow:    var(--shadow-md);
+  transform:     translateY(-3px);
+  border-color:  rgba(255,0,64,0.35);
+}
+
+.inicio-quick-card::before {
+  content:       '';
+  position:      absolute;
+  top:           0;
+  left:          0;
+  right:         0;
+  height:        3px;
+  background:    var(--border-subtle);
+  border-radius: var(--r-lg) var(--r-lg) 0 0;
+  transition:    background 0.18s;
+}
+
+.inicio-quick-card:hover::before {
+  background: var(--umoh-accent);
+}
+
+.inicio-quick-icon {
+  width:           48px;
+  height:          48px;
+  background:      rgba(255,0,64,0.08);
+  border-radius:   var(--r-md);
+  display:         flex;
+  align-items:     center;
+  justify-content: center;
+  color:           var(--umoh-accent);
+  flex-shrink:     0;
+  font-size:       28px;
+  font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 28;
+}
+
+.inicio-quick-title {
+  font-family: 'Outfit', sans-serif;
+  font-size:   22px;
+  font-weight: 800;
+  color:       var(--text-primary);
+  letter-spacing: -0.02em;
+  line-height: 1.1;
+}
+
+.inicio-quick-desc {
+  font-size:  13px;
+  color:      var(--text-muted);
+  line-height: 1.4;
+  margin-top: auto;
+}
+
+/* Responsive quick-grid */
+@media (max-width: 900px) {
+  .inicio-quick-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+@media (max-width: 480px) {
+  .inicio-quick-grid {
+    grid-template-columns: 1fr 1fr;
+    gap: var(--sp-3);
+  }
+
+  .inicio-saludo { font-size: 22px; }
+  .inicio-ai-card { padding: var(--sp-4); }
+  .inicio-quick-kpi-value { font-size: 18px; }
+}
+
+/* ── Theme toggle reposicionado para sidebar layout ─────────── */
+body.sidebar-layout .theme-toggle-switch {
+  /* En sidebar layout el toggle flota en la esquina superior derecha del content */
+  top:   16px;
+  right: 20px;
+}
+
+/* ── FAB en sidebar layout ──────────────────────────────────── */
+body.sidebar-layout .nav-fab {
+  bottom: 28px;
+  right:  28px;
+}
+
+/* ── Ocultar header y nav viejos cuando sidebar está activo ─── */
+body.sidebar-layout .site-header,
+body.sidebar-layout .dashboard-nav {
+  display: none;
+}
+
+/* ══════════════════════════════════════════════════════════════
+   SPRINT UX 2.1 — Sidebar polished dropdowns + theme toggle
+   ══════════════════════════════════════════════════════════════ */
+
+/* ── Transición estándar de motion ─────────────────────────── */
+:root {
+  --sb-motion: 200ms cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* ── Secciones dropdown (Campañas + Secciones) ──────────────── */
+
+/* Botón header de cada dropdown */
+.sb-dropdown-trigger {
+  display:         flex;
+  align-items:     center;
+  gap:             var(--sp-2);
+  width:           100%;
+  padding:         10px var(--sp-3);
+  border:          none;
+  border-radius:   var(--r-md);
+  background:      transparent;
+  color:           var(--text-secondary);
+  font-family:     var(--font);
+  font-size:       13px;
+  font-weight:     500;
+  cursor:          pointer;
+  text-align:      left;
+  transition:      background var(--sb-motion), color var(--sb-motion);
+  white-space:     nowrap;
+  position:        relative;
+}
+
+.sb-dropdown-trigger:hover {
+  background: rgba(0, 0, 0, 0.04);
+  color:      var(--text-primary);
+}
+
+[data-theme="dark"] .sb-dropdown-trigger:hover {
+  background: rgba(255, 255, 255, 0.05);
+}
+
+.sb-dropdown-trigger.is-open {
+  color:      var(--text-primary);
+  background: rgba(0, 0, 0, 0.03);
+}
+
+[data-theme="dark"] .sb-dropdown-trigger.is-open {
+  background: rgba(255, 255, 255, 0.04);
+}
+
+/* Icono de la campaña activa en el trigger */
+.sb-dt-icon {
+  flex-shrink: 0;
+  color:       var(--umoh-accent);
+}
+
+/* Bloque de texto (nombre + meta info) */
+.sb-dt-text {
+  flex:        1;
+  min-width:   0;
+  overflow:    hidden;
+}
+
+.sb-dt-name {
+  font-size:     13px;
+  font-weight:   600;
+  color:         var(--text-primary);
+  white-space:   nowrap;
+  overflow:      hidden;
+  text-overflow: ellipsis;
+  line-height:   1.3;
+}
+
+.sb-dt-meta {
+  font-size:   11px;
+  color:       var(--text-muted);
+  white-space: nowrap;
+  overflow:    hidden;
+  text-overflow: ellipsis;
+  line-height: 1.2;
+  margin-top:  1px;
+  font-variant-numeric: tabular-nums;
+}
+
+/* Chevron */
+.sb-dt-chevron {
+  flex-shrink: 0;
+  color:       var(--text-muted);
+  transition:  transform var(--sb-motion);
+  /* Cerrado: apunta hacia abajo (↓ = click para abrir) */
+  transform:   rotate(0deg);
+}
+
+/* Abierto: chevron rota hacia arriba (↑ = click para cerrar) */
+.sb-dropdown-trigger.is-open .sb-dt-chevron {
+  transform: rotate(180deg);
+}
+
+/* Panel expandible */
+.sb-dropdown-panel {
+  overflow:      hidden;
+  max-height:    0;
+  transition:    max-height var(--sb-motion);
+}
+
+.sb-dropdown-panel.is-open {
+  max-height:    600px;
+}
+
+/* ── Items dentro del panel ─────────────────────────────────── */
+
+/* Upgrade: padding más generoso, border-radius 8-10px, transición suave */
+.sb-campaign-item {
+  padding:       10px var(--sp-3);
+  border-radius: var(--r-md);
+  gap:           var(--sp-2);
+  transition:    background var(--sb-motion), color var(--sb-motion);
+}
+
+.sb-campaign-item:hover {
+  background: rgba(0, 0, 0, 0.04);
+  color:      var(--text-primary);
+}
+
+[data-theme="dark"] .sb-campaign-item:hover {
+  background: rgba(255, 255, 255, 0.05);
+}
+
+.sb-campaign-item.active {
+  background: rgba(255, 0, 64, 0.08);
+  color:      var(--umoh-accent);
+}
+
+[data-theme="dark"] .sb-campaign-item.active {
+  background: rgba(255, 0, 64, 0.12);
+}
+
+.sb-nav-item {
+  padding:       12px var(--sp-3);
+  border-radius: var(--r-md);
+  transition:    background var(--sb-motion), color var(--sb-motion), border-left-color var(--sb-motion);
+}
+
+.sb-nav-item:hover {
+  background: rgba(0, 0, 0, 0.04);
+  color:      var(--text-primary);
+}
+
+[data-theme="dark"] .sb-nav-item:hover {
+  background: rgba(255, 255, 255, 0.05);
+}
+
+.sb-nav-item.active {
+  background:        rgba(255, 0, 64, 0.08);
+  color:             var(--umoh-accent);
+  border-left-color: var(--umoh-accent);
+}
+
+[data-theme="dark"] .sb-nav-item.active {
+  background: rgba(255, 0, 64, 0.12);
+}
+
+/* Secciones nav: mismo dropdown expandible */
+.sb-nav-dropdown-panel {
+  overflow:   hidden;
+  max-height: 0;
+  transition: max-height var(--sb-motion);
+}
+
+.sb-nav-dropdown-panel.is-open {
+  max-height: 400px;
+}
+
+/* ── Período — panel inline expandible ──────────────────────── */
+
+/* El botón "Personalizado" tiene un chevron integrado */
+.sb-period-btn--custom .sb-period-chevron {
+  margin-left: auto;
+  flex-shrink: 0;
+  color:       var(--text-muted);
+  transition:  transform var(--sb-motion);
+  transform:   rotate(0deg); /* cerrado → apunta abajo */
+}
+
+.sb-period-btn--custom.is-open .sb-period-chevron {
+  transform: rotate(180deg); /* abierto → apunta arriba */
+}
+
+/* Panel inline del date picker dentro del sidebar */
+.sb-custom-date-panel {
+  overflow:      hidden;
+  max-height:    0;
+  transition:    max-height var(--sb-motion);
+}
+
+.sb-custom-date-panel.is-open {
+  max-height:    400px;
+}
+
+/* Cuando se usa el inline panel, el popover flotante no aplica al sidebar */
+.sb-period-wrap .date-picker-popover.sb-inline-hidden {
+  display: none !important;
+}
+
+/* El date-picker-inner dentro del inline panel usa colores del tema correctamente */
+.sb-custom-date-panel .date-picker-inner {
+  padding: var(--sp-3) var(--sp-2) var(--sp-2);
+}
+
+.sb-custom-date-panel .date-picker-input {
+  background:   var(--bg-page);
+  border-color: var(--border-subtle);
+  color:        var(--text-primary);
+  color-scheme: auto;
+}
+
+[data-theme="dark"] .sb-custom-date-panel .date-picker-input {
+  background:   rgba(255, 255, 255, 0.06);
+  border-color: rgba(255, 255, 255, 0.15);
+  color:        #fff;
+  color-scheme: dark;
+}
+
+.sb-custom-date-panel .date-picker-label {
+  color: var(--text-secondary);
+}
+
+.sb-custom-date-panel .historic-label {
+  color: var(--text-muted);
+}
+
+.sb-custom-date-panel .historic-btn {
+  background:   var(--bg-page);
+  color:        var(--text-secondary);
+  border-color: var(--border-subtle);
+}
+
+[data-theme="dark"] .sb-custom-date-panel .historic-btn {
+  background:   rgba(255, 255, 255, 0.06);
+  color:        rgba(255, 255, 255, 0.7);
+  border-color: rgba(255, 255, 255, 0.15);
+}
+
+.sb-custom-date-panel .historic-btn:hover,
+.sb-custom-date-panel .historic-btn.active {
+  background:   var(--umoh-accent);
+  color:        #fff;
+  border-color: var(--umoh-accent);
+}
+
+.sb-custom-date-panel .date-picker-divider {
+  background: var(--border-subtle);
+}
+
+.sb-custom-date-panel .date-apply-btn {
+  width: 100%;
+}
+
+/* ── sb-period-btn upgrade ──────────────────────────────────── */
+.sb-period-btn {
+  padding:       10px var(--sp-3);
+  border-radius: var(--r-md);
+  transition:    background var(--sb-motion), color var(--sb-motion);
+}
+
+.sb-period-btn:hover {
+  background: rgba(0, 0, 0, 0.04);
+  color:      var(--text-primary);
+}
+
+[data-theme="dark"] .sb-period-btn:hover {
+  background: rgba(255, 255, 255, 0.05);
+}
+
+.sb-period-btn.active {
+  background: rgba(255, 0, 64, 0.08);
+  color:      var(--umoh-accent);
+  font-weight: 600;
+}
+
+[data-theme="dark"] .sb-period-btn.active {
+  background: rgba(255, 0, 64, 0.12);
+}
+
+/* ── Perfil: chevron apunta hacia abajo cerrado ─────────────── */
+.sb-user-trigger .sb-user-chevron {
+  flex-shrink: 0;
+  color:       var(--text-muted);
+  margin-left: auto;
+  opacity:     0.5;
+  transition:  transform var(--sb-motion);
+  transform:   rotate(0deg); /* cerrado → apunta abajo */
+}
+
+/* Cuando el dropdown está abierto, el chevron rota 180° (apunta arriba) */
+.sb-user-trigger[aria-expanded="true"] .sb-user-chevron {
+  transform: rotate(180deg);
+}
+
+/* ── Logo brand-mark: SVG inline (punto 6) ──────────────────── */
+.sb-brand-mark {
+  background: var(--umoh-accent);
+}
+
+/* Cuando hay SVG inline, no necesitamos el <img> */
+.sb-brand-mark .sb-brand-svg {
+  width:  18px;
+  height: 18px;
+  display: block;
+  fill: #ffffff;
+}
+
+/* En modo claro el brand-mark tiene fondo rojo, SVG blanco → perfecto */
+/* En modo oscuro igual — el rojo UMOH es invariante entre temas */
+[data-theme="dark"] .sb-brand-mark {
+  background: var(--umoh-accent);
+}
+
+/* Ocultar img si sigue existiendo en el DOM — la nueva versión es SVG inline */
+.sb-brand-mark img {
+  display: none;
+}
+
+/* ── Avatar del usuario: inicial en circle ──────────────────── */
+.sb-user-avatar {
+  background:    var(--bg-card);
+  border:        2px solid var(--border-subtle);
+  /* Sin padding ya que ahora muestra una letra */
+  padding:       0;
+}
+
+/* Si contiene una letra como avatar */
+.sb-user-avatar-initial {
+  width:           100%;
+  height:          100%;
+  display:         flex;
+  align-items:     center;
+  justify-content: center;
+  font-size:       13px;
+  font-weight:     700;
+  color:           var(--umoh-accent);
+  line-height:     1;
+  font-family:     var(--font);
+  background:      rgba(255, 0, 64, 0.10);
+  border-radius:   50%;
+}
+
+[data-theme="dark"] .sb-user-avatar-initial {
+  color:      var(--umoh-accent);
+  background: rgba(255, 0, 64, 0.15);
+}
+
+/* Ocultar img del avatar si hay initial */
+.sb-user-avatar.has-initial img {
+  display: none;
+}
+
+/* Avatar grande en el menú de usuario */
+.user-menu-avatar-lg .sb-user-avatar-initial {
+  font-size:   20px;
+  font-weight: 700;
+}
+
+/* Variante lg del avatar (dentro del dropdown expandido) */
+.sb-user-avatar--lg {
+  width:  40px;
+  height: 40px;
+  border-radius: 50%;
+  border: 2px solid var(--border-subtle);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  padding: 0;
+  background: rgba(255, 0, 64, 0.10);
+}
+
+/* ── Sección del tema (contenedor encima del perfil) ────────── */
+.sb-theme-section {
+  border-top:  1px solid var(--border-subtle);
+  padding:     var(--sp-2) var(--sp-3);
+  flex-shrink: 0;
+}
+
+/* ── Theme toggle en sidebar (punto 8) ──────────────────────── */
+.sb-theme-row {
+  display:     flex;
+  align-items: center;
+  gap:         var(--sp-2);
+  width:       100%;
+  padding:     10px var(--sp-3);
+  border:      none;
+  border-radius: var(--r-md);
+  background:  transparent;
+  color:       var(--text-secondary);
+  font-family: var(--font);
+  font-size:   13px;
+  font-weight: 500;
+  cursor:      pointer;
+  text-align:  left;
+  transition:  background var(--sb-motion), color var(--sb-motion);
+  white-space: nowrap;
+}
+
+.sb-theme-row:hover {
+  background: rgba(0, 0, 0, 0.04);
+  color:      var(--text-primary);
+}
+
+[data-theme="dark"] .sb-theme-row:hover {
+  background: rgba(255, 255, 255, 0.05);
+}
+
+.sb-theme-icon {
+  flex-shrink: 0;
+  width:       16px;
+  height:      16px;
+  color:       var(--text-muted);
+}
+
+.sb-theme-label {
+  /* sb-label: oculto en colapsado */
+}
+
+/* Icono sol/luna según tema */
+[data-theme="light"] .sb-theme-icon--sun  { display: block; }
+[data-theme="light"] .sb-theme-icon--moon { display: none; }
+[data-theme="dark"]  .sb-theme-icon--sun  { display: none; }
+[data-theme="dark"]  .sb-theme-icon--moon { display: block; }
+
+/* ── Section-label upgrade: más espacio ─────────────────────── */
+.sb-section-label {
+  padding-top: var(--sp-1);
+}
+
+/* El dropdown sale hacia arriba — necesita ancestor position:relative */
+.sb-user {
+  position: relative;
+}
+
+/* ── Theme toggle: esquina superior derecha, sobre el content ── */
+/* En sidebar layout el toggle sigue flotando fixed, visible siempre */
+body.sidebar-layout .theme-toggle-switch {
+  display: block;
+  position: fixed;
+  top:   16px;
+  right: 20px;
+  z-index: 150;
+}
+
+/* ══════════════════════════════════════════════════════════════
+   SPRINT UX FINAL — 19 corrections batch
+   ══════════════════════════════════════════════════════════════ */
+
+/* ── 1. Brand mark: imagen PNG real del asterisco UMOH ─────── */
+.sb-brand-mark {
+  background: #0B1E3F; /* azul UMOH para contraste con el asterisco rojo/blanco */
+  padding:    4px;
+  width:      34px;
+  height:     34px;
+}
+
+/* Override: las .sb-brand-img con clase avatar-light/dark usan el switch de tema */
+.sb-brand-mark .sb-brand-img {
+  width:      100%;
+  height:     100%;
+  object-fit: contain;
+  filter:     none;
+}
+
+/* Switch light/dark del brand-mark — mismo patrón que el avatar de usuario */
+.sb-brand-mark .avatar-light { display: block; }
+.sb-brand-mark .avatar-dark  { display: none;  }
+
+[data-theme="dark"] .sb-brand-mark .avatar-light { display: none;  }
+[data-theme="dark"] .sb-brand-mark .avatar-dark  { display: block; }
+
+/* Ocultar SVG inline que ya no se usa */
+.sb-brand-svg {
+  display: none;
+}
+
+/* ── 2. Avatares: imagen real del usuario ───────────────────── */
+.sb-user-avatar img {
+  width:         100%;
+  height:        100%;
+  object-fit:    cover;
+  border-radius: 50%;
+  filter:        none; /* foto real — no invertir */
+  display:       block;
+}
+
+.sb-user-avatar--lg img {
+  width:         100%;
+  height:        100%;
+  object-fit:    cover;
+  border-radius: 50%;
+  filter:        none;
+  display:       block;
+}
+
+/* Cuando hay imagen, no mostrar el background de initial */
+.sb-user-avatar:has(img) {
+  background: transparent;
+  padding:    0;
+}
+
+/* ── Admin avatar: variantes por tema ───────────────────────── */
+/* Mismo patrón que .sb-theme-icon--sun / --moon               */
+/* Especificidad explícita: sobreescribe .sb-user-avatar img { display:block } */
+.avatar-light { display: block; }
+.avatar-dark  { display: none;  }
+
+[data-theme="dark"] .avatar-light { display: none;  }
+[data-theme="dark"] .avatar-dark  { display: block; }
+
+/* Fix: .sb-user-avatar img { display:block } pisaba .avatar-dark { display:none }
+   Estos selectores tienen mayor especificidad para ganar en ambos temas */
+.sb-user-avatar .avatar-dark,
+.sb-user-avatar--lg .avatar-dark,
+.inicio-avatar .avatar-dark {
+  display: none;
+}
+
+[data-theme="dark"] .sb-user-avatar .avatar-dark,
+[data-theme="dark"] .sb-user-avatar--lg .avatar-dark,
+[data-theme="dark"] .inicio-avatar .avatar-dark {
+  display: block;
+}
+
+[data-theme="dark"] .sb-user-avatar .avatar-light,
+[data-theme="dark"] .sb-user-avatar--lg .avatar-light,
+[data-theme="dark"] .inicio-avatar .avatar-light {
+  display: none;
+}
+
+/* Asegura que ambas imágenes usen las mismas dimensiones */
+.sb-user-avatar .avatar-light,
+.sb-user-avatar .avatar-dark {
+  width:         100%;
+  height:        100%;
+  object-fit:    contain;
+  border-radius: 50%;
+}
+
+/* Versión lg (dropdown del perfil) */
+.sb-user-avatar--lg .avatar-light,
+.sb-user-avatar--lg .avatar-dark {
+  width:         100%;
+  height:        100%;
+  object-fit:    contain;
+  border-radius: 50%;
+}
+
+/* Inicio header avatar — sin border-radius en el asterisk logo */
+.inicio-avatar .avatar-light,
+.inicio-avatar .avatar-dark {
+  width:         100%;
+  height:        100%;
+  object-fit:    contain;
+  border-radius: 0;
+}
+
+/* ── 3. "Todas las campañas" — wrap en 2 líneas ─────────────── */
+.sb-campaign-name {
+  white-space: normal;
+  word-break:  break-word;
+  line-height: 1.3;
+}
+
+.sb-dt-name {
+  white-space: normal;
+  word-break:  break-word;
+  line-height: 1.3;
+}
+
+/* ── 4. Secciones nav: lista fija siempre visible ───────────── */
+/* El .sb-section--nav ya no usa dropdown — el nav-list es visible siempre */
+.sb-section--nav {
+  flex: 1;
+  padding-bottom: var(--sp-2);
+}
+
+.sb-section--nav .sb-nav-list {
+  padding: var(--sp-1) 0;
+}
+
+/* ── 5. Período personalizado: ocultar historic section ─────── */
+/* La sección historic-section se eliminó del HTML — ya no se muestra */
+.historic-section {
+  display: none;
+}
+
+/* ── 6. Resize handle del sidebar ───────────────────────────── */
+.sb-resize-handle {
+  position:   absolute;
+  top:        0;
+  right:      -4px;
+  width:      8px;
+  height:     100%;
+  cursor:     col-resize;
+  z-index:    200;
+  background: transparent;
+  transition: background 0.2s;
+}
+
+.sb-resize-handle:hover,
+.sb-resize-handle.dragging {
+  background: rgba(255, 0, 64, 0.35);
+}
+
+/* ── 7. Footer visual: alinear con sidebar ──────────────────── */
+.site-footer {
+  background:   var(--bg-card);
+  border-top:   1px solid var(--border-subtle);
+  color:        var(--text-secondary);
+}
+
+.footer-brand {
+  color: var(--text-primary);
+}
+
+.footer-text {
+  color: var(--text-secondary);
+}
+
+/* Dark mode footer */
+[data-theme="dark"] .site-footer {
+  background:  var(--bg-card);
+  border-top:  1px solid var(--border-subtle);
+}
+
+/* ── 8. Popup de perfil: heredar tema ───────────────────────── */
+/* El dropdown ya estaba en la raíz del DOM (position: absolute en sb-user).
+   El bug era que tenía colores hardcodeados a oscuro.
+   Ahora usa variables semánticas que respetan el tema. */
+.sb-user-dropdown {
+  background:   var(--bg-card);
+  border-color: var(--border-subtle);
+}
+
+[data-theme="dark"] .sb-user-dropdown {
+  background:   var(--bg-card); /* #1E2A3A — ya correcto */
+  border-color: var(--border-subtle);
+}
+
+/* Texto dentro del dropdown hereda el tema */
+.sb-user-dropdown .user-menu-fullname {
+  color: var(--text-primary);
+}
+
+.sb-user-dropdown .user-menu-role {
+  color: var(--text-secondary);
+}
+
+.sb-user-dropdown .user-menu-item {
+  color: var(--text-secondary);
+}
+
+.sb-user-dropdown .user-menu-item:hover {
+  background: rgba(0, 0, 0, 0.04);
+  color:      var(--text-primary);
+}
+
+[data-theme="dark"] .sb-user-dropdown .user-menu-item:hover {
+  background: rgba(255, 255, 255, 0.06);
+}
+
+.sb-user-dropdown .user-menu-item--danger:hover {
+  background: rgba(255, 0, 64, 0.10);
+  color:      var(--umoh-accent);
+}
+
+.sb-user-dropdown .user-menu-divider {
+  background: var(--border-subtle);
+}
+
+.sb-user-dropdown .user-menu-header {
+  background: var(--bg-card-header);
+  border-radius: var(--r-lg) var(--r-lg) 0 0;
+}
+
+/* ── 9. Flecha perfil: lógica de dropdown que abre hacia ARRIBA ──
+   El dropdown del perfil sube desde la esquina inferior del sidebar.
+   → Cerrado: flecha apunta ARRIBA (↑) — indicando que al click el menú emerge hacia arriba.
+   → Abierto: flecha apunta ABAJO (↓) — indicando que al click el menú se cierra hacia abajo.
+   El SVG base (points="6 9 12 15 18 9") dibuja una ↓.
+   rotate(180deg) la convierte en ↑. */
+.sb-user-trigger .sb-user-chevron {
+  transform: rotate(180deg); /* cerrado → apunta arriba (↑) */
+}
+
+.sb-user-trigger[aria-expanded="true"] .sb-user-chevron {
+  transform: rotate(0deg); /* abierto → apunta abajo (↓) */
+}
+
+/* ── 10. Section headers: tipografía grande y con presencia ─── */
+.section-title--hero {
+  font-size:      clamp(36px, 5vw, 64px);
+  font-weight:    900;
+  letter-spacing: -0.03em;
+  color:          var(--text-primary);
+  line-height:    1;
+  margin-bottom:  var(--sp-1);
+}
+
+.section-title--sub {
+  font-size:      clamp(14px, 2vw, 20px);
+  font-weight:    600;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color:          var(--umoh-accent);
+  line-height:    1;
+  margin-bottom:  var(--sp-3);
+}
+
+/* ── 11. Inicio — saludo más grande ─────────────────────────── */
+.inicio-saludo {
+  font-size:      clamp(32px, 4vw, 52px);
+  font-weight:    800;
+  letter-spacing: -1px;
+  line-height:    1.05;
+}
+
+/* ── 12. AI Empty state ──────────────────────────────────────── */
+.inicio-ai-empty {
+  display:         flex;
+  flex-direction:  column;
+  align-items:     center;
+  gap:             var(--sp-3);
+  padding:         var(--sp-8) var(--sp-6);
+  color:           var(--text-muted);
+  text-align:      center;
+}
+
+.inicio-ai-empty[hidden] {
+  display: none;
+}
+
+.inicio-ai-empty-text {
+  font-size:   16px;
+  font-weight: 600;
+  color:       var(--text-secondary);
+  margin:      0;
+}
+
+.inicio-ai-empty-sub {
+  font-size:   13px;
+  color:       var(--text-muted);
+  margin:      0;
+  max-width:   340px;
+}
+
+/* ── 13. MOFU: journey-insights 2 columnas ─────────────────── */
+.journey-insights-list {
+  display:               grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap:                   var(--sp-3);
+}
+
+@media (max-width: 768px) {
+  .journey-insights-list {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* ── 14. journey-insights-header: más presencia ─────────────── */
+.journey-insights-header {
+  margin-bottom: var(--sp-2);
+}
+
+.journey-insights-icon {
+  width:           32px;
+  height:          32px;
+  background:      rgba(255, 0, 64, 0.10);
+  border-radius:   var(--r-md);
+  display:         flex;
+  align-items:     center;
+  justify-content: center;
+  font-size:       18px;
+}
+
+.journey-insights-title {
+  font-size:      14px;
+  font-weight:    700;
+  color:          var(--text-primary);
+  letter-spacing: 0.02em;
+  text-transform: none;
+}
+
+/* ── 15. MOFU Segmento: igual de ancho que Customer Journey ─── */
+/* El chart-card de Segmento ahora vive en charts-grid--2col.
+   Si solo hay 1 chart-card en ese grid, ocupa la primer columna.
+   Para hacerlo del mismo ancho que el Journey (charts-grid--full),
+   se le aplica span 2 para que ocupe todo el ancho. */
+#section-mofu .charts-grid--2col > .chart-card:only-child {
+  grid-column: 1 / -1;
+  max-width:   480px; /* evitar que se estire demasiado en pantallas anchas */
+  justify-self: start;
+}
+
+/* ── 16. Tema claro: sb-theme-section ya no existe ──────────── */
+.sb-theme-section {
+  display: none;
+}
+
+/* ── 17. Icono tema en user-menu-item hereda colores del tema ── */
+.sb-user-dropdown .sb-theme-icon {
+  color: var(--text-muted);
+}
+
+/* Mostrar el icono correcto según tema */
+[data-theme="light"] .sb-user-dropdown .sb-theme-icon--sun  { display: none; }
+[data-theme="light"] .sb-user-dropdown .sb-theme-icon--moon { display: block; }
+[data-theme="dark"]  .sb-user-dropdown .sb-theme-icon--sun  { display: block; }
+[data-theme="dark"]  .sb-user-dropdown .sb-theme-icon--moon { display: none; }
+
+/* ── Modal: Regenerar análisis ──────────────────────────────── */
+.regen-modal-overlay {
+  position:   fixed;
+  inset:      0;
+  background: rgba(0,0,0,0.45);
+  backdrop-filter: blur(4px);
+  z-index:    500;
+  display:    flex;
+  align-items: center;
+  justify-content: center;
+  padding:    var(--sp-4);
+}
+
+.regen-modal-overlay[hidden] {
+  display: none;
+}
+
+.regen-modal {
+  background:    var(--bg-card);
+  border:        1px solid var(--border-subtle);
+  border-radius: var(--r-lg);
+  box-shadow:    var(--shadow-lg);
+  padding:       var(--sp-6);
+  width:         100%;
+  max-width:     520px;
+}
+
+.regen-modal-header {
+  display:         flex;
+  align-items:     center;
+  justify-content: space-between;
+  margin-bottom:   var(--sp-4);
+}
+
+.regen-modal-title {
+  font-size:   16px;
+  font-weight: 600;
+  color:       var(--text-primary);
+  margin:      0;
+}
+
+.regen-modal-close {
+  background:    transparent;
+  border:        none;
+  color:         var(--text-muted);
+  cursor:        pointer;
+  padding:       var(--sp-1);
+  border-radius: var(--r-sm);
+  display:       flex;
+  align-items:   center;
+  transition:    color 0.15s;
+}
+
+.regen-modal-close:hover {
+  color: var(--text-primary);
+}
+
+.regen-modal-body {
+  font-size:     14px;
+  color:         var(--text-secondary);
+  line-height:   1.55;
+  margin:        0 0 var(--sp-4);
+}
+
+.regen-modal-cmd-wrap {
+  display:       flex;
+  align-items:   center;
+  gap:           var(--sp-2);
+  background:    var(--bg-base);
+  border:        1px solid var(--border-subtle);
+  border-radius: var(--r-md);
+  padding:       var(--sp-3) var(--sp-4);
+  margin-bottom: var(--sp-3);
+}
+
+.regen-modal-cmd {
+  flex:          1;
+  font-family:   'Courier New', Courier, monospace;
+  font-size:     12px;
+  color:         var(--text-primary);
+  word-break:    break-all;
+  user-select:   all;
+}
+
+.regen-modal-copy {
+  background:    var(--umoh-primary);
+  border:        none;
+  border-radius: var(--r-sm);
+  color:         #fff;
+  cursor:        pointer;
+  font-size:     12px;
+  font-weight:   600;
+  padding:       6px 12px;
+  display:       flex;
+  align-items:   center;
+  gap:           var(--sp-1);
+  flex-shrink:   0;
+  transition:    background 0.15s;
+  white-space:   nowrap;
+}
+
+.regen-modal-copy:hover {
+  background: var(--umoh-dark);
+}
+
+.regen-modal-note {
+  font-size:  12px;
+  color:      var(--text-muted);
+  margin:     0;
+}
+
+@media (max-width: 480px) {
+  .regen-modal {
+    padding: var(--sp-4);
+  }
+  .regen-modal-cmd-wrap {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+  .regen-modal-copy {
+    width: 100%;
+    justify-content: center;
+  }
 }
 

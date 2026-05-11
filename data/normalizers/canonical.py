@@ -90,9 +90,14 @@ def normalize_google_ads(raw_data: dict[str, Any]) -> pd.DataFrame:
         return _empty_tofu_dataframe()
 
     # Paso 1: Agregar metricas base por dia
-    # (cada fila cruda es date+channel+device; las sumamos por dia).
+    # (cada fila cruda es date+campaign_id+channel+device; las sumamos por dia).
     # channel_counts/device_counts/geo_counts ahora guardan {clicks, impressions}
     # por label, no solo el total — el frontend usa clicks para ponderar charts.
+    #
+    # campaign_id y campaign_name: se captura el "dominante" del día — el que
+    # más spend acumulado tiene. Para el caso de una sola campaña (Prepagas v1)
+    # siempre habrá uno solo. Para el futuro multi-campaña, este normalizador
+    # deberá actualizar la PK de tofu_ads_daily para incluir campaign_id.
     def _zero_metrics() -> dict[str, int]:
         return {"clicks": 0, "impressions": 0}
 
@@ -103,15 +108,20 @@ def normalize_google_ads(raw_data: dict[str, Any]) -> pd.DataFrame:
         "channel_counts": defaultdict(_zero_metrics),
         "device_counts":  defaultdict(_zero_metrics),
         "geo_counts":     defaultdict(_zero_metrics),
+        # campaign_id_spend: {campaign_id: spend_micros} — para determinar dominante
+        "campaign_id_spend": defaultdict(int),
+        # campaign_name_map: {campaign_id: campaign_name} — para lookup rápido
+        "campaign_name_map": {},
     })
 
     for row in raw_metrics:
         date = row["date"]
         impressions = row.get("impressions", 0)
         clicks = row.get("clicks", 0)
+        spend_micros = row.get("spend_micros", 0)
         daily[date]["impressions"] += impressions
         daily[date]["clicks"] += clicks
-        daily[date]["spend_micros"] += row.get("spend_micros", 0)
+        daily[date]["spend_micros"] += spend_micros
 
         channel_raw = row.get("channel", "UNKNOWN")
         channel_label = _NETWORK_TYPE_MAP.get(channel_raw, channel_raw)
@@ -122,6 +132,13 @@ def normalize_google_ads(raw_data: dict[str, Any]) -> pd.DataFrame:
         device_label = _DEVICE_MAP.get(device_raw, device_raw)
         daily[date]["device_counts"][device_label]["clicks"] += clicks
         daily[date]["device_counts"][device_label]["impressions"] += impressions
+
+        # Acumular spend por campaign_id para elegir el dominante del día
+        campaign_id = row.get("campaign_id", "PMAX_PREPAGAS")
+        campaign_name = row.get("campaign_name", "PMAX Prevención Salud")
+        daily[date]["campaign_id_spend"][campaign_id] += spend_micros
+        if campaign_id not in daily[date]["campaign_name_map"]:
+            daily[date]["campaign_name_map"][campaign_id] = campaign_name
 
     # Geo viene en una lista separada — granularidad date+city, sin canal/dispositivo.
     for geo_row in raw_geo:
@@ -149,6 +166,19 @@ def normalize_google_ads(raw_data: dict[str, Any]) -> pd.DataFrame:
         spend = d["spend_micros"] / _MICROS
         clicks = d["clicks"]
         cpc = round(spend / clicks, 4) if clicks > 0 else 0.0
+
+        # Campaña dominante del día: la que más spend acumuló.
+        # En el caso de una sola campaña, siempre es la única.
+        # Para el futuro multi-campaña, este dato se usará cuando la PK
+        # de tofu_ads_daily incluya campaign_id.
+        campaign_id_spend = d["campaign_id_spend"]
+        if campaign_id_spend:
+            dominant_campaign_id = max(campaign_id_spend, key=lambda k: campaign_id_spend[k])
+        else:
+            dominant_campaign_id = "PMAX_PREPAGAS"
+        dominant_campaign_name = d["campaign_name_map"].get(
+            dominant_campaign_id, "PMAX Prevención Salud"
+        )
 
         # Top 10 terminos del dia ordenados por clicks desc
         top_terms = sorted(
@@ -178,6 +208,10 @@ def normalize_google_ads(raw_data: dict[str, Any]) -> pd.DataFrame:
         records.append({
             "date": date,
             "platform": "google",
+            # campaign_id y campaign_name son el de la campaña dominante del día
+            # (por spend). En v1 con una sola campaña PMAX, siempre es la misma.
+            "campaign_id": dominant_campaign_id,
+            "campaign_name": dominant_campaign_name,
             "impressions": d["impressions"],
             "clicks": clicks,
             "spend": round(spend, 2),
@@ -256,6 +290,8 @@ def _empty_tofu_dataframe() -> pd.DataFrame:
     return pd.DataFrame(columns=[
         "date",
         "platform",
+        "campaign_id",
+        "campaign_name",
         "impressions",
         "clicks",
         "spend",
