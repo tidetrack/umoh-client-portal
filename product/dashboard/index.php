@@ -26,7 +26,7 @@ $_asset_v = defined('ASSET_VERSION') ? ASSET_VERSION : filemtime(__DIR__ . '/ass
   <!-- Fonts -->
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet">
 
   <!-- Leaflet CSS -->
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.css" crossorigin="">
@@ -257,8 +257,10 @@ $_asset_v = defined('ASSET_VERSION') ? ASSET_VERSION : filemtime(__DIR__ . '/ass
         <div class="user-menu-header">
           <div class="user-menu-avatar-lg">
             <!-- Avatar real del usuario -->
+            <!-- TODO: cuando tengamos roles, condicionar avatar admin aquí -->
             <div class="sb-user-avatar sb-user-avatar--lg" id="sb-user-avatar-menu">
-              <img src="assets/img/franco-avatar.png" alt="Avatar">
+              <img src="assets/img/umoh-asterisk-light.png" alt="Avatar" class="avatar-light">
+              <img src="assets/img/umoh-asterisk-dark.png"  alt="Avatar" class="avatar-dark">
             </div>
           </div>
           <div>
@@ -297,9 +299,10 @@ $_asset_v = defined('ASSET_VERSION') ? ASSET_VERSION : filemtime(__DIR__ . '/ass
       </div>
       <!-- Trigger -->
       <button class="sb-user-trigger" id="sb-user-trigger" aria-haspopup="true" aria-expanded="false">
-        <!-- Avatar: foto real del usuario -->
+        <!-- TODO: cuando tengamos roles, condicionar avatar admin aquí -->
         <div class="sb-user-avatar" id="sb-user-avatar">
-          <img src="assets/img/franco-avatar.png" alt="Avatar">
+          <img src="assets/img/umoh-asterisk-light.png" alt="Avatar" class="avatar-light">
+          <img src="assets/img/umoh-asterisk-dark.png"  alt="Avatar" class="avatar-dark">
         </div>
         <div class="sb-user-info sb-label">
           <span class="sb-user-name" id="sb-user-name">Usuario</span>
@@ -335,8 +338,9 @@ $_asset_v = defined('ASSET_VERSION') ? ASSET_VERSION : filemtime(__DIR__ . '/ass
       <!-- Header con saludo -->
       <div class="inicio-header">
         <div class="inicio-avatar" aria-hidden="true" id="inicio-avatar">
-          <!-- Avatar real del usuario -->
-          <img src="assets/img/franco-avatar.png" alt="Avatar" style="width:100%;height:100%;object-fit:cover;border-radius:50%;">
+          <!-- TODO: cuando tengamos roles, condicionar avatar admin aquí -->
+          <img src="assets/img/umoh-asterisk-light.png" alt="Avatar" class="avatar-light" style="width:100%;height:100%;object-fit:contain;border-radius:0;">
+          <img src="assets/img/umoh-asterisk-dark.png"  alt="Avatar" class="avatar-dark"  style="width:100%;height:100%;object-fit:contain;border-radius:0;">
         </div>
         <div class="inicio-greeting-block">
           <h1 class="inicio-saludo">Hola, <span id="inicio-user-name">Franco</span></h1>

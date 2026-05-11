@@ -5,11 +5,13 @@ Orquestador end-to-end del pipeline MeisterTask → Supabase.
 
 Flujo:
     1. Cargar .env (load_dotenv).
-    2. Leer CLIENT_SLUG del entorno (default: 'prepagas').
-    3. Localizar el CSV más reciente en Meistertask/{slug}/*.csv.
+    2. Leer CLIENT_SLUG del entorno o --client-slug CLI (default: 'prepagas').
+    3. Localizar el CSV: --input CLI > MEISTERTASK_CSV_PATH env > glob en Meistertask/{slug}/.
     4. Cargar clients/{slug}.yaml.
     5. sync_funnel_stages_from_yaml (sincroniza config del funnel antes de todo).
-    6. extract_csv → (client_slug, rows). Validar que coincide con CLIENT_SLUG.
+    6. extract_csv → (client_slug_inferido, rows).
+       Nota: cuando se usa --input con --client-slug, el slug NO se valida contra
+       el directorio padre del CSV (el CSV puede venir de inbox/ con nombre arbitrario).
     7. start_run → run_id.
     8. Por cada fila: normalize → upsert_lead → upsert_monetary (si hay datos)
        → upsert_activity por cada comentario.
@@ -26,10 +28,12 @@ Variables de entorno:
 
 Ejecución:
     python scripts/run_meistertask_pipeline.py
+    python scripts/run_meistertask_pipeline.py --input data/inbox/meistertask/prepagas-meistertask-20260511.csv --client-slug prepagas
 """
 
 from __future__ import annotations
 
+import argparse
 import glob
 import json
 import logging
@@ -63,15 +67,21 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 
-def _find_csv(client_slug: str) -> str:
+def _find_csv(client_slug: str, cli_input: str | None = None) -> str:
     """Localiza el CSV más reciente para el cliente.
 
-    Busca en Meistertask/{client_slug}/project-export-*.csv y toma el más
-    reciente por mtime. Si CLIENT_SLUG_CSV_PATH está en el entorno, lo usa
-    directamente (permite override en GitHub Actions).
+    Orden de precedencia:
+    1. --input CLI argument (cli_input).
+    2. Variable de entorno MEISTERTASK_CSV_PATH.
+    3. Glob en Meistertask/{client_slug}/project-export-*.csv.
+
+    Cuando se pasa --input con --client-slug, el CSV puede tener cualquier nombre
+    (ej: prepagas-meistertask-20260511.csv desde inbox/). La validación del slug
+    contra el directorio padre se saltea en este caso — el slug viene explícito.
 
     Args:
         client_slug: Slug del cliente.
+        cli_input: Path al CSV pasado vía --input, o None.
 
     Returns:
         Path absoluto al CSV.
@@ -79,7 +89,17 @@ def _find_csv(client_slug: str) -> str:
     Raises:
         FileNotFoundError: si no se encuentra ningún CSV.
     """
-    # Override explícito via env
+    # 1. Override explícito via --input CLI
+    if cli_input:
+        p = Path(cli_input)
+        if not p.is_absolute():
+            p = _ROOT / p
+        if p.exists():
+            logger.info("Usando CSV desde --input CLI: %s", p)
+            return str(p)
+        raise FileNotFoundError(f"--input apunta a un archivo inexistente: {p}")
+
+    # 2. Override explícito via env
     env_path = os.environ.get('MEISTERTASK_CSV_PATH')
     if env_path:
         p = Path(env_path)
@@ -90,7 +110,7 @@ def _find_csv(client_slug: str) -> str:
             return str(p)
         raise FileNotFoundError(f"MEISTERTASK_CSV_PATH apunta a un archivo inexistente: {p}")
 
-    # Glob en Meistertask/{slug}/
+    # 3. Glob en Meistertask/{slug}/
     pattern = str(_ROOT / 'Meistertask' / client_slug / 'project-export-*.csv')
     candidates = glob.glob(pattern)
     if not candidates:
@@ -119,15 +139,55 @@ def _load_yaml(client_slug: str) -> dict:
         return yaml.safe_load(fh)
 
 
+def _parse_args() -> argparse.Namespace:
+    """Parsea argumentos de línea de comandos (todos opcionales)."""
+    parser = argparse.ArgumentParser(
+        description=(
+            "Orquestador del pipeline MeisterTask → Supabase. "
+            "Por defecto lee CLIENT_SLUG del entorno y hace glob en Meistertask/{slug}/. "
+            "Usar --input + --client-slug para procesar CSVs desde inbox/ u otras rutas."
+        )
+    )
+    parser.add_argument(
+        "--input",
+        default=None,
+        metavar="RUTA_CSV",
+        help=(
+            "Path explícito al CSV de MeisterTask. Si se omite, el script busca en "
+            "MEISTERTASK_CSV_PATH (env) o hace glob en Meistertask/{slug}/. "
+            "Cuando se usa --input, --client-slug es obligatorio."
+        ),
+    )
+    parser.add_argument(
+        "--client-slug",
+        default=None,
+        metavar="SLUG",
+        help=(
+            "Slug del cliente (ej: 'prepagas'). Si se omite, se lee de la variable "
+            "de entorno CLIENT_SLUG (default: 'prepagas')."
+        ),
+    )
+    return parser.parse_args()
+
+
 def main() -> None:
     """Punto de entrada del pipeline."""
     load_dotenv()
+    args = _parse_args()
 
-    client_slug = os.environ.get('CLIENT_SLUG', 'prepagas')
+    # --client-slug CLI tiene precedencia sobre la variable de entorno
+    client_slug = args.client_slug or os.environ.get('CLIENT_SLUG', 'prepagas')
     logger.info("=== Pipeline MeisterTask → Supabase | cliente=%s ===", client_slug)
 
+    # Validar: si se pasa --input, también debe haber un slug explícito
+    if args.input and not args.client_slug and not os.environ.get('CLIENT_SLUG'):
+        logger.warning(
+            "--input especificado sin --client-slug ni CLIENT_SLUG env. "
+            "Usando default 'prepagas'. Si es incorrecto, pasá --client-slug explícito."
+        )
+
     # 1. Localizar CSV
-    csv_path = _find_csv(client_slug)
+    csv_path = _find_csv(client_slug, cli_input=args.input)
 
     # 2. Cargar YAML del cliente
     yaml_config = _load_yaml(client_slug)
@@ -143,12 +203,44 @@ def main() -> None:
     logger.info("funnel_stages sync: %s", sync_result)
 
     # 5. Extraer CSV
-    csv_client_slug, rows = extract_csv(csv_path)
-    if csv_client_slug != client_slug:
+    # Cuando se usa --input (CSV desde inbox/ u otra ruta), el directorio padre
+    # puede no coincidir con client_slug. Si se pasó --input, usamos client_slug
+    # explícito como fuente de verdad y no validamos el slug inferido del path.
+    explicit_input = bool(args.input)
+    try:
+        csv_client_slug, rows = extract_csv(csv_path)
+    except ValueError as exc:
+        if explicit_input:
+            # El directorio padre no matchea el patrón de slug — leer directamente.
+            logger.info(
+                "extract_csv rechazó el path (%s). "
+                "Usando --client-slug '%s' explícito y leyendo CSV directamente.",
+                exc, client_slug,
+            )
+            import csv as _csv
+            rows = []
+            with open(csv_path, encoding='utf-8-sig', newline='') as fh:
+                reader = _csv.DictReader(fh)
+                for row in reader:
+                    rows.append(dict(row))
+            csv_client_slug = client_slug
+        else:
+            raise
+
+    if explicit_input:
+        # El slug viene explícito vía --input + --client-slug: no validar el inferido.
+        # El directorio padre del CSV puede ser 'inbox', 'meistertask', etc.
+        logger.info(
+            "Slug explícito '%s' — se omite validación del slug inferido del CSV ('%s').",
+            client_slug, csv_client_slug,
+        )
+        csv_client_slug = client_slug
+    elif csv_client_slug != client_slug:
         raise ValueError(
             f"El slug inferido del CSV ({csv_client_slug!r}) no coincide "
             f"con CLIENT_SLUG ({client_slug!r}). "
-            f"Verificar que el CSV está en Meistertask/{client_slug}/."
+            f"Verificar que el CSV está en Meistertask/{client_slug}/ "
+            f"o pasá --input + --client-slug explícitamente."
         )
     logger.info("Filas extraídas del CSV: %d", len(rows))
 

@@ -4744,6 +4744,41 @@ body.sidebar-layout .theme-toggle-switch {
   padding:    0;
 }
 
+/* ── Admin avatar: variantes por tema ───────────────────────── */
+/* Mismo patrón que .sb-theme-icon--sun / --moon               */
+.avatar-light { display: block; }
+.avatar-dark  { display: none;  }
+
+[data-theme="dark"] .avatar-light { display: none;  }
+[data-theme="dark"] .avatar-dark  { display: block; }
+
+/* Asegura que ambas imágenes usen las mismas dimensiones */
+.sb-user-avatar .avatar-light,
+.sb-user-avatar .avatar-dark {
+  width:         100%;
+  height:        100%;
+  object-fit:    contain;
+  border-radius: 50%;
+}
+
+/* Versión lg (dropdown del perfil) */
+.sb-user-avatar--lg .avatar-light,
+.sb-user-avatar--lg .avatar-dark {
+  width:         100%;
+  height:        100%;
+  object-fit:    contain;
+  border-radius: 50%;
+}
+
+/* Inicio header avatar — sin border-radius en el asterisk logo */
+.inicio-avatar .avatar-light,
+.inicio-avatar .avatar-dark {
+  width:         100%;
+  height:        100%;
+  object-fit:    contain;
+  border-radius: 0;
+}
+
 /* ── 3. "Todas las campañas" — wrap en 2 líneas ─────────────── */
 .sb-campaign-name {
   white-space: normal;
@@ -4880,8 +4915,8 @@ body.sidebar-layout .theme-toggle-switch {
 /* ── 10. Section headers: tipografía grande y con presencia ─── */
 .section-title--hero {
   font-size:      clamp(36px, 5vw, 64px);
-  font-weight:    800;
-  letter-spacing: -1.5px;
+  font-weight:    900;
+  letter-spacing: -0.03em;
   color:          var(--text-primary);
   line-height:    1;
   margin-bottom:  var(--sp-1);

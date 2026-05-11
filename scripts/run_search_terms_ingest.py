@@ -59,6 +59,7 @@ Filas descartadas:
 from __future__ import annotations
 
 import argparse
+import calendar
 import csv
 import json
 import logging
@@ -164,20 +165,60 @@ def _parse_date_range_line(line: str) -> tuple[str, str]:
 def _infer_slug_from_filename(path: Path) -> str | None:
     """Intenta inferir el client_slug del nombre del archivo.
 
-    Soporta el formato canónico: {slug}-search-terms-{YYYYMMDD}.csv
-    Ejemplos: 'prepagas-search-terms-20260429.csv' → 'prepagas'
+    Soporta dos formatos:
+    - Diario:  {slug}-search-terms-{YYYYMMDD}.csv  (ej: prepagas-search-terms-20260429.csv)
+    - Mensual: {slug}-search-terms-{YYYYMM}.csv    (ej: prepagas-search-terms-202604.csv)
 
     Args:
         path: Path al archivo CSV.
 
     Returns:
-        Slug inferido, o None si el nombre no coincide con el patrón.
+        Slug inferido, o None si el nombre no coincide con ningún patrón.
     """
     stem = path.stem  # nombre sin extensión
+    # Formato diario (8 dígitos) — tiene precedencia
     match = re.match(r"^(.+)-search-terms-\d{8}$", stem)
     if match:
         return match.group(1)
+    # Formato mensual (6 dígitos)
+    match = re.match(r"^(.+)-search-terms-\d{6}$", stem)
+    if match:
+        return match.group(1)
     return None
+
+
+def _resolve_date_from_filename(path: Path) -> str | None:
+    """Intenta inferir la fecha a usar desde el nombre del archivo.
+
+    Para archivos mensuales ({slug}-search-terms-{YYYYMM}.csv), resuelve el
+    ÚLTIMO día del mes como fecha canónica. Esto es consistente con el modelo
+    de datos: un CSV mensual representa todo el mes, y la fecha de cierre es
+    el extremo más informativo para el upsert por (date, campaign_id, term).
+
+    Ejemplos:
+        'prepagas-search-terms-202603.csv' → '2026-03-31'
+        'prepagas-search-terms-202604.csv' → '2026-04-30'
+        'prepagas-search-terms-20260429.csv' → None  (diario: fecha viene del CSV)
+
+    Args:
+        path: Path al archivo CSV.
+
+    Returns:
+        Fecha 'YYYY-MM-DD' del último día del mes, o None si el nombre es diario
+        o no coincide con el patrón mensual.
+    """
+    stem = path.stem
+    match = re.match(r"^.+-search-terms-(\d{6})$", stem)
+    if not match:
+        return None
+    yyyymm = match.group(1)
+    try:
+        year = int(yyyymm[:4])
+        month = int(yyyymm[4:6])
+        last_day = calendar.monthrange(year, month)[1]
+        return f"{year:04d}-{month:02d}-{last_day:02d}"
+    except (ValueError, IndexError):
+        return None
 
 
 # ---------------------------------------------------------------------------
@@ -570,7 +611,15 @@ def main() -> None:
             sys.exit(1)
         logger.info("Usando fecha explícita: %s", date_to_use)
     else:
-        if date_end_csv:
+        # Intentar inferir fecha desde el nombre del archivo (formato mensual YYYYMM)
+        date_from_filename = _resolve_date_from_filename(csv_path)
+        if date_from_filename:
+            date_to_use = date_from_filename
+            logger.info(
+                "Fecha inferida del nombre del archivo (último día del mes): %s",
+                date_to_use,
+            )
+        elif date_end_csv:
             date_to_use = date_end_csv
             logger.info(
                 "Usando fecha de fin del rango del CSV como date: %s", date_to_use

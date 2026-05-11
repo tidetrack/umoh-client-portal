@@ -42,12 +42,13 @@ try {
         'limit'       => '5000',
     ]);
 
-    // 2. Leads — enriquecimiento + comments para el modal de detalle del lead.
-    //    `comments` (textarea de MeisterTask) es donde el vendedor anota
-    //    seguimientos e interacciones — funciona como historial real de actividad.
+    // 2. Leads — enriquecimiento para el modal de detalle del lead.
+    //    Nota: `comments` no existe en la tabla `leads` de Supabase — los comentarios
+    //    están en `lead_activity` (migración 007). El historial de actividad se lee
+    //    desde ese endpoint, no desde leads.
     $leads = supabase_query('leads', [
         'client_slug' => 'eq.' . CLIENT_SLUG,
-        'select'      => 'meistertask_id,nombre,tipification,canal,is_campaign_lead,assignee,section,lead_created_at,comments',
+        'select'      => 'meistertask_id,nombre,tipification,canal,is_campaign_lead,assignee,section,lead_created_at',
         'limit'       => '5000',
     ]);
     $lead_by_id = [];
@@ -299,7 +300,6 @@ try {
             'tipification'    => $l['tipification'] ?? '',
             'canal'           => $l['canal'] ?? '',
             'section'         => $l['section'] ?? '',
-            'comments'        => $l['comments'] ?? '',
             'lead_created_at' => $l['lead_created_at'] ?? '',
             'is_campaign'     => !empty($l['is_campaign_lead']),
         ];
