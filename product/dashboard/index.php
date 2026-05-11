@@ -280,7 +280,7 @@ $_asset_v = defined('ASSET_VERSION') ? ASSET_VERSION : filemtime(__DIR__ . '/ass
     </div><!-- /.sb-body -->
 
     <!-- E. Toggle de tema (arriba del perfil) -->
-    <div class="sb-user" id="sb-theme-section" style="border-top:1px solid var(--border-subtle);padding:var(--sp-2) var(--sp-3);">
+    <div class="sb-theme-section" id="sb-theme-section">
       <button class="sb-theme-row" id="sb-theme-toggle" type="button" title="Cambiar tema" aria-label="Cambiar modo claro/oscuro">
         <!-- Icono sol (modo dark → click pone light) -->
         <svg class="sb-theme-icon sb-theme-icon--sun" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
@@ -308,9 +308,9 @@ $_asset_v = defined('ASSET_VERSION') ? ASSET_VERSION : filemtime(__DIR__ . '/ass
       <div class="sb-user-dropdown" id="sb-user-dropdown" role="menu">
         <div class="user-menu-header">
           <div class="user-menu-avatar-lg">
-            <!-- Avatar inicial del usuario — JS reemplaza con la letra del nombre -->
-            <div class="sb-user-avatar" id="sb-user-avatar-menu" style="width:40px;height:40px;border-radius:50%;border:2px solid var(--border-subtle);display:flex;align-items:center;justify-content:center;overflow:hidden;">
-              <span class="sb-user-avatar-initial" id="sb-user-initial-menu" style="width:100%;height:100%;display:flex;align-items:center;justify-content:center;font-size:18px;font-weight:700;color:var(--umoh-accent);background:rgba(255,0,64,0.10);border-radius:50%;">U</span>
+            <!-- Avatar inicial del usuario — JS actualiza con la letra correcta -->
+            <div class="sb-user-avatar has-initial sb-user-avatar--lg">
+              <span class="sb-user-avatar-initial" id="sb-user-initial-menu">U</span>
             </div>
           </div>
           <div>

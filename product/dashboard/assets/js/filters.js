@@ -64,6 +64,8 @@ function _activateSidebarNavItem(section) {
     item.classList.toggle('active', active);
     item.setAttribute('aria-current', active ? 'page' : 'false');
   });
+  // Sincronizar el trigger del dropdown de secciones
+  _updateSectionsTrigger(section);
 }
 
 function _activatePeriod(btn) {
@@ -954,17 +956,19 @@ function _updateSectionsTrigger(section) {
  * Muestra nombre + meta (ID · Plataforma).
  */
 function _updateCampaignsTrigger(id, name, platform) {
-  const nameEl = document.getElementById('sb-campaigns-active-name');
-  const metaEl = document.getElementById('sb-campaigns-active-meta');
+  const nameEl   = document.getElementById('sb-campaigns-active-name');
+  const metaEl   = document.getElementById('sb-campaigns-active-meta');
+  const trigger  = document.getElementById('sb-campaigns-trigger');
 
   if (id === 'all') {
     if (nameEl) nameEl.textContent = 'Todas las campañas';
     if (metaEl) metaEl.textContent = 'vista agregada';
+    if (trigger) trigger.classList.remove('has-campaign');
   } else {
     if (nameEl) nameEl.textContent = name || id;
-    // Plataforma: usar fallback 'Google Ads' si no viene del backend
     const platformLabel = _platformLabel(platform || 'google_ads');
     if (metaEl) metaEl.textContent = `${id} · ${platformLabel}`;
+    if (trigger) trigger.classList.add('has-campaign');
   }
 }
 
@@ -1108,14 +1112,21 @@ function initCampaignSelector() {
     });
   }
 
-  function _selectCampaign(id, name) {
+  function _selectCampaign(id, name, platform) {
     _currentCampaignId   = id;
     _currentCampaignName = name || '';
     localStorage.setItem('umoh:campaign_id',   id);
     localStorage.setItem('umoh:campaign_name', _currentCampaignName);
     _setSelectedUI(id);
+    // Actualizar el trigger del dropdown con la selección
+    _updateCampaignsTrigger(id, _currentCampaignName, platform);
+    // Cerrar el panel del dropdown
+    const trigger = document.getElementById('sb-campaigns-trigger');
+    const panel   = document.getElementById('sb-campaigns-panel');
+    if (trigger) { trigger.classList.remove('is-open'); trigger.setAttribute('aria-expanded', 'false'); }
+    if (panel)   panel.classList.remove('is-open');
+
     refreshDashboard(_currentSection, _currentPeriod);
-    // En mobile: cerrar el drawer al seleccionar campaña
     _closeMobileDrawer();
   }
 
@@ -1123,9 +1134,10 @@ function initCampaignSelector() {
   list.addEventListener('click', e => {
     const item = e.target.closest('.sb-campaign-item');
     if (!item) return;
-    const id   = item.dataset.campaignId;
-    const name = item.dataset.campaignName || item.querySelector('.sb-campaign-name')?.textContent || '';
-    _selectCampaign(id, name);
+    const id       = item.dataset.campaignId;
+    const name     = item.dataset.campaignName || item.querySelector('.sb-campaign-name')?.textContent || '';
+    const platform = item.dataset.platform || '';
+    _selectCampaign(id, name, platform);
   });
 
   // Búsqueda: filtra las opciones en tiempo real
@@ -1152,8 +1164,11 @@ function initCampaignSelector() {
         item.type = 'button';
         item.dataset.campaignId   = c.id;
         item.dataset.campaignName = c.name;
+        // Incluir plataforma si el backend la provee — fallback a 'google_ads'
+        item.dataset.platform = c.platform || 'google_ads';
         item.setAttribute('role', 'option');
         item.setAttribute('aria-selected', 'false');
+        const platformLabel = _platformLabel(c.platform || 'google_ads');
         item.innerHTML = `
           <svg class="sb-campaign-icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
             <circle cx="12" cy="12" r="10"/>
@@ -1162,9 +1177,8 @@ function initCampaignSelector() {
           </svg>
           <div class="sb-campaign-info sb-label">
             <span class="sb-campaign-name">${_escape(c.name)}</span>
-            <span class="sb-campaign-id">ID ${_escape(c.id)}</span>
+            <span class="sb-campaign-id">${_escape(c.id)} · ${_escape(platformLabel)}</span>
           </div>
-          <span class="sb-campaign-dot" aria-hidden="true"></span>
         `;
         list.appendChild(item);
       });
@@ -1180,6 +1194,8 @@ function initCampaignSelector() {
         } else {
           _currentCampaignName = found.name;
           localStorage.setItem('umoh:campaign_name', found.name);
+          // Actualizar el trigger con los datos completos
+          _updateCampaignsTrigger(_currentCampaignId, found.name, found.platform || 'google_ads');
         }
       }
       _setSelectedUI(_currentCampaignId);
@@ -1199,6 +1215,7 @@ function _escape(s) {
 /* ── Bootstrap ──────────────────────────────────────────── */
 document.addEventListener('DOMContentLoaded', () => {
   initTheme();
+  _syncThemeLabel();
   initSidebar();
   initUserMenu();
   initFilters();
@@ -1206,8 +1223,8 @@ document.addEventListener('DOMContentLoaded', () => {
   initScrollNavBehavior();
   initCampaignSelector();
 
-  // La sección activa al cargar es "performance" (el HTML tiene active en
-  // ese section). El sidebar nav-item "performance" también tiene .active.
-  // Cargamos los datos de Performance como primera sección.
+  // Sincronizar el trigger de secciones con la sección activa al cargar
+  _updateSectionsTrigger(_currentSection);
+
   refreshDashboard(_currentSection, _currentPeriod);
 });

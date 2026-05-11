@@ -3578,6 +3578,11 @@ body.sidebar-collapsed .sb-campaign-item.active .sb-campaign-dot {
   display: block;
 }
 
+/* Dot en el trigger del dropdown de campañas — visible en colapsado cuando hay campaña específica activa */
+body.sidebar-collapsed #sb-campaigns-trigger.has-campaign .sb-campaign-dot {
+  display: block;
+}
+
 /* ── Navegación de secciones ─────────────────────────────────── */
 .sb-nav-list {
   display:        flex;
@@ -4603,8 +4608,29 @@ body.sidebar-layout .dashboard-nav {
 
 /* Avatar grande en el menú de usuario */
 .user-menu-avatar-lg .sb-user-avatar-initial {
-  font-size:  20px;
+  font-size:   20px;
   font-weight: 700;
+}
+
+/* Variante lg del avatar (dentro del dropdown expandido) */
+.sb-user-avatar--lg {
+  width:  40px;
+  height: 40px;
+  border-radius: 50%;
+  border: 2px solid var(--border-subtle);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  padding: 0;
+  background: rgba(255, 0, 64, 0.10);
+}
+
+/* ── Sección del tema (contenedor encima del perfil) ────────── */
+.sb-theme-section {
+  border-top:  1px solid var(--border-subtle);
+  padding:     var(--sp-2) var(--sp-3);
+  flex-shrink: 0;
 }
 
 /* ── Theme toggle en sidebar (punto 8) ──────────────────────── */
@@ -4658,13 +4684,7 @@ body.sidebar-layout .dashboard-nav {
   padding-top: var(--sp-1);
 }
 
-/* ── sb-user dentro del sidebar layout: sin posición relativa rota ─ */
-.sb-user > div {
-  position: static !important;
-}
-
-/* El dropdown sale hacia arriba gracias a position:absolute bottom:100% */
-/* Pero necesita un ancestor con position:relative */
+/* El dropdown sale hacia arriba — necesita ancestor position:relative */
 .sb-user {
   position: relative;
 }
