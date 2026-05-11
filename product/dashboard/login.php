@@ -17,7 +17,7 @@ if (!empty($_SESSION['umoh_user'])) {
 $error = '';
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-    $username = trim($_POST['username'] ?? '');
+    $username = strtolower(trim($_POST['username'] ?? ''));
     $password = $_POST['password'] ?? '';
 
     $creds_file = __DIR__ . '/config/credentials.php';
@@ -25,8 +25,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $error = 'Sistema no configurado. Contactá al equipo UMOH.';
     } else {
         require $creds_file;
-        if (isset(UMOH_USERS[$username])) {
-            $user = UMOH_USERS[$username];
+        // Lookup case-insensitive: el usuario puede tipear "Admin" o "ADMIN" y resuelve igual
+        $users_lower = array_change_key_case(UMOH_USERS, CASE_LOWER);
+        if (isset($users_lower[$username])) {
+            $user = $users_lower[$username];
             if (password_verify($password, $user['password_hash'])) {
                 $_SESSION['umoh_user']    = $username;
                 $_SESSION['umoh_role']    = $user['role'];
