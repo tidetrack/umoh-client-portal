@@ -11,19 +11,23 @@ El diferencial no es mostrar métricas de ads — es conectar el funnel completo
 ## Arquitectura
 
 ```
-Browser → filters.js → api.js
-                          ├─ USE_MOCK=true  → mockdata.js → charts.js
-                          └─ USE_MOCK=false → PHP endpoint → API externa → charts.js
+Browser → sidebar.js + filters.js → api.js
+                                        ├─ USE_MOCK=true  → mockdata.js → charts.js
+                                        └─ USE_MOCK=false → PHP endpoints → Supabase → charts.js
+                                                                           ↘ Google Sheets (espejo cliente)
 ```
 
 **Stack:**
 - Frontend: HTML + CSS + Vanilla JS (sin frameworks — Hostinger shared hosting)
-- Backend: PHP 8.3 (middleware entre el frontend y las APIs externas)
-- Base de datos: MySQL en Hostinger (auth de usuarios + config de clientes)
+- Backend: PHP 8.3 (middleware entre el frontend y Supabase)
+- Base de datos principal: Supabase (Postgres) — 15 migraciones aplicadas, 8+ tablas, multi-tenant
+- Base de datos auth (futura): MySQL en Hostinger — no en uso activo (PHASE1_BYPASS activo)
 - Charts: Chart.js 4 (CDN)
 - Maps: Leaflet.js 1.9 (CDN)
-- APIs externas: Google Ads API, Meta Marketing API, MeisterTask API (Fase 2+)
-- Pipeline de extracción: Python + GitHub Actions (extrae datos, los escribe en Google Sheets, PHP los lee desde ahí)
+- APIs externas: Google Ads API (activa), Meta Marketing API (extractor creado), MeisterTask (via CSV)
+- Pipeline de extracción: Python + GitHub Actions → Supabase + Google Sheets espejo
+- MCC Google Ads: `865-936-8705`
+- Service Account Sheets: `umoh-sheets-writer@eco-league-466000-d2.iam.gserviceaccount.com`
 
 **Hosting:** Hostinger shared hosting. Sin Docker, sin Node, sin Composer. PHP puro.
 
@@ -182,15 +186,21 @@ reporting:
 
 ## Estado del proyecto
 
+Ver `docs/estado-del-proyecto.md` para el estado detallado y actualizado. Este archivo es la fuente de verdad del estado actual.
+
+Resumen al 2026-05-11:
+
 | Fase | Estado | Descripción |
 |------|--------|-------------|
-| 1 | Completa | Dashboard frontend con mock data, esqueleto PHP con TODOs |
-| 2 | Pendiente | Conectar Google Ads API (extractor Python + endpoints PHP TOFU) |
-| 3 | Pendiente | Conectar Meta API |
-| 4 | Pendiente | Login + MySQL auth por subdominio |
-| 5 | Pendiente | MeisterTask API para MOFU automático |
+| 1 | En producción (MVP parcial) | Dashboard en `prepagas.umohcrew.com`. TOFU + MOFU validados. BOFU y SUMMARY pendientes de validación. |
+| 2 | Parcial | Google Ads en producción. Meta Ads extractor creado pero sin integrar. |
+| 3 | Parcial | MeisterTask via CSV manual funciona. API directa no implementada. |
+| 4 | Pendiente | `PHASE1_BYPASS = true` activo — login page existe, auth no activada. |
+| 5 | Parcial | Tabla `ai_summaries` en Supabase. Llamada a Claude API pendiente. |
 
-**Próximo paso concreto antes de empezar Fase 2:** obtener el Developer Token de Google Ads API (se solicita desde el MCC en Google Ads → Herramientas → API Center). El proceso de aprobación puede tardar días — solicitarlo ahora.
+**Stack real:** PHP 8.3 + Supabase (Postgres, 15 migraciones) + Python pipeline + Google Sheets espejo. MySQL en Hostinger no se usa actualmente (reemplazado por Supabase).
+
+**Próximos pasos:** Validar BOFU/SUMMARY → resolver canal/dispositivo en cero → Node.js 24 → entregar al cliente.
 
 ---
 

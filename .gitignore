@@ -52,3 +52,16 @@ Thumbs.db
 
 # Logs
 *.log
+
+# Docs internas (operativa privada — no va al repo)
+docs-internal/
+
+# MCP config local (entorno de desarrollo, no del repo)
+.mcp.json
+
+# Supabase temp/local
+supabase/.temp/
+
+# MeisterTask — data de cliente (CSVs exports). El template JSON sí va al repo.
+Meistertask/**/*.csv
+Meistertask/*.csv
