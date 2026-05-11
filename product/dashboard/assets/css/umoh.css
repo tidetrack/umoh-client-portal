@@ -3433,6 +3433,17 @@ body.sidebar-collapsed .sb-collapse-btn svg {
   transform: rotate(180deg);
 }
 
+/* Sidebar colapsado: el header pierde el brand y el botón queda solo —
+   centrarlo horizontalmente en el ancho colapsado. */
+body.sidebar-collapsed .sb-header {
+  justify-content: center;
+  padding-left:  0;
+  padding-right: 0;
+}
+body.sidebar-collapsed .sb-brand {
+  display: none;
+}
+
 /* ── Sidebar scrollable body ─────────────────────────────────── */
 .sb-body {
   flex:            1;
@@ -4261,25 +4272,31 @@ body.sidebar-collapsed .dashboard-content {
   padding-bottom: var(--sp-6);
 }
 
+/* Acceso rápido a sección — botón cuadrado, ícono grande, título + descripción */
 .inicio-quick-card {
   background:    var(--bg-card);
   border:        1px solid var(--border-subtle);
   border-radius: var(--r-lg);
-  padding:       var(--sp-5);
+  padding:       var(--sp-6) var(--sp-5);
   cursor:        pointer;
-  transition:    box-shadow 0.15s, transform 0.15s, border-color 0.15s;
+  transition:    box-shadow 0.18s, transform 0.18s, border-color 0.18s;
   position:      relative;
   overflow:      hidden;
   display:       flex;
   flex-direction: column;
+  align-items:   flex-start;
   gap:           var(--sp-3);
   box-shadow:    var(--shadow-sm);
+  text-align:    left;
+  font:          inherit;
+  color:         inherit;
+  min-height:    180px;
 }
 
 .inicio-quick-card:hover {
   box-shadow:    var(--shadow-md);
-  transform:     translateY(-2px);
-  border-color:  rgba(255,0,64,0.3);
+  transform:     translateY(-3px);
+  border-color:  rgba(255,0,64,0.35);
 }
 
 .inicio-quick-card::before {
@@ -4291,7 +4308,7 @@ body.sidebar-collapsed .dashboard-content {
   height:        3px;
   background:    var(--border-subtle);
   border-radius: var(--r-lg) var(--r-lg) 0 0;
-  transition:    background 0.15s;
+  transition:    background 0.18s;
 }
 
 .inicio-quick-card:hover::before {
@@ -4299,8 +4316,8 @@ body.sidebar-collapsed .dashboard-content {
 }
 
 .inicio-quick-icon {
-  width:           36px;
-  height:          36px;
+  width:           48px;
+  height:          48px;
   background:      rgba(255,0,64,0.08);
   border-radius:   var(--r-md);
   display:         flex;
@@ -4308,50 +4325,25 @@ body.sidebar-collapsed .dashboard-content {
   justify-content: center;
   color:           var(--umoh-accent);
   flex-shrink:     0;
+  font-size:       28px;
+  font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 28;
 }
 
-.inicio-quick-section-name {
-  font-size:   11px;
-  font-weight: 700;
-  letter-spacing: 0.07em;
-  text-transform: uppercase;
-  color:       var(--text-muted);
+.inicio-quick-title {
+  font-family: 'Outfit', sans-serif;
+  font-size:   22px;
+  font-weight: 800;
+  color:       var(--text-primary);
+  letter-spacing: -0.02em;
+  line-height: 1.1;
 }
 
-.inicio-quick-kpi-label {
-  font-size:  11.5px;
-  color:      var(--text-secondary);
-  font-weight: 500;
+.inicio-quick-desc {
+  font-size:  13px;
+  color:      var(--text-muted);
+  line-height: 1.4;
+  margin-top: auto;
 }
-
-.inicio-quick-kpi-value {
-  font-size:      22px;
-  font-weight:    700;
-  color:          var(--text-primary);
-  letter-spacing: -0.4px;
-  font-variant-numeric: tabular-nums;
-  line-height:    1.1;
-}
-
-.inicio-quick-delta {
-  font-size:   12px;
-  font-weight: 600;
-}
-
-.inicio-quick-delta--good { color: #22C55E; }
-.inicio-quick-delta--bad  { color: var(--umoh-accent); }
-.inicio-quick-delta--flat { color: var(--text-muted); }
-
-/* Skeleton para quick cards */
-.inicio-quick-card.iq-skeleton .iq-sk-val,
-.inicio-quick-card.iq-skeleton .iq-sk-label {
-  background:    var(--border-subtle);
-  border-radius: var(--r-sm);
-  animation:     skeletonPulse 1.6s ease infinite;
-}
-
-.inicio-quick-card.iq-skeleton .iq-sk-val   { height: 28px; width: 80px; }
-.inicio-quick-card.iq-skeleton .iq-sk-label { height: 12px; width: 50px; margin-top: 4px; }
 
 /* Responsive quick-grid */
 @media (max-width: 900px) {

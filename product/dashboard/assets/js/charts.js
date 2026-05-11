@@ -1928,160 +1928,29 @@ function renderSparklines(data) {
 /* ── Sección Inicio ──────────────────────────────────────── */
 
 /**
- * renderInicio(data) — Renderiza la sección "Inicio" con resumen AI y
- * cards de acceso rápido a las 4 secciones del dashboard.
+ * renderInicio(data) — sección "Inicio" simplificada: saludo + 4 accesos
+ * rápidos a las secciones del funnel (Performance / Awareness / Interest / Sales).
  *
- * @param {Object} data  Respuesta de GET /api/inicio o MOCK_DATA.inicio[period]
- *   {
- *     user_name:    string,
- *     period_label: string,
- *     ai_summary:   { headline, highlights[], recommendation, generated_by },
- *     section_kpis: { performance, tofu, mofu, bofu } — cada uno { label, value, delta_pct }
- *   }
+ * Las cards están en el HTML estático con data-target. Acá solo bindeamos
+ * el click una vez (idempotente) para navegar a la sección correspondiente.
  */
 function renderInicio(data) {
-  if (!data) return;
-
-  /* ── Resumen AI ────────────────────────────────────── */
-  const skeleton = document.getElementById('inicio-ai-skeleton');
-  const content  = document.getElementById('inicio-ai-content');
-  const headline = document.getElementById('inicio-ai-headline');
-  const hlList   = document.getElementById('inicio-ai-highlights');
-  const rec      = document.getElementById('inicio-ai-recommendation');
-
-  if (skeleton) skeleton.style.display = 'none';
-
-  const ai    = data.ai_summary || {};
-  const empty = document.getElementById('inicio-ai-empty');
-
-  const hasAiData = ai.headline || (Array.isArray(ai.highlights) && ai.highlights.length > 0);
-
-  if (!hasAiData) {
-    /* Mostrar placeholder cuando no hay datos de campaña */
-    if (empty)   empty.removeAttribute('hidden');
-    if (content) content.setAttribute('hidden', '');
-  } else {
-    if (empty) empty.setAttribute('hidden', '');
-
-    if (headline) headline.textContent = ai.headline || '';
-
-    if (hlList && Array.isArray(ai.highlights)) {
-      hlList.innerHTML = '';
-      ai.highlights.forEach(h => {
-        const li = document.createElement('li');
-        li.textContent = h;
-        hlList.appendChild(li);
-      });
-    }
-
-    if (rec) rec.textContent = ai.recommendation || '';
-    if (content) content.removeAttribute('hidden');
-
-    // Timestamp de generación
-    const tsEl = document.getElementById('inicio-ai-timestamp');
-    if (tsEl) {
-      const generatedAt = ai.generated_at || null;
-      if (generatedAt) {
-        const d = new Date(generatedAt);
-        tsEl.textContent = 'Última actualización: ' + d.toLocaleString('es-AR', { day:'2-digit', month:'short', year:'numeric', hour:'2-digit', minute:'2-digit' });
-      } else {
-        // Resumen generado on-the-fly: marcar como "ahora"
-        tsEl.textContent = 'Generado: ahora';
-      }
-    }
+  // Saludo personalizado si el endpoint o session lo trae
+  const nameEl = document.getElementById('inicio-user-name');
+  if (nameEl) {
+    const n = (data && data.user_name) || window.DASHBOARD_USERNAME || 'Franco';
+    nameEl.textContent = n;
   }
 
-  /* ── Botón Regenerar análisis ────────────────────────── */
-  // El resumen lo genera el script local `scripts/run_inicio_summary.py`.
-  // El botón abre un modal con el comando exacto para copiar y pegar en terminal.
-  // Una vez corrido el script, el próximo load del dashboard levanta el cache de Supabase.
-  const refreshBtn = document.getElementById('inicio-ai-refresh-btn');
-  if (refreshBtn) {
-    // Evitar duplicar el listener si renderInicio se llama más de una vez
-    if (!refreshBtn._umohRefreshBound) {
-      refreshBtn._umohRefreshBound = true;
-      refreshBtn.addEventListener('click', () => {
-        if (typeof window._openRegenModal === 'function') {
-          window._openRegenModal(_currentPeriod || '30d');
-        }
-      });
-    }
-  }
-
-  /* ── Quick access cards ─────────────────────────────── */
-  const grid = document.getElementById('inicio-quick-grid');
-  if (!grid) return;
-
-  const kpis = data.section_kpis || {};
-
-  const SECTIONS = [
-    {
-      key:   'performance',
-      label: 'Performance',
-      icon:  `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="18" y="3" width="4" height="18"/><rect x="10" y="8" width="4" height="13"/><rect x="2" y="13" width="4" height="8"/></svg>`,
-    },
-    {
-      key:   'tofu',
-      label: 'Awareness',
-      icon:  `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/><path d="M15.54 8.46a5 5 0 0 1 0 7.07"/><path d="M19.07 4.93a10 10 0 0 1 0 14.14"/></svg>`,
-    },
-    {
-      key:   'mofu',
-      label: 'Interest',
-      icon:  `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>`,
-    },
-    {
-      key:   'bofu',
-      label: 'Sales',
-      icon:  `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="2" y="7" width="20" height="14" rx="2" ry="2"/><path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16"/></svg>`,
-    },
-  ];
-
-  grid.innerHTML = '';
-
-  SECTIONS.forEach(sec => {
-    const kpi    = kpis[sec.key] || {};
-    const delta  = kpi.delta_pct || 0;
-
-    // Mostrar '—' si el valor es nulo, vacío, cero literal o cero formateado
-    const _isZeroish = v => !v || v === '0' || v === '$0' || v === '0k' || v === '$0k' || v === '0.0x' || v === '—';
-    const displayValue = _isZeroish(kpi.value) ? '—' : kpi.value;
-
-    const deltaClass = delta > 0 ? 'inicio-quick-delta--good'
-                     : delta < 0 ? 'inicio-quick-delta--bad'
-                     : 'inicio-quick-delta--flat';
-    const deltaSign  = delta > 0 ? '+' : '';
-    const deltaText  = delta !== 0 ? `${deltaSign}${delta}% vs período anterior` : 'sin variación';
-
-    const card = document.createElement('div');
-    card.className = 'inicio-quick-card';
-    card.setAttribute('role', 'button');
-    card.setAttribute('tabindex', '0');
-    card.setAttribute('aria-label', `Ir a ${sec.label}`);
-    card.dataset.section = sec.key;
-
-    card.innerHTML = `
-      <div class="inicio-quick-icon">${sec.icon}</div>
-      <span class="inicio-quick-section-name">${sec.label}</span>
-      <div>
-        <div class="inicio-quick-kpi-label">${kpi.label || '—'}</div>
-        <div class="inicio-quick-kpi-value">${displayValue}</div>
-      </div>
-      <span class="inicio-quick-delta ${deltaClass}">${deltaText}</span>
-    `;
-
-    // Navegar a la sección al hacer click o Enter/Space
-    function _goToSection() {
-      const navItem = document.querySelector(`.sb-nav-item[data-section="${sec.key}"]`);
+  // Click handlers en los 4 accesos rápidos (una sola vez)
+  document.querySelectorAll('.inicio-quick-card[data-target]').forEach(card => {
+    if (card._umohQuickBound) return;
+    card._umohQuickBound = true;
+    card.addEventListener('click', () => {
+      const target = card.dataset.target;
+      const navItem = document.querySelector(`.sb-nav-item[data-section="${target}"]`);
       if (navItem) navItem.click();
-    }
-
-    card.addEventListener('click', _goToSection);
-    card.addEventListener('keydown', e => {
-      if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); _goToSection(); }
     });
-
-    grid.appendChild(card);
   });
 }
 

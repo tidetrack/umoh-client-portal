@@ -313,91 +313,37 @@ $_asset_v = defined('ASSET_VERSION') ? ASSET_VERSION : filemtime(__DIR__ . '/ass
 
       <!-- Header con saludo -->
       <div class="inicio-header">
-        <div class="inicio-avatar" aria-hidden="true" id="inicio-avatar">
-          <!-- TODO: cuando tengamos roles, condicionar avatar admin aquí -->
-          <img src="assets/img/umoh-asterisk-light.png" alt="Avatar" class="avatar-light" style="width:100%;height:100%;object-fit:contain;border-radius:0;">
-          <img src="assets/img/umoh-asterisk-dark.png"  alt="Avatar" class="avatar-dark"  style="width:100%;height:100%;object-fit:contain;border-radius:0;">
-        </div>
         <div class="inicio-greeting-block">
           <h1 class="inicio-saludo">Hola, <span id="inicio-user-name">Franco</span></h1>
-          <p class="inicio-subtitle" id="inicio-subtitle">Esto es lo que pasó con tus campañas en los últimos 30 días</p>
+          <p class="inicio-subtitle">Elegí una sección para ver el detalle</p>
         </div>
       </div>
 
-      <!-- Resumen AI -->
-      <div class="inicio-ai-card" id="inicio-ai-card">
-        <div class="inicio-ai-header">
-          <span class="inicio-ai-badge">
-            <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-              <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/>
-            </svg>
-            Análisis IA
-          </span>
-          <button class="inicio-ai-refresh-btn" id="inicio-ai-refresh-btn" type="button" title="Regenerar análisis" aria-label="Regenerar análisis">
-            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-              <polyline points="23 4 23 10 17 10"/>
-              <polyline points="1 20 1 14 7 14"/>
-              <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/>
-            </svg>
-            Regenerar
-          </button>
-        </div>
-        <!-- Skeleton mientras carga -->
-        <div class="inicio-ai-skeleton" id="inicio-ai-skeleton">
-          <div class="sk-line sk-line--title"></div>
-          <div class="sk-line sk-line--long"></div>
-          <div class="sk-line sk-line--medium"></div>
-          <div class="sk-line sk-line--long"></div>
-          <div class="sk-line sk-line--short"></div>
-        </div>
-        <!-- Placeholder cuando no hay datos -->
-        <div id="inicio-ai-empty" class="inicio-ai-empty" hidden>
-          <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="var(--text-muted)" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-            <rect x="2" y="7" width="20" height="14" rx="2" ry="2"/>
-            <path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16"/>
-          </svg>
-          <p class="inicio-ai-empty-text">Sin campañas activas</p>
-          <p class="inicio-ai-empty-sub">Los datos aparecerán aquí una vez que el pipeline esté conectado.</p>
-        </div>
-        <!-- Contenido real (oculto hasta que carga) -->
-        <div id="inicio-ai-content" hidden>
-          <p class="inicio-ai-headline" id="inicio-ai-headline"></p>
-          <ul class="inicio-ai-highlights" id="inicio-ai-highlights"></ul>
-          <div class="inicio-ai-recommendation">
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--umoh-accent)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink:0;margin-top:2px;" aria-hidden="true">
-              <circle cx="12" cy="12" r="10"/>
-              <line x1="12" y1="8" x2="12" y2="12"/>
-              <line x1="12" y1="16" x2="12.01" y2="16"/>
-            </svg>
-            <p id="inicio-ai-recommendation"></p>
-          </div>
-          <p class="inicio-ai-timestamp" id="inicio-ai-timestamp" aria-live="polite"></p>
-        </div>
-      </div>
+      <!-- Accesos rápidos a las 4 secciones del funnel -->
+      <div class="inicio-quick-grid">
+        <button type="button" class="inicio-quick-card" data-target="performance">
+          <span class="inicio-quick-icon material-symbols-outlined">bar_chart_4_bars</span>
+          <span class="inicio-quick-title">Performance</span>
+          <span class="inicio-quick-desc">Resumen comercial y KPIs principales</span>
+        </button>
 
-      <!-- Cards de acceso rápido (generadas dinámicamente por renderInicio) -->
-      <!-- Los 4 skeletons iniciales dan feedback visual mientras carga el endpoint -->
-      <div class="inicio-quick-grid" id="inicio-quick-grid">
-        <div class="inicio-quick-card iq-skeleton" aria-hidden="true">
-          <div class="inicio-quick-icon"></div>
-          <span class="inicio-quick-section-name iq-sk-label"></span>
-          <div><div class="iq-sk-val"></div><div class="iq-sk-label"></div></div>
-        </div>
-        <div class="inicio-quick-card iq-skeleton" aria-hidden="true">
-          <div class="inicio-quick-icon"></div>
-          <span class="inicio-quick-section-name iq-sk-label"></span>
-          <div><div class="iq-sk-val"></div><div class="iq-sk-label"></div></div>
-        </div>
-        <div class="inicio-quick-card iq-skeleton" aria-hidden="true">
-          <div class="inicio-quick-icon"></div>
-          <span class="inicio-quick-section-name iq-sk-label"></span>
-          <div><div class="iq-sk-val"></div><div class="iq-sk-label"></div></div>
-        </div>
-        <div class="inicio-quick-card iq-skeleton" aria-hidden="true">
-          <div class="inicio-quick-icon"></div>
-          <span class="inicio-quick-section-name iq-sk-label"></span>
-          <div><div class="iq-sk-val"></div><div class="iq-sk-label"></div></div>
-        </div>
+        <button type="button" class="inicio-quick-card" data-target="tofu">
+          <span class="inicio-quick-icon material-symbols-outlined">visibility</span>
+          <span class="inicio-quick-title">Awareness</span>
+          <span class="inicio-quick-desc">Top of Funnel — impresiones y alcance</span>
+        </button>
+
+        <button type="button" class="inicio-quick-card" data-target="mofu">
+          <span class="inicio-quick-icon material-symbols-outlined">psychology_alt</span>
+          <span class="inicio-quick-title">Interest</span>
+          <span class="inicio-quick-desc">Middle of Funnel — leads y journey</span>
+        </button>
+
+        <button type="button" class="inicio-quick-card" data-target="bofu">
+          <span class="inicio-quick-icon material-symbols-outlined">add_shopping_cart</span>
+          <span class="inicio-quick-title">Sales</span>
+          <span class="inicio-quick-desc">Bottom of Funnel — ventas e ingresos</span>
+        </button>
       </div>
 
     </section>
