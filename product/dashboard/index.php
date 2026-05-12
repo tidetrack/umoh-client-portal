@@ -354,7 +354,8 @@ $_asset_v = defined('ASSET_VERSION') ? ASSET_VERSION : filemtime(__DIR__ . '/ass
     <section id="section-performance" class="dashboard-section" aria-label="Performance">
 
       <div class="section-header">
-        <h2 class="section-title">Performance</h2>
+        <h2 class="section-title--hero">Performance</h2>
+        <p class="section-title--sub">Resumen Comercial</p>
         <p class="section-subtitle">Resumen general de inversión y resultados del período seleccionado</p>
       </div>
 

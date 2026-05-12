@@ -68,12 +68,12 @@
 /* ── Dark Mode overrides ────────────────────────────────────── */
 [data-theme="dark"] {
   --bg-page: #0F1724;
-  /* Cards en gris azulado medio (#2D3748 = slate-700) — sube contraste con
-     el texto sin perder la sensación de modo oscuro. --bg-page queda más
-     oscuro para que las cards "se levanten". Texto e iconos también suben
-     un escalón para que la jerarquía visual se mantenga. */
-  --bg-card: #2D3748;
-  --bg-card-header: #252E3D;
+  /* Cards en gris azulado (#374151 = slate-600) — un toque más claras para
+     mejor contraste. --bg-page queda mucho más oscuro para que las cards
+     "se levanten" visualmente. Texto e iconos también suben un escalón
+     para mantener la jerarquía. */
+  --bg-card: #374151;
+  --bg-card-header: #2D3748;
   --bg-header: #0A1018;
   --bg-nav: #111827;
   --border-subtle: rgba(255, 255, 255, 0.16);
