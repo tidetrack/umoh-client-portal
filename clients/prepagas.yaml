@@ -46,14 +46,9 @@ reporting:
 # Cada run del pipeline sincroniza este bloque a la DB (sync con soft-delete).
 # Para reclasificar una sección: editar acá, el siguiente run actualiza la vista.
 funnel_stages:
-  - section: "Inbox"
-    stage: mofu
-    high_intent: false
-    closed_won: false
-    typified: false
-    lost: false
-    incubating: false
-    order: 1
+  # Columnas activas del proyecto MeisterTask al 2026-05-12.
+  # Columnas eliminadas (Inbox, Prioritarios, Para Hoy, Procesando) quedan
+  # con is_active=false en Supabase (soft-delete automático en cada sync).
   - section: "Nuevo"
     stage: mofu
     high_intent: false
@@ -61,31 +56,7 @@ funnel_stages:
     typified: false
     lost: false
     incubating: false
-    order: 2
-  - section: "Prioritarios"
-    stage: mofu
-    high_intent: true
-    closed_won: false
-    typified: true
-    lost: false
-    incubating: false
-    order: 3
-  - section: "Para Hoy"
-    stage: mofu
-    high_intent: false
-    closed_won: false
-    typified: true
-    lost: false
-    incubating: false
-    order: 4
-  - section: "Procesando"
-    stage: mofu
-    high_intent: false
-    closed_won: false
-    typified: true
-    lost: false
-    incubating: false
-    order: 5
+    order: 1
   - section: "Contactados"
     stage: mofu
     high_intent: false
@@ -93,7 +64,7 @@ funnel_stages:
     typified: true
     lost: false
     incubating: false
-    order: 6
+    order: 2
   - section: "Cotizados"
     stage: mofu
     high_intent: true
@@ -101,15 +72,17 @@ funnel_stages:
     typified: true
     lost: false
     incubating: false
-    order: 7
+    order: 3
   - section: "En Auditoria"
+    # Nombre exacto en la tabla Supabase (sin tilde) — coincide con el CSV.
+    # MeisterTask UI muestra "En auditoría" con tilde pero el CSV exporta sin ella.
     stage: mofu
     high_intent: true
     closed_won: false
     typified: true
     lost: false
     incubating: false
-    order: 8
+    order: 4
   - section: "Mes que viene"
     stage: mofu
     high_intent: false
@@ -117,7 +90,7 @@ funnel_stages:
     typified: true
     lost: false
     incubating: true
-    order: 9
+    order: 5
   - section: "A futuro"
     stage: mofu
     high_intent: false
@@ -125,7 +98,7 @@ funnel_stages:
     typified: true
     lost: false
     incubating: true
-    order: 10
+    order: 6
   - section: "Ventas Ganadas"
     stage: bofu
     high_intent: false
@@ -133,15 +106,7 @@ funnel_stages:
     typified: true
     lost: false
     incubating: false
-    order: 11
-  - section: "No prospera"
-    stage: mofu
-    high_intent: false
-    closed_won: false
-    typified: true
-    lost: true
-    incubating: false
-    order: 12
+    order: 7
   - section: "Erroneos"
     stage: excluded
     high_intent: false
@@ -149,15 +114,25 @@ funnel_stages:
     typified: false
     lost: false
     incubating: false
-    order: 13
-  - section: "Tareas Finalizadas"
-    stage: excluded
+    order: 8
+  - section: "No prospera"
+    stage: mofu
     high_intent: false
     closed_won: false
-    typified: false
+    typified: true
+    lost: true
+    incubating: false
+    order: 9
+  - section: "Tareas Finalizadas"
+    # Visible en dashboard como etapa final (Franco: "no se contabilizan" era el bug).
+    # stage=mofu para que aparezca en la vista MOFU; lost=false, closed_won=false.
+    stage: mofu
+    high_intent: false
+    closed_won: false
+    typified: true
     lost: false
     incubating: false
-    order: 14
+    order: 10
 
 # Mapping asesor → email para el envío semanal de update_requirements.
 # Placeholder: setup SMTP postergado (memo: project_email_smtp_backlog).

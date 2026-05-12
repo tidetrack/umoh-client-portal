@@ -2971,6 +2971,31 @@ body.nav-hidden .nav-fab {
   font-weight: 600;
 }
 
+/* ── Sales List Table — badges de completitud (Frente 5) ───── */
+.sales-complete-badge {
+  display: inline-block;
+  padding: 2px 8px;
+  border-radius: 10px;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  background: rgba(72, 199, 142, 0.12);
+  color: #2da76b;
+}
+[data-theme="dark"] .sales-complete-badge { color: #6dd9a4; }
+
+.sales-missing-tag {
+  display: inline-block;
+  padding: 2px 7px;
+  border-radius: 10px;
+  font-size: 11px;
+  font-weight: 500;
+  background: rgba(255, 82, 82, 0.10);
+  color: #c0392b;
+  margin-right: 3px;
+}
+[data-theme="dark"] .sales-missing-tag { color: #ff7675; background: rgba(255, 118, 117, 0.12); }
+
 /* ── Lead Detail Modal (F.4.d) ─────────────────────────────── */
 
 /* Reutiliza .kpi-modal-overlay y .kpi-modal — solo extiende con .lead-modal */

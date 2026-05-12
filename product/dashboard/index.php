@@ -826,6 +826,49 @@ $_asset_v = defined('ASSET_VERSION') ? ASSET_VERSION : filemtime(__DIR__ . '/ass
         </div>
       </div>
 
+      <!-- ── Ventas Ganadas como tareas ─────────────────────────── -->
+      <div class="charts-grid charts-grid--full">
+        <div class="chart-card">
+          <div class="chart-card-header">
+            <h3 class="chart-title">Ventas Ganadas — detalle por operación</h3>
+            <span class="chart-badge" id="sales-list-count">0 ventas</span>
+          </div>
+          <div class="chart-card-body" style="padding: var(--sp-4);">
+            <!-- Filtros client-side -->
+            <div class="sales-list-filters" style="display:flex; gap: var(--sp-3); margin-bottom: var(--sp-4); flex-wrap: wrap; align-items: center;">
+              <div style="display:flex; align-items:center; gap:var(--sp-2);">
+                <label for="sales-list-filter-seller" style="font-size:0.8rem; color:var(--color-muted); white-space:nowrap;">Vendedor</label>
+                <select id="sales-list-filter-seller" class="period-select" style="font-size:0.8rem; padding:var(--sp-1) var(--sp-2); min-width:140px;">
+                  <option value="">Todos</option>
+                </select>
+              </div>
+              <div style="display:flex; align-items:center; gap:var(--sp-2);">
+                <label for="sales-list-filter-complete" style="font-size:0.8rem; color:var(--color-muted); white-space:nowrap;">Estado</label>
+                <select id="sales-list-filter-complete" class="period-select" style="font-size:0.8rem; padding:var(--sp-1) var(--sp-2); min-width:160px;">
+                  <option value="">Todos</option>
+                  <option value="incomplete">Solo incompletos</option>
+                  <option value="complete">Solo completos</option>
+                </select>
+              </div>
+            </div>
+            <table class="pending-table" id="sales-list-table">
+              <thead>
+                <tr>
+                  <th>Lead</th>
+                  <th>Asesor</th>
+                  <th class="th-num">Fecha cierre</th>
+                  <th class="th-num">Precio final</th>
+                  <th class="th-num">Cápitas</th>
+                  <th>Plan</th>
+                  <th>Faltante</th>
+                </tr>
+              </thead>
+              <tbody id="sales-list-body"></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
     </section>
 
   </main>
