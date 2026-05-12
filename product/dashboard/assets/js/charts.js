@@ -1611,6 +1611,9 @@ function renderBofu(data) {
 
   /* Pending price table — ventas marcadas cerradas pero sin monto cargado */
   _renderPendingPriceTable(data.pending_price || []);
+
+  /* Sales list table — Ventas Ganadas como tareas con detalle por operación */
+  if (data.sales_list) _renderSalesListTable(data.sales_list);
 }
 
 /* Registry de filas pendientes para el modal de detalle de lead.
@@ -1680,6 +1683,112 @@ function _renderPendingPriceTable(rows) {
   };
 }
 
+/* ── Tabla "Ventas Ganadas — detalle por operación" (Frente 5) ─── */
+
+/** Almacén de filas de sales_list para reutilizar en filtros client-side. */
+let _salesListRows = [];
+
+/**
+ * Renderiza la tabla de ventas ganadas con filtros por vendedor y completitud.
+ * Los datos (<100 filas) se mantienen en memoria y se filtran client-side.
+ * @param {object[]} rows - array de ventas desde data.sales_list
+ */
+function _renderSalesListTable(rows) {
+  const tbody = document.getElementById('sales-list-body');
+  const badge = document.getElementById('sales-list-count');
+  if (!tbody) return;
+
+  _salesListRows = rows;
+
+  /* Poblar dropdown de vendedores (deduplica) */
+  const sellerSelect = document.getElementById('sales-list-filter-seller');
+  if (sellerSelect) {
+    const sellers = [...new Set(rows.map(r => r.assignee).filter(Boolean))].sort();
+    sellerSelect.innerHTML = '<option value="">Todos</option>' +
+      sellers.map(s => `<option value="${s}">${s}</option>`).join('');
+
+    sellerSelect.onchange = () => _applySalesListFilters();
+  }
+
+  const completeSelect = document.getElementById('sales-list-filter-complete');
+  if (completeSelect) completeSelect.onchange = () => _applySalesListFilters();
+
+  _applySalesListFilters();
+
+  if (badge) badge.textContent = `${rows.length} venta${rows.length === 1 ? '' : 's'}`;
+}
+
+/**
+ * Aplica los filtros de vendedor y completitud sobre _salesListRows y re-renderiza.
+ */
+function _applySalesListFilters() {
+  const tbody = document.getElementById('sales-list-body');
+  if (!tbody) return;
+
+  const sellerVal   = (document.getElementById('sales-list-filter-seller')?.value || '').trim();
+  const completeVal = document.getElementById('sales-list-filter-complete')?.value || '';
+
+  const filtered = _salesListRows.filter(r => {
+    if (sellerVal && r.assignee !== sellerVal) return false;
+    if (completeVal === 'incomplete' && r.complete) return false;
+    if (completeVal === 'complete'   && !r.complete) return false;
+    return true;
+  });
+
+  if (filtered.length === 0) {
+    tbody.innerHTML = '<tr><td colspan="7" class="pending-empty">Sin ventas para los filtros seleccionados.</td></tr>';
+    return;
+  }
+
+  tbody.innerHTML = filtered.map(r => {
+    const nombre = r.nombre || `#${r.meistertask_id}`;
+    const asesor = r.assignee || '—';
+
+    const closeFmt = r.close_date
+      ? new Date(r.close_date).toLocaleDateString('es-AR', { day: '2-digit', month: '2-digit', year: 'numeric' })
+      : '—';
+
+    const precio = r.precio_final > 0 ? fmtCurrency(r.precio_final) : '<span class="muted">—</span>';
+    const caps   = r.capitas > 0 ? r.capitas : '<span class="muted">—</span>';
+    const plan   = r.plan_code || '<span class="muted">—</span>';
+
+    /* Badge de faltante */
+    let missingBadge;
+    if (r.complete) {
+      missingBadge = '<span class="sales-complete-badge">Completo</span>';
+    } else {
+      const tags = (r.missing || []).map(m => `<span class="sales-missing-tag">${m}</span>`).join(' ');
+      missingBadge = tags || '<span class="muted">—</span>';
+    }
+
+    return `
+      <tr class="pending-row" data-mid="${r.meistertask_id}" style="cursor:pointer" role="button" tabindex="0" aria-label="Ver detalle de ${nombre}">
+        <td class="pending-name">${nombre}</td>
+        <td class="pending-asesor">${asesor}</td>
+        <td class="pending-date th-num">${closeFmt}</td>
+        <td class="pending-date th-num">${precio}</td>
+        <td class="pending-date th-num">${caps}</td>
+        <td class="pending-tip">${plan}</td>
+        <td class="pending-origin">${missingBadge}</td>
+      </tr>
+    `;
+  }).join('');
+
+  /* Click en fila abre el modal de lead (reutiliza el mismo modal de pending_price) */
+  tbody.onclick = function(e) {
+    const tr = e.target.closest('tr.pending-row');
+    if (!tr) return;
+    _openLeadDetailModal(tr.dataset.mid);
+  };
+  tbody.onkeydown = function(e) {
+    if (e.key !== 'Enter' && e.key !== ' ') return;
+    const tr = e.target.closest('tr.pending-row');
+    if (!tr) return;
+    e.preventDefault();
+    _openLeadDetailModal(tr.dataset.mid);
+  };
+}
+
 /* ── Modal de detalle del lead (F.4.d) ──────────────────────── */
 
 /**
@@ -1688,7 +1797,9 @@ function _renderPendingPriceTable(rows) {
  * @param {string|number} mid - meistertask_id del lead
  */
 function _openLeadDetailModal(mid) {
-  const row = _pendingRows.find(r => String(r.meistertask_id) === String(mid));
+  /* Buscar en pending_price primero, luego en sales_list (ambas listas están en memoria) */
+  const row = _pendingRows.find(r => String(r.meistertask_id) === String(mid))
+           || _salesListRows.find(r => String(r.meistertask_id) === String(mid));
   if (!row) return;
 
   const overlay = document.getElementById('lead-detail-modal');

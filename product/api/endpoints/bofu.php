@@ -38,7 +38,7 @@ try {
     $closed = supabase_query('lead_monetary', [
         'client_slug' => 'eq.' . CLIENT_SLUG,
         'is_closed'   => 'eq.true',
-        'select'      => 'meistertask_id,capitas,precio_final,updated_at',
+        'select'      => 'meistertask_id,capitas,precio_final,cuota_mensual,plan_code,data_source,updated_at',
         'limit'       => '5000',
     ]);
 
@@ -307,6 +307,57 @@ try {
     // Ordenar: más recientes primero
     usort($pending_price, fn($a, $b) => strcmp($b['lead_created_at'] ?? '', $a['lead_created_at'] ?? ''));
 
+    // 12. Lista de ventas ganadas para la tabla "Ventas Ganadas como tareas" (Frente 5).
+    //     Une lead_monetary (datos de precio/cápitas) con leads (nombre, asesor, tipificación).
+    //     Incluye badge de "completitud" para que Franco vea qué falta cargar.
+    //     La lista es completa (sin filtro de período) porque sirve para auditoría histórica.
+    $monetary_full = [];
+    foreach ($closed as $c) {
+        $monetary_full[$c['meistertask_id']] = $c;
+    }
+
+    $sales_list = [];
+    foreach ($leads as $l) {
+        $sec = $l['section'] ?? '';
+        if (!isset($closed_won_sections[$sec])) continue;  // Solo sección "Ventas Ganadas"
+
+        $mid = $l['meistertask_id'];
+        $mon = $monetary_full[$mid] ?? null;
+
+        $precio   = $mon ? (float)($mon['precio_final'] ?? 0) : 0.0;
+        $capitas_v = $mon ? ((int)($mon['capitas'] ?? 0)) : 0;
+        $plan     = $mon ? ($mon['plan_code'] ?? null) : null;
+
+        // Badge de completitud: campos faltantes en la venta
+        $missing = [];
+        if ($precio <= 0)    $missing[] = 'Sin precio';
+        if ($capitas_v <= 0) $missing[] = 'Sin cápitas';
+        if (!$plan)          $missing[] = 'Sin plan';
+
+        $sales_list[] = [
+            'meistertask_id'  => $mid,
+            'nombre'          => $l['nombre'] ?? '',
+            'assignee'        => $l['assignee'] ?? '',
+            'tipification'    => $l['tipification'] ?? '',
+            'canal'           => $l['canal'] ?? '',
+            'lead_created_at' => $l['lead_created_at'] ?? null,
+            'close_date'      => $mon ? ($mon['updated_at'] ?? null) : null,
+            'precio_final'    => $precio,
+            'capitas'         => $capitas_v,
+            'plan_code'       => $plan,
+            'is_campaign'     => !empty($l['is_campaign_lead']),
+            'missing'         => $missing,        // array de strings para el badge
+            'complete'        => empty($missing),  // true si precio+capitas+plan están presentes
+        ];
+    }
+
+    // Ordenar: más recientes primero (por fecha de cierre, luego por creación)
+    usort($sales_list, function($a, $b) {
+        $ca = $a['close_date'] ?? $a['lead_created_at'] ?? '';
+        $cb = $b['close_date'] ?? $b['lead_created_at'] ?? '';
+        return strcmp($cb, $ca);
+    });
+
     echo json_encode([
         'total_revenue'         => round($total_revenue, 2),
         'closed_sales'          => $closed_sales,
@@ -322,6 +373,7 @@ try {
         ],
         'sellers'       => $sellers,
         'pending_price' => $pending_price,
+        'sales_list'    => $sales_list,
         'non_campaign' => [
             'closed_sales'   => $nc_sales,
             'total_revenue'  => round($nc_revenue, 2),

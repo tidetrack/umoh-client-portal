@@ -51,9 +51,23 @@ MONEY_PATTERNS = [
     re.compile(r'cotizaci[oó]n:?\s*\$?\s*([\d\.,]+)', re.I),
     re.compile(r'\$\s*([\d\.,]+)'),
 ]
-# Soporta ambos formatos: "2 cápitas" (numero antes) y "Cápitas: 2" (numero despues).
-# El segundo es el formato real del CSV de prepagas (auditoría 2026-04-29).
-CAPITAS_PATTERN = re.compile(r'(?:(\d+)\s+c[aá]pitas?|c[aá]pitas?\s*:\s*(\d+))', re.I)
+# Patrones de cápitas — auditoría 2026-05-12 sobre 30 notas de Ventas Ganadas reales.
+#
+# Los asesores del cliente NO escriben "Cápitas: N". Los formatos reales son:
+#   Explícito:  "2 cápitas", "Cápitas: 3", "Valor por capita: $X x 2"
+#   Implícito:  "Individual", "Matrimonio", "Individual + 1 hijo", "Matrimonio + 2 hijos"
+#
+# CAPITAS_PATTERN cubre los formatos explícitos con número.
+# _infer_capitas() cubre los implícitos por composición familiar.
+# parse_notes_money llama _infer_capitas() como fallback si CAPITAS_PATTERN no matchea.
+CAPITAS_PATTERN = re.compile(
+    r'(?:'
+    r'(\d+)\s+c[aá]pitas?'                          # "2 cápitas" / "2 capitas"
+    r'|c[aá]pitas?\s*:\s*(\d+)'                     # "Cápitas: 3" / "capitas: 3"
+    r'|valor\s+por\s+c[aá]pita[^x\d]*x\s*(\d+)'   # "Valor por capita: $X x 2"
+    r')',
+    re.I,
+)
 PLAN_PATTERN = re.compile(r'[Pp]lan\s+([\w\d]+)')
 # Descuento: "- 50%" o "descuento 30%" etc.
 DISCOUNT_PATTERN = re.compile(r'-\s*(\d+(?:\.\d+)?)\s*%|descuento\s+(\d+(?:\.\d+)?)\s*%', re.I)
@@ -150,6 +164,56 @@ def _clean_money_str(raw: str) -> Optional[float]:
         return float(cleaned)
     except ValueError:
         return None
+
+
+def _infer_capitas(notes: str) -> Optional[int]:
+    """Infiere el número de cápitas desde la composición familiar en el campo notes.
+
+    Se usa como fallback cuando CAPITAS_PATTERN no encuentra un número explícito.
+    Los asesores del cliente escriben la composición familiar en texto libre:
+    "Individual", "Matrimonio", "Individual + 1 hijo", "Matrimonio + 2 hijos", etc.
+
+    Reglas:
+        - "matrimonio" base → 2
+        - "individual" base → 1 (o N si hay "N hijas/hijos ingresan como individual")
+        - "+ N hijo/hija/hijos/hijas" → suma N
+        - "+ 1 hijo/hija" (sin número explícito) → suma 1
+
+    Args:
+        notes: Texto libre del campo notes.
+
+    Returns:
+        Número de cápitas inferidas, o None si no se puede determinar.
+    """
+    if not notes:
+        return None
+
+    text = notes.lower()
+
+    # Detectar composición base.
+    # 'invidual' cubre el typo frecuente de los asesores (auditoría 2026-05-12).
+    base = 0
+    if 'matrimonio' in text or 'pareja' in text:
+        base = 2
+    elif 'individual' in text or 'invidual' in text:
+        # Caso especial: "N hijas/hijos ingresan como individual"
+        m = re.search(r'(\d+)\s+(?:hijas?|hijos?)\s+ingresan?\s+como\s+i[nm]vidual', text)
+        if m:
+            return int(m.group(1))
+        base = 1
+    else:
+        return None
+
+    # Sumar hijos/personas adicionales: "+ N hijo(s)/hija(s)" o "+ N persona(s)"
+    # Cubre "Cobertura para X + 1 hijo" aunque no empiece con "individual/matrimonio".
+    hijos_match = re.search(r'\+\s*(\d+)\s+(?:hijos?|hijas?|persona)', text)
+    if hijos_match:
+        base += int(hijos_match.group(1))
+    elif re.search(r'\+\s*(?:1\s+)?(?:hijo|hija)\b', text):
+        # "+ hijo" o "+ 1 hijo" sin número explícito → suma 1
+        base += 1
+
+    return base if base > 0 else None
 
 
 # ---------------------------------------------------------------------------
@@ -274,14 +338,19 @@ def parse_notes_money(notes: str) -> Optional[dict]:
     if cuota_mensual is None:
         return None
 
-    # Buscar cápitas. Pattern tiene 2 grupos alternos según formato:
-    #   group(1) → "N cápitas"      (numero antes)
-    #   group(2) → "Cápitas: N"     (numero despues, formato real del CSV)
+    # Buscar cápitas — primero explícito (CAPITAS_PATTERN), luego inferido.
+    # CAPITAS_PATTERN tiene 3 grupos según el formato:
+    #   group(1) → "N cápitas"              (número antes)
+    #   group(2) → "Cápitas: N"             (número después)
+    #   group(3) → "Valor por capita: $X x N"
     m = CAPITAS_PATTERN.search(notes)
     if m:
-        cap_str = m.group(1) or m.group(2)
+        cap_str = m.group(1) or m.group(2) or m.group(3)
         if cap_str:
             capitas = int(cap_str)
+    else:
+        # Fallback: inferir desde composición familiar ("Matrimonio + 2 hijos" → 4)
+        capitas = _infer_capitas(notes)
 
     # Buscar plan
     m = PLAN_PATTERN.search(notes)
