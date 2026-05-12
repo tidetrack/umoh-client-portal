@@ -187,7 +187,20 @@ $_asset_v = defined('ASSET_VERSION') ? ASSET_VERSION : filemtime(__DIR__ . '/ass
       <div class="sb-period-wrap" id="sb-period-wrap">
         <div class="sb-period-header">
           <span class="sb-period-label">Período</span>
-          <span class="sb-period-range" id="sb-period-range" aria-live="polite"></span>
+        </div>
+        <!-- Rango visible: el "30 días" muestra los últimos 30 desde hoy,
+             NO el último mes calendario. Este chip lo deja claro. -->
+        <div class="sb-period-range-chip sb-label" id="sb-period-range-chip">
+          <svg class="sb-period-range-icon" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <rect x="3" y="4" width="18" height="18" rx="2" ry="2"/>
+            <line x1="16" y1="2" x2="16" y2="6"/>
+            <line x1="8" y1="2" x2="8" y2="6"/>
+            <line x1="3" y1="10" x2="21" y2="10"/>
+          </svg>
+          <span class="sb-period-range-text">
+            <span class="sb-period-range-prefix">Mostrando</span>
+            <span class="sb-period-range" id="sb-period-range" aria-live="polite"></span>
+          </span>
         </div>
         <div class="sb-period-selector" role="group" aria-label="Selector de período">
           <button class="sb-period-btn" data-period="7d">

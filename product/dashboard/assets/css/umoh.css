@@ -3719,27 +3719,58 @@ body.sidebar-collapsed .sb-nav-item:hover .sb-tooltip {
   white-space:     nowrap;
 }
 
-/* Header del selector: label "PERÍODO" a la izquierda, rango de fechas a la derecha */
+/* Header del selector: solo el label "PERÍODO" */
 .sb-period-header {
   display:         flex;
   align-items:     baseline;
-  justify-content: space-between;
-  gap:             var(--sp-2);
   padding:         0 var(--sp-2) var(--sp-2);
 }
 .sb-period-header .sb-period-label {
   padding:         0;
 }
-.sb-period-range {
-  font-size:       10.5px;
-  font-weight:     500;
-  color:           var(--text-muted);
-  white-space:     nowrap;
-  letter-spacing:  0.01em;
-  font-variant-numeric: tabular-nums;
+
+/* Chip prominente con el rango de fechas — aclara que "30d" es "últimos 30 días desde hoy" */
+.sb-period-range-chip {
+  display:         flex;
+  align-items:     center;
+  gap:             var(--sp-2);
+  padding:         var(--sp-2) var(--sp-3);
+  margin:          0 var(--sp-2) var(--sp-3);
+  background:      rgba(255, 0, 64, 0.05);
+  border:          1px solid rgba(255, 0, 64, 0.18);
+  border-radius:   var(--r-md);
+  color:           var(--text-primary);
 }
-body.sidebar-collapsed .sb-period-header,
-body.sidebar-collapsed .sb-period-range {
+[data-theme="dark"] .sb-period-range-chip {
+  background:      rgba(255, 0, 64, 0.08);
+  border-color:    rgba(255, 0, 64, 0.22);
+}
+.sb-period-range-icon {
+  color:           var(--umoh-accent);
+  flex-shrink:     0;
+}
+.sb-period-range-text {
+  display:         flex;
+  flex-direction:  column;
+  line-height:     1.2;
+  min-width:       0;
+}
+.sb-period-range-prefix {
+  font-size:       9px;
+  font-weight:     700;
+  letter-spacing:  0.1em;
+  text-transform:  uppercase;
+  color:           var(--text-muted);
+}
+.sb-period-range {
+  font-size:       12px;
+  font-weight:     600;
+  color:           var(--text-primary);
+  white-space:     nowrap;
+  font-variant-numeric: tabular-nums;
+  letter-spacing:  -0.005em;
+}
+body.sidebar-collapsed .sb-period-range-chip {
   display: none;
 }
 
