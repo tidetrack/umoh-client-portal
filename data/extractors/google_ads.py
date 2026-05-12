@@ -23,9 +23,15 @@ from __future__ import annotations
 import os
 import glob
 import logging
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone as dt_timezone
 from pathlib import Path
 from typing import Any
+
+# zoneinfo disponible en Python 3.9+. Fallback a pytz si no está (entornos viejos).
+try:
+    from zoneinfo import ZoneInfo
+except ImportError:  # pragma: no cover
+    from backports.zoneinfo import ZoneInfo  # type: ignore
 
 import yaml
 from google.ads.googleads.client import GoogleAdsClient
@@ -123,9 +129,11 @@ _TOFU_METRICS_QUERY = """
 SELECT
   campaign.id,
   campaign.name,
+  customer.time_zone,
   segments.date,
   metrics.impressions,
   metrics.clicks,
+  metrics.interactions,
   metrics.cost_micros,
   segments.ad_network_type,
   segments.device
@@ -134,6 +142,29 @@ WHERE
   segments.date BETWEEN '{date_start}' AND '{date_end}'
 ORDER BY segments.date ASC
 """
+# NOTA TIMEZONE (2026-05-12):
+# La Google Ads API interpreta segments.date en el customer.time_zone de la
+# cuenta del cliente — NO del MCC y NO en UTC. Si la cuenta de prepagas
+# (384-763-4137) está configurada en un TZ distinto de America/Argentina/Mendoza,
+# los días que devuelve la API no coinciden con los que muestra la UI de Google Ads.
+#
+# Evidencia: delta de ~105 clicks en abril entre Google Ads UI (1024) y Supabase
+# (919). El cálculo de orden de magnitud: 919 clicks / 30 días ≈ 30.6/día.
+# Offset de 3h UTC vs ART = 12.5% del día. 30.6 × 0.125 × 30 = ~115 clicks
+# shifted — consistente con el delta observado.
+#
+# Fix en código (hecho): _date_range ahora calcula "hoy" en el TZ del cliente
+# en vez de UTC, para que al menos el rango sea correcto desde el lado del extractor.
+#
+# Fix pendiente en Google Ads UI (Franco):
+#   Google Ads → Settings → Account settings → Time zone
+#   → verificar que sea "Argentina Standard Time" / America/Argentina/Mendoza.
+#   Si está en UTC u otro TZ, cambiarlo. ATENCION: Google Ads NO permite cambiar
+#   el TZ de una cuenta después del primer gasto. Si la cuenta tiene historial,
+#   el TZ está bloqueado. En ese caso, documentarlo como sesgo permanente.
+#
+# customer.time_zone se agrega al SELECT para que el pipeline logee el TZ real
+# de la cuenta en cada run, facilitando el diagnóstico.
 
 _SEARCH_TERMS_QUERY = """
 SELECT
@@ -202,9 +233,27 @@ WHERE geo_target_constant.resource_name IN ({resource_names})
 """
 
 
-def _date_range(days_back: int = 7) -> tuple[str, str]:
-    """Devuelve (date_start, date_end) en formato YYYY-MM-DD para los ultimos N dias."""
-    today = datetime.utcnow().date()
+def _date_range(
+    days_back: int = 7,
+    tz_name: str = "America/Argentina/Mendoza",
+) -> tuple[str, str]:
+    """
+    Devuelve (date_start, date_end) en formato YYYY-MM-DD para los ultimos N dias,
+    calculando 'hoy' en el timezone del cliente (no en UTC).
+
+    Por qué importa: si se calcula en UTC y el cliente está en ART (UTC-3), a
+    las 21:00-23:59 ART el extractor enviaria una fecha un día adelantada. Eso
+    generaria un gap en los datos del día en curso y un aparente delta vs la UI.
+
+    Args:
+        days_back: Cantidad de dias hacia atras a extraer (incluye date_end).
+        tz_name: Nombre de timezone IANA del cliente (ej: 'America/Argentina/Mendoza').
+
+    Returns:
+        Tupla (date_start, date_end) en formato YYYY-MM-DD.
+    """
+    tz = ZoneInfo(tz_name)
+    today = datetime.now(tz=tz).date()
     end = today - timedelta(days=1)       # ayer (Google Ads consolida con 1 dia de lag)
     start = end - timedelta(days=days_back - 1)
     return str(start), str(end)
@@ -263,8 +312,18 @@ def extract_tofu_metrics(
                     # con el placeholder 'PMAX_PREPAGAS' y para el upsert en Supabase.
                     "campaign_id": str(row.campaign.id),
                     "campaign_name": row.campaign.name,
+                    # customer.time_zone expone el TZ real de la cuenta de Google Ads.
+                    # Si difiere del reporting.timezone del YAML, hay riesgo de sesgo
+                    # en los datos — ver comentario en _TOFU_METRICS_QUERY.
+                    "account_timezone": row.customer.time_zone,
                     "impressions": row.metrics.impressions,
                     "clicks": row.metrics.clicks,
+                    # interactions: en campañas PMAX, Google Ads UI muestra
+                    # interactions (no clicks puros) como "Clicks" en la columna
+                    # principal. Si clicks != interactions en PMAX, el delta
+                    # entre UI y lo que extraemos viene de usar el campo equivocado.
+                    # Se expone ambos para que el normalizer decida cuál usar.
+                    "interactions": row.metrics.interactions,
                     # cost_micros: Google almacena el costo multiplicado por 1_000_000
                     "spend_micros": row.metrics.cost_micros,
                     "channel": row.segments.ad_network_type.name,
@@ -589,7 +648,8 @@ def extract_client(
                                            campaign_search_term_insight según el tipo de campaña)
           - raw_geo: list[dict]
     """
-    date_start, date_end = _date_range(days_back)
+    tz_name: str = client_config.get("timezone", "America/Argentina/Mendoza")
+    date_start, date_end = _date_range(days_back, tz_name=tz_name)
     customer_id = client_config["customer_id"]
 
     logger.info(
@@ -601,6 +661,27 @@ def extract_client(
     )
 
     metrics = extract_tofu_metrics(client, customer_id, date_start, date_end)
+
+    # Auditar el TZ real de la cuenta Google Ads vs el TZ del cliente en el YAML.
+    # Si difieren, los días que devuelve la API no coinciden con los de la UI.
+    if metrics:
+        account_tz = metrics[0].get("account_timezone", "desconocido")
+        if account_tz != tz_name:
+            logger.warning(
+                "TIMEZONE MISMATCH para customer_id=%s: "
+                "la cuenta Google Ads usa TZ='%s' pero reporting.timezone='%s'. "
+                "Esto genera un offset en segments.date y explica deltas entre "
+                "la UI de Google Ads y los datos extraídos. "
+                "Fix: ir a Google Ads UI → Settings → Account settings → Time zone. "
+                "ATENCION: Google no permite cambiar TZ si la cuenta ya tiene historial de gasto.",
+                customer_id, account_tz, tz_name,
+            )
+        else:
+            logger.info(
+                "Timezone OK: cuenta Google Ads customer_id=%s usa TZ='%s' "
+                "(coincide con reporting.timezone del YAML).",
+                customer_id, account_tz,
+            )
 
     # Estrategia de extracción de términos de búsqueda:
     # 1. Intentar search_term_view (campañas Search tradicionales).
