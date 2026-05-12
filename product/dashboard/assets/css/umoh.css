@@ -67,16 +67,18 @@
 
 /* ── Dark Mode overrides ────────────────────────────────────── */
 [data-theme="dark"] {
-  /* Jerarquía espejada al light mode: página grisácea media, cards levemente
-     más claras — misma separación sutil que en light (#F0F5F5 → #FFFFFF).
-     Antes: page #0F1724 / card #374151 — delta demasiado alto, cards saltaban.
-     Ahora: page #1A2332 / card #252F3E — delta homogéneo, lenguaje visual consistente. */
-  --bg-page: #1A2332;
-  --bg-card: #252F3E;
-  --bg-card-header: #1F2A38;
+  /* Jerarquía INVERTIDA respecto al light mode (decisión de Franco 2026-05-12):
+     - Light: page=#F0F5F5 (gris) + card=#FFFFFF (más clara que page) → cards SALEN
+     - Dark : page=#2D3748 (gris medio) + card=#1A2332 (más oscura que page) → cards HUNDIDAS
+     Es lo opuesto al patrón estándar pero da una sensación más "premium / app oscura
+     con cards que se sumergen en la noche". El border-subtle compensa la falta de
+     elevación visual. */
+  --bg-page: #2D3748;
+  --bg-card: #1A2332;
+  --bg-card-header: #141C28;
   --bg-header: #0A1018;
   --bg-nav: #111827;
-  --border-subtle: rgba(255, 255, 255, 0.16);
+  --border-subtle: rgba(255, 255, 255, 0.13);
   --text-primary: #F1F5F9;
   --text-secondary: #94A3B8;
   --text-muted: #64748B;
@@ -112,11 +114,12 @@
 }
 
 [data-theme="dark"] .site-footer {
-  background: #111827;
+  /* Footer alineado con las cards (oscuro) bajo la nueva jerarquía invertida */
+  background: var(--bg-card);
 }
 
 [data-theme="dark"] .geo-map {
-  background: #1A2332;
+  background: #0F1724;
 }
 
 

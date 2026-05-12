@@ -60,8 +60,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
       --red:        #FF003B;
       --red-dark:   #CC002F;
 
-      --bg:              #0E1520;
-      --card-bg:         rgba(22, 31, 44, 0.80);
+      /* Dark: jerarquía invertida respecto al light (decisión 2026-05-12):
+         page gris medio, card más oscura. Espejo de la decisión del dashboard. */
+      --bg:              #2D3748;
+      --card-bg:         rgba(15, 22, 35, 0.92);
       --text:            rgba(255,255,255,0.90);
       --text-strong:     #FFFFFF;
       --muted:           rgba(255,255,255,0.45);
