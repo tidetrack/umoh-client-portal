@@ -918,7 +918,8 @@ function _fmtFechaCortaConYear(d) {
   return d.getDate() + ' ' + _MESES_ES[d.getMonth()] + ' ' + d.getFullYear();
 }
 function _updatePeriodRange(period) {
-  const el = document.getElementById('sb-period-range');
+  const el   = document.getElementById('sb-period-range');
+  const chip = document.getElementById('sb-period-range-chip');
   if (!el) return;
   const hoy = new Date();
   let desde, hasta;
@@ -930,6 +931,7 @@ function _updatePeriodRange(period) {
       hasta = new Date(e.value + 'T00:00:00');
     } else {
       el.textContent = '';
+      if (chip) chip.style.display = 'none';
       return;
     }
   } else {
@@ -938,6 +940,7 @@ function _updatePeriodRange(period) {
     desde = new Date(hoy);
     desde.setDate(hoy.getDate() - (dias - 1));
   }
+  if (chip) chip.style.display = '';
   const sameYear = desde.getFullYear() === hasta.getFullYear();
   el.textContent = sameYear
     ? _fmtFechaCorta(desde) + ' – ' + _fmtFechaCortaConYear(hasta)
