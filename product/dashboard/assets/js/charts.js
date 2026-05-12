@@ -1609,78 +1609,8 @@ function renderBofu(data) {
   /* Sellers ranking table */
   if (data.sellers) _renderSellersTable(data.sellers);
 
-  /* Pending price table — ventas marcadas cerradas pero sin monto cargado */
-  _renderPendingPriceTable(data.pending_price || []);
-
   /* Sales list table — Ventas Ganadas como tareas con detalle por operación */
   if (data.sales_list) _renderSalesListTable(data.sales_list);
-}
-
-/* Registry de filas pendientes para el modal de detalle de lead.
-   Se actualiza cada vez que renderBofu() llama a _renderPendingPriceTable(). */
-let _pendingRows = [];
-
-function _renderPendingPriceTable(rows) {
-  const tbody = document.getElementById('pending-price-body');
-  const badge = document.getElementById('pending-price-count');
-  if (!tbody) return;
-
-  /* Guardar referencia para el modal */
-  _pendingRows = rows;
-
-  if (badge) badge.textContent = `${rows.length} pendiente${rows.length === 1 ? '' : 's'}`;
-
-  if (rows.length === 0) {
-    tbody.innerHTML = '<tr><td colspan="6" class="pending-empty">Todas las ventas tienen monto cargado.</td></tr>';
-    return;
-  }
-
-  tbody.innerHTML = rows.map(r => {
-    const fecha = r.lead_created_at
-      ? new Date(r.lead_created_at).toLocaleDateString('es-AR', { day: '2-digit', month: '2-digit', year: 'numeric' })
-      : '—';
-    const tip = (r.tipification && r.tipification.trim()) || '<span class="muted">Sin clasificar</span>';
-
-    /* F.4.b — Mostrar canal real del lead. Si no existe, fallback a Campaña / Vendedor */
-    const canalLabel = r.canal || (r.is_campaign ? 'Campaña' : 'Vendedor');
-    const canalClass = r.is_campaign ? 'origin-campaign' : 'origin-vendor';
-    const origin = `<span class="origin-badge ${canalClass}">${canalLabel}</span>`;
-
-    /* F.4.a — Etapa actual desde leads.section */
-    const stage = r.section || '—';
-
-    const nombre = r.nombre || `#${r.meistertask_id}`;
-    const asesor = r.assignee || '—';
-    const mid    = r.meistertask_id || '';
-
-    return `
-      <tr class="pending-row" data-mid="${mid}" style="cursor:pointer" role="button" tabindex="0" aria-label="Ver detalle de ${nombre}">
-        <td class="pending-name">${nombre}</td>
-        <td class="pending-asesor">${asesor}</td>
-        <td class="pending-tip">${tip}</td>
-        <td class="pending-origin">${origin}</td>
-        <td class="pending-stage">${stage}</td>
-        <td class="pending-date">${fecha}</td>
-      </tr>
-    `;
-  }).join('');
-
-  /* F.4.d — Delegar click en tbody (una sola escucha, no por fila) */
-  tbody.onclick = function(e) {
-    const tr = e.target.closest('tr.pending-row');
-    if (!tr) return;
-    const mid = tr.dataset.mid;
-    _openLeadDetailModal(mid);
-  };
-
-  /* Soporte teclado: Enter / Space abre el modal */
-  tbody.onkeydown = function(e) {
-    if (e.key !== 'Enter' && e.key !== ' ') return;
-    const tr = e.target.closest('tr.pending-row');
-    if (!tr) return;
-    e.preventDefault();
-    _openLeadDetailModal(tr.dataset.mid);
-  };
 }
 
 /* ── Tabla "Ventas Ganadas — detalle por operación" (Frente 5) ─── */
@@ -1774,7 +1704,7 @@ function _applySalesListFilters() {
     `;
   }).join('');
 
-  /* Click en fila abre el modal de lead (reutiliza el mismo modal de pending_price) */
+  /* Click en fila abre el modal de detalle del lead */
   tbody.onclick = function(e) {
     const tr = e.target.closest('tr.pending-row');
     if (!tr) return;
@@ -1793,13 +1723,11 @@ function _applySalesListFilters() {
 
 /**
  * Abre el modal #lead-detail-modal con la data del lead identificado por meistertask_id.
- * Usa los datos ya cargados en _pendingRows — no hace fetch adicional.
+ * Usa los datos ya cargados en _salesListRows — no hace fetch adicional.
  * @param {string|number} mid - meistertask_id del lead
  */
 function _openLeadDetailModal(mid) {
-  /* Buscar en pending_price primero, luego en sales_list (ambas listas están en memoria) */
-  const row = _pendingRows.find(r => String(r.meistertask_id) === String(mid))
-           || _salesListRows.find(r => String(r.meistertask_id) === String(mid));
+  const row = _salesListRows.find(r => String(r.meistertask_id) === String(mid));
   if (!row) return;
 
   const overlay = document.getElementById('lead-detail-modal');
