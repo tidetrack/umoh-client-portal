@@ -6,16 +6,34 @@
  * La sección "inicio" se convierte en la pantalla de entrada (default).
  */
 
-let _currentPeriod      = '30d';
+// Período activo. Se restaura desde localStorage si existe.
+let _currentPeriod      = localStorage.getItem('umoh:period') || '30d';
 // Default a "inicio" — el cliente entra al dashboard y ve el saludo + resumen
 // IA primero, después navega a las secciones específicas (Performance/TOFU/etc.)
 let _currentSection     = 'inicio';
 let _currentGranularity = 'dias';   // última granularidad activa del historic-section
 let _loading            = false;
+
+// Fechas del rango personalizado. Se persisten en localStorage.
+let _currentCustomStart = localStorage.getItem('umoh:custom-start') || '';
+let _currentCustomEnd   = localStorage.getItem('umoh:custom-end')   || '';
+
 // Filtro global de campaña (Fase 4 — sprint 1.8). 'all' = vista agregada.
 // Se persiste en localStorage para que la selección sobreviva entre reloads.
 let _currentCampaignId   = localStorage.getItem('umoh:campaign_id')   || 'all';
 let _currentCampaignName = localStorage.getItem('umoh:campaign_name') || '';
+
+/**
+ * Devuelve los extraParams de período correctos para la llamada actual.
+ * Si el período es 'custom' y hay fechas guardadas, pasa start + end.
+ * En cualquier otro caso retorna un objeto vacío.
+ */
+function _periodParams() {
+  if (_currentPeriod === 'custom' && _currentCustomStart && _currentCustomEnd) {
+    return { start: _currentCustomStart, end: _currentCustomEnd, granularity: _currentGranularity };
+  }
+  return {};
+}
 
 /* ── Loader visual ──────────────────────────────────────── */
 function _setLoading(on) {
@@ -139,15 +157,19 @@ function _applyCustomRange() {
   if (!startInput || !endInput || !startInput.value || !endInput.value) return;
   if (startInput.value > endInput.value) { endInput.value = startInput.value; return; }
 
+  // Guardar fechas en variables globales y localStorage para que persistan
+  // entre cambios de sección y reloads del browser.
+  _currentCustomStart = startInput.value;
+  _currentCustomEnd   = endInput.value;
+  localStorage.setItem('umoh:custom-start', _currentCustomStart);
+  localStorage.setItem('umoh:custom-end',   _currentCustomEnd);
+
   _closeDatePicker();
   _currentPeriod = 'custom';
+  localStorage.setItem('umoh:period', 'custom');
   _updatePeriodRange('custom');
-  // Pasa la granularity activa para que build_trend la respete en el backend
-  refreshDashboard(_currentSection, 'custom', {
-    start: startInput.value,
-    end:   endInput.value,
-    granularity: _currentGranularity,
-  });
+  // _periodParams() ya construye { start, end, granularity } para el período custom.
+  refreshDashboard(_currentSection, 'custom', _periodParams());
 }
 
 /* ── Theme toggle ────────────────────────────────────────── */
@@ -163,7 +185,7 @@ function _toggleTheme() {
   localStorage.setItem('umoh-theme', next);
   _syncThemeLabel();
   // Redraw charts to pick up new CSS variable colors
-  refreshDashboard(_currentSection, _currentPeriod);
+  refreshDashboard(_currentSection, _currentPeriod, _periodParams());
 }
 
 /* ── User menu (sidebar) ─────────────────────────────────── */
@@ -787,6 +809,12 @@ function initFilters() {
       _closeDatePicker();
       _activatePeriod(btn);
       _currentPeriod = period;
+      localStorage.setItem('umoh:period', period);
+      // Limpiar las fechas custom guardadas — ya no aplican a este período.
+      _currentCustomStart = '';
+      _currentCustomEnd   = '';
+      localStorage.removeItem('umoh:custom-start');
+      localStorage.removeItem('umoh:custom-end');
       _updateInicioSubtitle(period);
       _updatePeriodRange(period);
       refreshDashboard(_currentSection, _currentPeriod);
@@ -811,7 +839,7 @@ function initFilters() {
       _activateSidebarNavItem(section);
       _activateSection(section);
       _currentSection = section;
-      refreshDashboard(_currentSection, _currentPeriod);
+      refreshDashboard(_currentSection, _currentPeriod, _periodParams());
       if (section === 'tofu') {
         setTimeout(() => { if (typeof invalidateGeoMap === 'function') invalidateGeoMap(); }, 350);
       }
@@ -1103,7 +1131,7 @@ function initCampaignSelector() {
     if (trigger) { trigger.classList.remove('is-open'); trigger.setAttribute('aria-expanded', 'false'); }
     if (panel)   panel.classList.remove('is-open');
 
-    refreshDashboard(_currentSection, _currentPeriod);
+    refreshDashboard(_currentSection, _currentPeriod, _periodParams());
     _closeMobileDrawer();
   }
 
@@ -1270,7 +1298,24 @@ document.addEventListener('DOMContentLoaded', () => {
   initScrollNavBehavior();
   initCampaignSelector();
   initSidebarResize();
+
+  // Si se restauró un período custom desde localStorage, pre-rellenar los inputs
+  // y activar visualmente el botón "Personalizado" para que el chip "MOSTRANDO"
+  // se calcule correctamente con las fechas guardadas.
+  if (_currentPeriod === 'custom' && _currentCustomStart && _currentCustomEnd) {
+    const startInput = document.getElementById('date-start');
+    const endInput   = document.getElementById('date-end');
+    if (startInput) startInput.value = _currentCustomStart;
+    if (endInput)   endInput.value   = _currentCustomEnd;
+    const customBtn = document.getElementById('sb-period-custom-btn');
+    if (customBtn) _activatePeriod(customBtn);
+  } else if (_currentPeriod !== 'custom') {
+    // Activar visualmente el botón del período restaurado
+    const activeBtn = document.querySelector(`.sb-period-btn[data-period="${_currentPeriod}"]`);
+    if (activeBtn) _activatePeriod(activeBtn);
+  }
+
   _updatePeriodRange(_currentPeriod);
 
-  refreshDashboard(_currentSection, _currentPeriod);
+  refreshDashboard(_currentSection, _currentPeriod, _periodParams());
 });

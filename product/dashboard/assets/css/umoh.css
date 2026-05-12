@@ -67,13 +67,13 @@
 
 /* ── Dark Mode overrides ────────────────────────────────────── */
 [data-theme="dark"] {
-  --bg-page: #0F1724;
-  /* Cards en gris azulado (#374151 = slate-600) — un toque más claras para
-     mejor contraste. --bg-page queda mucho más oscuro para que las cards
-     "se levanten" visualmente. Texto e iconos también suben un escalón
-     para mantener la jerarquía. */
-  --bg-card: #374151;
-  --bg-card-header: #2D3748;
+  /* Jerarquía espejada al light mode: página grisácea media, cards levemente
+     más claras — misma separación sutil que en light (#F0F5F5 → #FFFFFF).
+     Antes: page #0F1724 / card #374151 — delta demasiado alto, cards saltaban.
+     Ahora: page #1A2332 / card #252F3E — delta homogéneo, lenguaje visual consistente. */
+  --bg-page: #1A2332;
+  --bg-card: #252F3E;
+  --bg-card-header: #1F2A38;
   --bg-header: #0A1018;
   --bg-nav: #111827;
   --border-subtle: rgba(255, 255, 255, 0.16);
@@ -112,7 +112,7 @@
 }
 
 [data-theme="dark"] .site-footer {
-  background: #080E18;
+  background: #111827;
 }
 
 [data-theme="dark"] .geo-map {
@@ -4362,6 +4362,7 @@ body.sidebar-collapsed .dashboard-content {
   flex-shrink:     0;
   font-size:       28px;
   font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 28;
+  align-self:      center;
 }
 
 .inicio-quick-title {
