@@ -715,7 +715,7 @@ $_asset_v = defined('ASSET_VERSION') ? ASSET_VERSION : filemtime(__DIR__ . '/ass
           <canvas class="kpi-sparkline" id="sparkline-bofu-capitas" aria-hidden="true"></canvas>
         </div>
         <div class="kpi-card">
-          <span class="kpi-label">Ticket Promedio por Cápita</span>
+          <span class="kpi-label">Cápitas por Venta</span>
           <span class="kpi-value" id="bofu-ticket-capita">—</span>
           <span class="kpi-delta" id="delta-bofu-ticket-capita"></span>
           <canvas class="kpi-sparkline" id="sparkline-bofu-ticket-capita" aria-hidden="true"></canvas>
@@ -833,6 +833,14 @@ $_asset_v = defined('ASSET_VERSION') ? ASSET_VERSION : filemtime(__DIR__ . '/ass
                 </tr>
               </thead>
               <tbody id="sales-list-body"></tbody>
+              <tfoot>
+                <tr class="sales-list-totals">
+                  <td colspan="3" class="sales-totals-label">Totales (filtrados)</td>
+                  <td class="th-num" id="sales-list-total-revenue">—</td>
+                  <td class="th-num" id="sales-list-total-capitas">—</td>
+                  <td colspan="2" class="sales-totals-meta" id="sales-list-total-count">—</td>
+                </tr>
+              </tfoot>
             </table>
           </div>
         </div>

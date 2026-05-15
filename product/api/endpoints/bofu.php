@@ -148,8 +148,10 @@ try {
         }
     }
 
-    $avg_ticket     = $closed_sales > 0 ? round($total_revenue / $closed_sales, 2) : 0;
-    $avg_ticket_cap = $capitas > 0      ? round($total_revenue / $capitas, 2)      : 0;
+    $avg_ticket       = $closed_sales > 0 ? round($total_revenue / $closed_sales, 2) : 0;
+    // Cápitas por venta (decisión Franco 2026-05-15): cantidad de cápitas / cantidad de ventas.
+    // NO es el ticket monetario por cápita — eso era el cálculo viejo y estaba mal nombrado.
+    $capitas_per_sale = $closed_sales > 0 ? round($capitas / $closed_sales, 2) : 0;
 
     // Conversion rate definido como closed_sales / impressions en el período.
     // Es el ratio de cuánta gente que vio el ad terminó comprando.
@@ -177,12 +179,12 @@ try {
         if ($d >= $prev_start && $d <= $prev_end) $pr_impr += $n;
     }
     $prev = [
-        'total_revenue'         => round($pr_rev, 2),
-        'closed_sales'          => $pr_sales,
-        'avg_ticket'            => $pr_sales > 0 ? round($pr_rev / $pr_sales, 2) : 0,
-        'conversion_rate'       => $pr_impr > 0 ? round($pr_sales / $pr_impr * 100, 4) : 0,
-        'capitas_closed'        => $pr_cap,
-        'avg_ticket_per_capita' => $pr_cap > 0 ? round($pr_rev / $pr_cap, 2) : 0,
+        'total_revenue'    => round($pr_rev, 2),
+        'closed_sales'     => $pr_sales,
+        'avg_ticket'       => $pr_sales > 0 ? round($pr_rev / $pr_sales, 2) : 0,
+        'conversion_rate'  => $pr_impr > 0 ? round($pr_sales / $pr_impr * 100, 4) : 0,
+        'capitas_closed'   => $pr_cap,
+        'capitas_per_sale' => $pr_sales > 0 ? round($pr_cap / $pr_sales, 2) : 0,
     ];
 
     // 9. Tipification breakdown — top 5 operatorias por revenue
@@ -359,12 +361,12 @@ try {
     });
 
     echo json_encode([
-        'total_revenue'         => round($total_revenue, 2),
-        'closed_sales'          => $closed_sales,
-        'avg_ticket'            => $avg_ticket,
-        'conversion_rate'       => $conversion_rate,
-        'capitas_closed'        => $capitas,
-        'avg_ticket_per_capita' => $avg_ticket_cap,
+        'total_revenue'    => round($total_revenue, 2),
+        'closed_sales'     => $closed_sales,
+        'avg_ticket'       => $avg_ticket,
+        'conversion_rate'  => $conversion_rate,
+        'capitas_closed'   => $capitas,
+        'capitas_per_sale' => $capitas_per_sale,
         'trend' => $trend,
         'typification' => [
             'labels' => $type_labels,
