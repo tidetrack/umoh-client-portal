@@ -1451,14 +1451,16 @@ function renderBofu(data) {
   setKPI('bofu-ticket',        fmtCurrency(data.avg_ticket));
   setKPI('bofu-conversion',    fmtPercent(data.conversion_rate));
   setKPI('bofu-capitas',       fmtNumber(data.capitas_closed));
-  setKPI('bofu-ticket-capita', fmtCurrency(data.avg_ticket_per_capita));
+  // Cápitas/Venta = cantidad de cápitas / cantidad de ventas (decimal con sufijo "cap.")
+  setKPI('bofu-ticket-capita', (data.capitas_per_sale != null && data.capitas_per_sale > 0)
+    ? data.capitas_per_sale.toFixed(2) + ' cap.' : '—');
 
   _setDelta('delta-bofu-revenue',       data.total_revenue,         prev.total_revenue);
   _setDelta('delta-bofu-sales',         data.closed_sales,          prev.closed_sales);
   _setDelta('delta-bofu-ticket',        data.avg_ticket,            prev.avg_ticket);
   _setDelta('delta-bofu-conversion',    data.conversion_rate,       prev.conversion_rate);
   _setDelta('delta-bofu-capitas',       data.capitas_closed,        prev.capitas_closed);
-  _setDelta('delta-bofu-ticket-capita', data.avg_ticket_per_capita, prev.avg_ticket_per_capita);
+  _setDelta('delta-bofu-ticket-capita', data.capitas_per_sale,      prev.capitas_per_sale);
 
   /* ── Sparklines for BOFU KPI cards ── */
   if (data.trend) {
@@ -1664,6 +1666,16 @@ function _applySalesListFilters() {
     if (completeVal === 'complete'   && !r.complete) return false;
     return true;
   });
+
+  /* Totales del subset filtrado — viven en el <tfoot> de la tabla */
+  const totalRevenue = filtered.reduce((a, r) => a + (Number(r.precio_final) || 0), 0);
+  const totalCapitas = filtered.reduce((a, r) => a + (Number(r.capitas)       || 0), 0);
+  const totalRevEl   = document.getElementById('sales-list-total-revenue');
+  const totalCapEl   = document.getElementById('sales-list-total-capitas');
+  const totalCntEl   = document.getElementById('sales-list-total-count');
+  if (totalRevEl) totalRevEl.textContent = totalRevenue > 0 ? fmtCurrency(totalRevenue) : '—';
+  if (totalCapEl) totalCapEl.textContent = totalCapitas > 0 ? fmtNumber(totalCapitas) : '—';
+  if (totalCntEl) totalCntEl.textContent = filtered.length + (filtered.length === 1 ? ' venta' : ' ventas');
 
   if (filtered.length === 0) {
     tbody.innerHTML = '<tr><td colspan="7" class="pending-empty">Sin ventas para los filtros seleccionados.</td></tr>';
