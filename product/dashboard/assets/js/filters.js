@@ -107,10 +107,12 @@ function _openDatePicker() {
 
   const today   = new Date();
   const maxDate = new Date(today); maxDate.setDate(today.getDate() - 1);
-  const minDate = new Date(today); minDate.setDate(today.getDate() - 90);
   const fmt     = d => d.toISOString().split('T')[0];
 
-  startInput.min = endInput.min = fmt(minDate);
+  // Sin restricción de min — el usuario puede ir tan atrás como quiera (auditoría histórica).
+  // Solo limitamos el max a "ayer" para no permitir fechas futuras (no tienen datos).
+  startInput.removeAttribute('min');
+  endInput.removeAttribute('min');
   startInput.max = endInput.max = fmt(maxDate);
 
   if (!startInput.value) {

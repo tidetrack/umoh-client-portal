@@ -156,6 +156,20 @@ try {
         }
     }
 
+    // Ajuste closed_won: los non_campaign leads en sección is_closed_won=true que
+    // caen dentro del período también son ventas reales (regla de negocio: toda venta
+    // en "Ventas Ganadas" cuenta). Se suman aquí para que closed_won_leads coincida
+    // con el customer journey y con la BD (audit 2026-05-15).
+    // Nota: no se suman a total_leads porque esa métrica mide rendimiento de campaña.
+    foreach ($non_campaign_leads as $l) {
+        $created = $l['lead_created_at'] ?? null;
+        if (!$created) continue;
+        $d = substr($created, 0, 10);
+        if ($d < $start || $d > $end) continue;
+        $c_nc = $classify($l);
+        if ($c_nc['closed_won']) $leads_closed_won++;
+    }
+
     // CPL = sum(spend en periodo) / total_leads
     $period_spend = 0.0;
     foreach ($selected as $d => $_) $period_spend += $spend_by_date[$d] ?? 0;
@@ -202,7 +216,12 @@ try {
 
     // 10. Status breakdown — 14 columnas literales de MeisterTask, en orden del journey.
     //    Se construye a partir de $stage_by_section (ya ordenado por display_order.asc).
-    //    Se cuentan solo campaign_leads del período seleccionado.
+    //    Las secciones de funnel_stage != 'bofu' cuentan solo campaign_leads (mide
+    //    rendimiento de campaña). La sección is_closed_won=true ("Ventas Ganadas")
+    //    cuenta TODOS los leads del período (campaign + no_campaign) porque la regla
+    //    de negocio es: toda venta en esa columna del CRM cuenta como venta ganada,
+    //    independientemente del canal de origen. Esto hace coincidir el número con
+    //    lo que ve Franco en MeisterTask y en la BD (audit 2026-05-15).
     //    Las secciones con stage='excluded' (Erroneos, Tareas Finalizadas) se incluyen:
     //    Erroneos aporta información de calidad del lead; Tareas Finalizadas indica
     //    limpieza del CRM. Franco confirma si quiere excluirlas del render frontend.
@@ -221,6 +240,27 @@ try {
             if (array_key_exists($sec, $status_counts)) {
                 $status_counts[$sec]++;
             }
+        }
+    }
+
+    // Para secciones is_closed_won=true: sumar también non_campaign leads del período.
+    // Los leads manuales (Propio/Referido) que llegan a "Ventas Ganadas" son ventas
+    // reales — excluirlos del journey hace que el número no coincida con el CRM.
+    // El filtro de período usa lead_created_at (igual que el resto del journey).
+    $closed_won_section_names = [];
+    foreach ($stage_by_section as $name => $cfg) {
+        if (!empty($cfg['is_closed_won'])) {
+            $closed_won_section_names[$name] = true;
+        }
+    }
+    foreach ($non_campaign_leads as $l) {
+        $sec     = $l['section'] ?? '';
+        $created = $l['lead_created_at'] ?? null;
+        if (!$created || !isset($closed_won_section_names[$sec])) continue;
+        $d = substr($created, 0, 10);
+        if ($d < $start || $d > $end) continue;
+        if (array_key_exists($sec, $status_counts)) {
+            $status_counts[$sec]++;
         }
     }
 
