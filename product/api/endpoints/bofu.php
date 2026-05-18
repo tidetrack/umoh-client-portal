@@ -45,12 +45,46 @@ try {
         $canal_filter = 'campaign';
     }
     // 1. Ventas cerradas: lead_monetary con is_closed=true
-    $closed = supabase_query('lead_monetary', [
+    //
+    // ⚠️ Criterio único de "venta cerrada" en todo el módulo BOFU/Sales
+    // (definido con Franco 2026-05-18):
+    //
+    //   1 venta = 1 meistertask_id único con is_closed=true.
+    //
+    // `lead_monetary` puede tener N filas por meistertask_id porque la
+    // UNIQUE constraint es (client_slug, meistertask_id, plan_code, capitas)
+    // y Postgres trata NULL != NULL: cada corrida del pipeline que ve
+    // plan_code/capitas en NULL inserta una fila nueva sin colisionar. Eso
+    // inflaba `closed_sales` (84 filas vs ~33 ventas reales) y degradaba
+    // todos los ratios derivados (avg_ticket, cápitas/venta, conversion,
+    // ROAS) que dependen de "cantidad de ventas" o "cápitas totales".
+    //
+    // Solución: deduplicar por meistertask_id eligiendo la fila MÁS COMPLETA
+    // (precio_final > 0 gana sobre NULL/0), con desempate por updated_at más
+    // reciente. La fila elegida representa "la venta" para todos los KPIs.
+    $closed_raw = supabase_query('lead_monetary', [
         'client_slug' => 'eq.' . CLIENT_SLUG,
         'is_closed'   => 'eq.true',
         'select'      => 'meistertask_id,capitas,precio_final,cuota_mensual,plan_code,data_source,updated_at',
         'limit'       => '5000',
     ]);
+    $closed_by_mid = [];
+    foreach ($closed_raw as $row) {
+        $mid = $row['meistertask_id'] ?? null;
+        if ($mid === null) continue;
+        $cur = $closed_by_mid[$mid] ?? null;
+        if (!$cur) { $closed_by_mid[$mid] = $row; continue; }
+        $cur_p = (float)($cur['precio_final'] ?? 0);
+        $new_p = (float)($row['precio_final'] ?? 0);
+        // 1) Preferir fila con precio_final > 0
+        if ($new_p > 0 && $cur_p <= 0) { $closed_by_mid[$mid] = $row; continue; }
+        if ($new_p <= 0 && $cur_p > 0) continue;
+        // 2) Desempate: updated_at más reciente
+        if (strcmp((string)($row['updated_at'] ?? ''), (string)($cur['updated_at'] ?? '')) > 0) {
+            $closed_by_mid[$mid] = $row;
+        }
+    }
+    $closed = array_values($closed_by_mid);
 
     // 2. Leads — enriquecimiento para el modal de detalle del lead.
     //    Nota: `comments` no existe en la tabla `leads` de Supabase — los comentarios

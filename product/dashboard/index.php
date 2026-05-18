@@ -714,25 +714,27 @@ $_asset_v = defined('ASSET_VERSION') ? ASSET_VERSION : filemtime(__DIR__ . '/ass
           <span class="kpi-delta" id="delta-bofu-conversion"></span>
           <canvas class="kpi-sparkline" id="sparkline-bofu-conversion" aria-hidden="true"></canvas>
         </div>
-        <div class="kpi-card" data-kpi="roas" title="ROAS = Ingresos / Inversión en ads del período">
+        <div class="kpi-card" data-kpi="roas" title="ROAS: Ingresos del período ÷ Inversión en ads del período. Click para ver explicación.">
           <span class="kpi-label">ROAS</span>
           <span class="kpi-value" id="bofu-roas">—</span>
           <span class="kpi-delta" id="delta-bofu-roas"></span>
+          <span class="kpi-formula">Ingresos ÷ Inversión en ads</span>
           <canvas class="kpi-sparkline" id="sparkline-bofu-roas" aria-hidden="true"></canvas>
         </div>
       </div>
 
       <div class="kpi-grid kpi-grid--2">
-        <div class="kpi-card">
+        <div class="kpi-card" data-kpi="bofu-capitas" title="Suma de cápitas (titular + grupo familiar) de cada venta cerrada">
           <span class="kpi-label">Cápitas Cerradas</span>
           <span class="kpi-value" id="bofu-capitas">—</span>
           <span class="kpi-delta" id="delta-bofu-capitas"></span>
           <canvas class="kpi-sparkline" id="sparkline-bofu-capitas" aria-hidden="true"></canvas>
         </div>
-        <div class="kpi-card">
+        <div class="kpi-card" data-kpi="bofu-ticket-capita" title="Cápitas por Venta: Cápitas cerradas ÷ Ventas cerradas. Mínimo 1 (el titular). Click para ver explicación.">
           <span class="kpi-label">Cápitas por Venta</span>
           <span class="kpi-value" id="bofu-ticket-capita">—</span>
           <span class="kpi-delta" id="delta-bofu-ticket-capita"></span>
+          <span class="kpi-formula">Cápitas ÷ Ventas</span>
           <canvas class="kpi-sparkline" id="sparkline-bofu-ticket-capita" aria-hidden="true"></canvas>
         </div>
       </div>
