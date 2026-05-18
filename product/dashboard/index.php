@@ -678,9 +678,18 @@ $_asset_v = defined('ASSET_VERSION') ? ASSET_VERSION : filemtime(__DIR__ . '/ass
         <h2 class="section-title--hero">Bottom of Funnel</h2>
         <p class="section-title--sub">Sales</p>
         <p class="section-subtitle">Resultado del trabajo conjunto entre Marketing y Ventas</p>
+        <div class="bofu-canal-filter-wrap" style="margin-top: var(--sp-4); display:flex; align-items:center; gap:var(--sp-3); flex-wrap:wrap;">
+          <label for="bofu-canal-filter" class="bofu-canal-filter-label" style="font-size:0.875rem; color:var(--text-muted);">Canal del lead</label>
+          <select id="bofu-canal-filter" class="chart-filter-select" aria-label="Filtrar BOFU por canal del lead">
+            <option value="campaign" selected>Solo campaña</option>
+            <option value="non_campaign">Solo particulares</option>
+            <option value="all">Todos los canales</option>
+          </select>
+          <span class="chart-badge" id="bofu-canal-hint">campaña: Form, WhatsApp, etc. · particulares: Propio, Referido, vacíos</span>
+        </div>
       </div>
 
-      <div class="kpi-grid kpi-grid--4">
+      <div class="kpi-grid kpi-grid--5">
         <div class="kpi-card" data-kpi="revenue">
           <span class="kpi-label">Ingresos Totales</span>
           <span class="kpi-value" id="bofu-revenue">—</span>
@@ -705,19 +714,27 @@ $_asset_v = defined('ASSET_VERSION') ? ASSET_VERSION : filemtime(__DIR__ . '/ass
           <span class="kpi-delta" id="delta-bofu-conversion"></span>
           <canvas class="kpi-sparkline" id="sparkline-bofu-conversion" aria-hidden="true"></canvas>
         </div>
+        <div class="kpi-card" data-kpi="roas" title="ROAS: Ingresos del período ÷ Inversión en ads del período. Click para ver explicación.">
+          <span class="kpi-label">ROAS</span>
+          <span class="kpi-value" id="bofu-roas">—</span>
+          <span class="kpi-delta" id="delta-bofu-roas"></span>
+          <span class="kpi-formula">Ingresos ÷ Inversión en ads</span>
+          <canvas class="kpi-sparkline" id="sparkline-bofu-roas" aria-hidden="true"></canvas>
+        </div>
       </div>
 
       <div class="kpi-grid kpi-grid--2">
-        <div class="kpi-card">
+        <div class="kpi-card" data-kpi="bofu-capitas" title="Suma de cápitas (titular + grupo familiar) de cada venta cerrada">
           <span class="kpi-label">Cápitas Cerradas</span>
           <span class="kpi-value" id="bofu-capitas">—</span>
           <span class="kpi-delta" id="delta-bofu-capitas"></span>
           <canvas class="kpi-sparkline" id="sparkline-bofu-capitas" aria-hidden="true"></canvas>
         </div>
-        <div class="kpi-card">
+        <div class="kpi-card" data-kpi="bofu-ticket-capita" title="Cápitas por Venta: Cápitas cerradas ÷ Ventas cerradas. Mínimo 1 (el titular). Click para ver explicación.">
           <span class="kpi-label">Cápitas por Venta</span>
           <span class="kpi-value" id="bofu-ticket-capita">—</span>
           <span class="kpi-delta" id="delta-bofu-ticket-capita"></span>
+          <span class="kpi-formula">Cápitas ÷ Ventas</span>
           <canvas class="kpi-sparkline" id="sparkline-bofu-ticket-capita" aria-hidden="true"></canvas>
         </div>
       </div>

@@ -64,13 +64,32 @@ try {
         $mofu[$d] = ($mofu[$d] ?? 0) + 1;
     }
 
-    // 3. BOFU: ventas cerradas, separando campaña de vendedor
-    $closed = supabase_query('lead_monetary', [
+    // 3. BOFU: ventas cerradas, separando campaña de vendedor.
+    //    Mismo criterio único de venta cerrada que bofu.php (ver comentario
+    //    allá): 1 venta = 1 meistertask_id, dedup por completitud (precio>0)
+    //    y desempate por updated_at más reciente. Esto evita el inflado por
+    //    duplicados en lead_monetary con plan_code/capitas=NULL.
+    $closed_raw = supabase_query('lead_monetary', [
         'client_slug' => 'eq.' . CLIENT_SLUG,
         'is_closed'   => 'eq.true',
         'select'      => 'meistertask_id,precio_final,updated_at',
         'limit'       => '5000',
     ]);
+    $closed_by_mid = [];
+    foreach ($closed_raw as $row) {
+        $mid = $row['meistertask_id'] ?? null;
+        if ($mid === null) continue;
+        $cur = $closed_by_mid[$mid] ?? null;
+        if (!$cur) { $closed_by_mid[$mid] = $row; continue; }
+        $cur_p = (float)($cur['precio_final'] ?? 0);
+        $new_p = (float)($row['precio_final'] ?? 0);
+        if ($new_p > 0 && $cur_p <= 0) { $closed_by_mid[$mid] = $row; continue; }
+        if ($new_p <= 0 && $cur_p > 0) continue;
+        if (strcmp((string)($row['updated_at'] ?? ''), (string)($cur['updated_at'] ?? '')) > 0) {
+            $closed_by_mid[$mid] = $row;
+        }
+    }
+    $closed = array_values($closed_by_mid);
     // index leads para saber si la venta es de campaña
     $is_campaign_by_id = [];
     foreach ($leads as $l) {

@@ -1454,6 +1454,11 @@ function renderBofu(data) {
   // Cápitas/Venta = cantidad de cápitas / cantidad de ventas (decimal con sufijo "cap.")
   setKPI('bofu-ticket-capita', (data.capitas_per_sale != null && data.capitas_per_sale > 0)
     ? data.capitas_per_sale.toFixed(2) + ' cap.' : '—');
+  // ROAS = total_revenue / total_spend. Formato "Nx" (ej: 4.5x). Si no hay
+  // spend en el período el backend devuelve 0 — mostramos "—" para evitar
+  // un "0x" engañoso.
+  setKPI('bofu-roas', (data.roas != null && data.roas > 0)
+    ? data.roas.toFixed(2) + 'x' : '—');
 
   _setDelta('delta-bofu-revenue',       data.total_revenue,         prev.total_revenue);
   _setDelta('delta-bofu-sales',         data.closed_sales,          prev.closed_sales);
@@ -1461,6 +1466,7 @@ function renderBofu(data) {
   _setDelta('delta-bofu-conversion',    data.conversion_rate,       prev.conversion_rate);
   _setDelta('delta-bofu-capitas',       data.capitas_closed,        prev.capitas_closed);
   _setDelta('delta-bofu-ticket-capita', data.capitas_per_sale,      prev.capitas_per_sale);
+  _setDelta('delta-bofu-roas',          data.roas,                  prev.roas);
 
   /* ── Sparklines for BOFU KPI cards ── */
   if (data.trend) {
@@ -1479,6 +1485,9 @@ function renderBofu(data) {
     _renderSparkline('sparkline-bofu-conversion',    sales,   isUp(sales),   src.labels || []);
     _renderSparkline('sparkline-bofu-capitas',       capitas, isUp(capitas), src.labels || []);
     _renderSparkline('sparkline-bofu-ticket-capita', rev,     isUp(rev),     src.labels || []);
+    // ROAS no tiene serie diaria propia — usamos la evolución de revenue como
+    // proxy visual de tendencia (spend en TOFU suele ser estable día a día).
+    _renderSparkline('sparkline-bofu-roas',          rev,     isUp(rev),     src.labels || []);
   }
 
   /* ── Trend: 2 independent bar charts (Ingresos / Ventas) ── */
@@ -1646,8 +1655,6 @@ function _renderSalesListTable(rows) {
   if (completeSelect) completeSelect.onchange = () => _applySalesListFilters();
 
   _applySalesListFilters();
-
-  if (badge) badge.textContent = `${rows.length} venta${rows.length === 1 ? '' : 's'}`;
 }
 
 /**
@@ -1659,11 +1666,17 @@ function _applySalesListFilters() {
 
   const sellerVal   = (document.getElementById('sales-list-filter-seller')?.value || '').trim();
   const completeVal = document.getElementById('sales-list-filter-complete')?.value || '';
+  // Filtro de canal sincronizado con el dropdown global de BOFU. La sales_list
+  // siempre llega completa (backend no la filtra) para no perder histórico
+  // al cambiar el dropdown — la coherencia visual la garantizamos acá.
+  const canalVal    = document.getElementById('bofu-canal-filter')?.value || 'campaign';
 
   const filtered = _salesListRows.filter(r => {
     if (sellerVal && r.assignee !== sellerVal) return false;
     if (completeVal === 'incomplete' && r.complete) return false;
     if (completeVal === 'complete'   && !r.complete) return false;
+    if (canalVal === 'campaign'     && r.is_campaign !== true)  return false;
+    if (canalVal === 'non_campaign' && r.is_campaign !== false) return false;
     return true;
   });
 
@@ -1673,9 +1686,11 @@ function _applySalesListFilters() {
   const totalRevEl   = document.getElementById('sales-list-total-revenue');
   const totalCapEl   = document.getElementById('sales-list-total-capitas');
   const totalCntEl   = document.getElementById('sales-list-total-count');
+  const badgeEl      = document.getElementById('sales-list-count');
   if (totalRevEl) totalRevEl.textContent = totalRevenue > 0 ? fmtCurrency(totalRevenue) : '—';
   if (totalCapEl) totalCapEl.textContent = totalCapitas > 0 ? fmtNumber(totalCapitas) : '—';
   if (totalCntEl) totalCntEl.textContent = filtered.length + (filtered.length === 1 ? ' venta' : ' ventas');
+  if (badgeEl)    badgeEl.textContent    = `${filtered.length} venta${filtered.length === 1 ? '' : 's'}`;
 
   if (filtered.length === 0) {
     tbody.innerHTML = '<tr><td colspan="7" class="pending-empty">Sin ventas para los filtros seleccionados.</td></tr>';

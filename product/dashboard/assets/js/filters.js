@@ -59,6 +59,13 @@ async function refreshDashboard(section, period, extraParams = {}) {
 
   try {
     const params = { period, campaign_id: _currentCampaignId, ...extraParams };
+    // BOFU: si el caller no envió `canal` explícito, leemos el valor del dropdown
+    // para que cualquier refresh (cambio de período, tema, campaña, etc.) respete
+    // el filtro de canal elegido por el usuario.
+    if (section === 'bofu' && params.canal === undefined) {
+      const canalEl = document.getElementById('bofu-canal-filter');
+      if (canalEl) params.canal = canalEl.value || 'campaign';
+    }
     const data = await fetchData(endpointMap[section] || section, params);
     renderSection(section, data);
   } catch (err) {
@@ -424,13 +431,26 @@ const KPI_INFO = {
     }
   },
   'bofu-ticket-capita': {
-    name: 'Ticket Promedio por Cápita',
-    formula: 'Ingresos totales ÷ Cápitas cerradas',
-    desc: 'Ingreso promedio que aporta cada afiliado individual. A diferencia del ticket por venta, este número refleja el valor por persona contratada — útil para benchmarking entre planes.',
+    name: 'Cápitas por Venta',
+    formula: 'Cápitas cerradas ÷ Ventas cerradas',
+    desc: 'Promedio de afiliados que se suman por cada venta cerrada. Una venta individual aporta como mínimo 1 cápita (el titular); si la venta incluye grupo familiar o empresa, el ratio sube. Útil para entender el tamaño promedio de cada operación.',
     example: d => {
-      const tpc = d.avg_ticket_per_capita || 0;
-      const cap = d.capitas_closed || 0;
-      return `Cada cápita aportó en promedio ${_fc(tpc)} de ingreso. ${_fn(cap)} cápitas en total.`;
+      const cap   = d.capitas_closed || 0;
+      const sales = d.closed_sales   || 0;
+      const ratio = d.capitas_per_sale || (sales > 0 ? cap / sales : 0);
+      return `${_fn(cap)} cápitas en ${_fn(sales)} ventas — ${ratio.toFixed(2)} cápitas promedio por venta.`;
+    }
+  },
+  'roas': {
+    name: 'ROAS — Retorno sobre Inversión Publicitaria',
+    formula: 'Ingresos del período ÷ Inversión en ads del período',
+    desc: 'Por cada $1 invertido en publicidad, cuánto dinero se generó en ventas. Un ROAS de 4.5x significa que cada peso invertido devolvió $4,50 en ingresos. Es la métrica que conecta el gasto en TOFU con el revenue del BOFU — el indicador de rentabilidad de las campañas.',
+    example: d => {
+      const rev   = d.total_revenue || 0;
+      const spend = d.total_spend   || 0;
+      const roas  = d.roas || (spend > 0 ? rev / spend : 0);
+      if (spend <= 0) return 'Sin inversión publicitaria registrada en el período — el ROAS no se puede calcular.';
+      return `${_fc(rev)} en ventas con ${_fc(spend)} invertidos = ${roas.toFixed(2)}x de retorno.`;
     }
   },
   'bofu-ticket': {
@@ -517,7 +537,7 @@ const KPI_INFO = {
 function _kpiSection(kpiKey) {
   if (kpiKey.startsWith('tofu-')) return 'tofu';
   if (kpiKey.startsWith('mofu-')) return 'mofu';
-  if (kpiKey.startsWith('bofu-') || (['revenue', 'sales'].includes(kpiKey) && _currentSection === 'bofu')) return 'bofu';
+  if (kpiKey.startsWith('bofu-') || (['revenue', 'sales', 'roas'].includes(kpiKey) && _currentSection === 'bofu')) return 'bofu';
   return 'performance';
 }
 
@@ -627,8 +647,16 @@ function _renderModalChart(kpiKey) {
     values = salesArr.map(s => Math.round(s * ratio));
     color = isUp(values) ? '#22C55E' : '#FF0040'; label = 'Cápitas';
   } else if (kpiKey === 'bofu-ticket-capita') {
-    values = data.trend.revenue || [];
-    color = isUp(values) ? '#22C55E' : '#FF0040'; label = 'Ingreso (proxy ticket/cápita)';
+    // Cápitas/Venta: proxy con ratio total aplicado a la serie de ventas.
+    const salesArr = data.trend.sales || [];
+    const ratio    = data.closed_sales > 0 ? (data.capitas_closed / data.closed_sales) : 1;
+    values = salesArr.map(_ => ratio);
+    color = '#22C55E'; label = 'Cápitas/Venta';
+  } else if (kpiKey === 'roas') {
+    // ROAS no tiene serie diaria propia — usamos la evolución de revenue como
+    // proxy visual (spend en TOFU suele ser estable día a día).
+    values = data.trend && data.trend.revenue ? data.trend.revenue : [];
+    color = isUp(values) ? '#22C55E' : '#FF0040'; label = 'Ingresos (proxy ROAS)';
   } else {
     return false;
   }
@@ -668,9 +696,12 @@ function _renderModalChart(kpiKey) {
             title: items => items[0]?.label || '',
             label: c => {
               const v = c.parsed.y;
-              const currencyKeys = ['tofu-cpc', 'mofu-cpl', 'bofu-revenue', 'bofu-ticket', 'bofu-ticket-capita'];
+              // bofu-ticket-capita ahora es ratio (cápitas/venta), NO moneda.
+              const currencyKeys = ['tofu-cpc', 'mofu-cpl', 'bofu-revenue', 'bofu-ticket'];
               if (currencyKeys.includes(kpiKey)) return ` ${label}: $${Math.round(v).toLocaleString('es-AR')}`;
-              if (kpiKey === 'roi') return ` ${label}: ${v.toFixed(1)}%`;
+              if (kpiKey === 'roi')  return ` ${label}: ${v.toFixed(1)}%`;
+              if (kpiKey === 'roas') return ` ${label}: ${v.toFixed(2)}x`;
+              if (kpiKey === 'bofu-ticket-capita') return ` ${label}: ${v.toFixed(2)} cap.`;
               return ` ${label}: ${Number.isInteger(v) ? v.toLocaleString('es-AR') : v.toFixed(1)}`;
             }
           }
@@ -687,14 +718,16 @@ function _renderModalChart(kpiKey) {
           ticks: {
             font: { size: 10, family: 'Outfit' }, color: 'rgba(90,112,128,0.7)',
             callback: v => {
-              if (kpiKey === 'roi') return v.toFixed(0) + '%';
+              if (kpiKey === 'roi')  return v.toFixed(0) + '%';
+              if (kpiKey === 'roas') return v.toFixed(1) + 'x';
+              if (kpiKey === 'bofu-ticket-capita') return v.toFixed(1);
               if (kpiKey === 'tofu-impressions' || kpiKey === 'tofu-clicks') {
                 return v >= 1000 ? (v / 1000).toFixed(0) + 'k' : v;
               }
-              if (['tofu-cpc', 'mofu-cpl', 'bofu-ticket', 'bofu-ticket-capita'].includes(kpiKey)) {
+              if (['tofu-cpc', 'mofu-cpl', 'bofu-ticket'].includes(kpiKey)) {
                 return '$' + (v / 1000).toFixed(1) + 'k';
               }
-              if (['bofu-revenue', 'bofu-ticket-capita'].includes(kpiKey)) {
+              if (kpiKey === 'bofu-revenue') {
                 return v >= 1000000 ? '$' + (v / 1000000).toFixed(1) + 'M' : '$' + (v / 1000).toFixed(0) + 'k';
               }
               return v >= 1000000 ? '$' + (v / 1000000).toFixed(1) + 'M' : v >= 1000 ? '$' + (v / 1000).toFixed(0) + 'k' : v;
@@ -859,6 +892,20 @@ function initFilters() {
 
   /* Dropdown de campañas */
   _initCampaignsDropdown();
+
+  /* Dropdown de canal del lead (BOFU). Persistimos en localStorage para que
+     la selección sobreviva al reload y a la navegación entre secciones. */
+  const bofuCanalEl = document.getElementById('bofu-canal-filter');
+  if (bofuCanalEl) {
+    const savedCanal = localStorage.getItem('umoh:bofu_canal');
+    if (savedCanal && ['campaign', 'non_campaign', 'all'].includes(savedCanal)) {
+      bofuCanalEl.value = savedCanal;
+    }
+    bofuCanalEl.addEventListener('change', () => {
+      localStorage.setItem('umoh:bofu_canal', bofuCanalEl.value);
+      refreshDashboard('bofu', _currentPeriod, { ..._periodParams(), canal: bofuCanalEl.value });
+    });
+  }
 }
 
 /* ── Dropdown de campañas — trigger expandir/colapsar ────── */
