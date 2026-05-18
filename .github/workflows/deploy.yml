@@ -56,6 +56,13 @@ jobs:
           SUPABASE_URL=${{ secrets.SUPABASE_URL }}
           SUPABASE_SERVICE_KEY=${{ secrets.SUPABASE_SERVICE_KEY }}
           EOF
+          # Canary file — público vía /staging/deploy-canary.txt; sirve para verificar
+          # desde afuera si el path quedó bien servido tras el deploy.
+          echo "Deploy STAGING SHA: ${GITHUB_SHA:0:7} — $(date -u +%Y-%m-%dT%H:%M:%SZ)" > build/staging/deploy-canary.txt
+          echo "════ Sanity check del build local ════"
+          ls -la build/staging/ | head -15
+          echo "Total archivos en build/staging:"
+          find build/staging -type f | wc -l
 
       - name: Deploy via rsync
         run: |
@@ -63,6 +70,18 @@ jobs:
             -e "ssh -p $SSH_PORT -i ~/.ssh/deploy_key -o StrictHostKeyChecking=no" \
             build/staging/ \
             "${{ secrets.SSH_USER }}@${{ secrets.FTP_HOST }}:domains/umohcrew.com/public_html/prepagas/staging/"
+
+      - name: Verificación post-deploy (canary + listado del path real)
+        run: |
+          ssh -p $SSH_PORT -i ~/.ssh/deploy_key -o StrictHostKeyChecking=no \
+            "${{ secrets.SSH_USER }}@${{ secrets.FTP_HOST }}" \
+            'echo "════ Canary en path del staging ════"; cat domains/umohcrew.com/public_html/prepagas/staging/deploy-canary.txt 2>/dev/null || echo "NO EXISTE — path incorrecto"; \
+             echo ""; \
+             echo "════ Archivos directos del dir staging/ ════"; ls -la domains/umohcrew.com/public_html/prepagas/staging/ 2>/dev/null | head -25 || echo "NO EXISTE el dir"; \
+             echo ""; \
+             echo "════ Timestamp del index.php del staging ════"; stat domains/umohcrew.com/public_html/prepagas/staging/index.php 2>/dev/null | grep -E "Modify|File:" || echo "no existe el index.php"; \
+             echo ""; \
+             echo "════ ¿Hay .htaccess heredado en /prepagas/ que afecte? ════"; cat domains/umohcrew.com/public_html/prepagas/.htaccess 2>/dev/null | head -30 || echo "sin .htaccess en padre"'
 
       - name: Invalidar OPcache staging
         run: |
