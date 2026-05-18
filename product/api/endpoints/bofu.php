@@ -34,6 +34,16 @@ try {
     // las facts tables que ya están filtradas por campaign_id. Por ahora el
     // único bloque que sí filtra realmente es sellers (via seller_facts).
     $campaign_filter = $_GET['campaign_id'] ?? '';
+
+    // Filtro de canal del lead (2026-05-16). Valores:
+    //   campaign     → solo leads de campaña (is_campaign_lead = true). Default.
+    //   non_campaign → solo leads particulares (Propio, Referido, vacíos).
+    //   all          → ambos.
+    // Default 'campaign' preserva la UX previa al feature (lo que veía el cliente).
+    $canal_filter = $_GET['canal'] ?? 'campaign';
+    if (!in_array($canal_filter, ['campaign', 'non_campaign', 'all'], true)) {
+        $canal_filter = 'campaign';
+    }
     // 1. Ventas cerradas: lead_monetary con is_closed=true
     $closed = supabase_query('lead_monetary', [
         'client_slug' => 'eq.' . CLIENT_SLUG,
@@ -69,21 +79,41 @@ try {
 
     $tofu_rows = supabase_query('tofu_ads_daily', [
         'client_slug' => 'eq.' . CLIENT_SLUG,
-        'select'      => 'date,impressions',
+        'select'      => 'date,impressions,spend',
         'order'       => 'date.asc',
         'limit'       => '500',
     ]);
-    $impr_by_date = [];
+    $impr_by_date  = [];
+    $spend_by_date = [];
     foreach ($tofu_rows as $r) {
         $d = $r['date'];
-        $impr_by_date[$d] = ($impr_by_date[$d] ?? 0) + (int)$r['impressions'];
+        $impr_by_date[$d]  = ($impr_by_date[$d]  ?? 0) + (int)$r['impressions'];
+        $spend_by_date[$d] = ($spend_by_date[$d] ?? 0.0) + (float)$r['spend'];
     }
 
-    // 4. Agrupar ventas cerradas por fecha de cierre (updated_at).
-    //    Las métricas principales reflejan solo ventas de leads de campaña.
-    //    Las ventas de leads del vendedor se reportan en bloque non_campaign.
-    $by_date = [];
+    // 4. Agrupar ventas cerradas por fecha de cierre (updated_at) en dos buckets
+    //    independientes (campaign y non_campaign), para luego consolidar según
+    //    $canal_filter. Los totales de non_campaign también se exponen aparte
+    //    para descripción/microcopy.
+    $by_date_campaign = [];
+    $by_date_nc       = [];
     $nc_revenue = 0.0; $nc_sales = 0; $nc_capitas = 0;
+
+    $add_to_bucket = function(array &$bucket, string $d, float $price, int $caps, string $tip) {
+        if (!isset($bucket[$d])) {
+            $bucket[$d] = [
+                'total_revenue' => 0.0,
+                'closed_sales'  => 0,
+                'capitas'       => 0,
+                'sales_by_op'   => [],
+            ];
+        }
+        $bucket[$d]['total_revenue'] += $price;
+        $bucket[$d]['closed_sales']++;
+        $bucket[$d]['capitas']       += $caps;
+        $bucket[$d]['sales_by_op'][$tip] = ($bucket[$d]['sales_by_op'][$tip] ?? 0) + $price;
+    };
+
     foreach ($closed as $c) {
         $upd = $c['updated_at'] ?? null;
         if (!$upd) continue;
@@ -94,39 +124,59 @@ try {
         $lead  = $lead_by_id[$c['meistertask_id']] ?? null;
         $is_campaign = !empty($lead['is_campaign_lead']);
 
-        if (!$is_campaign) {
+        $tip = trim($lead['tipification'] ?? '');
+        if ($tip === '') $tip = 'Sin clasificar';
+
+        if ($is_campaign) {
+            $add_to_bucket($by_date_campaign, $d, $price, $caps, $tip);
+        } else {
+            $add_to_bucket($by_date_nc, $d, $price, $caps, $tip);
             $nc_revenue += $price;
             $nc_sales++;
             $nc_capitas += $caps;
-            continue;
         }
+    }
 
-        if (!isset($by_date[$d])) {
-            $by_date[$d] = [
-                'total_revenue' => 0.0,
-                'closed_sales'  => 0,
-                'capitas'       => 0,
-                'sales_by_op'   => [],
-            ];
+    // Consolidación según filtro de canal. 'all' fusiona ambos buckets sumando
+    // por fecha (sales_by_op se fusiona por tipificación).
+    if ($canal_filter === 'campaign') {
+        $by_date = $by_date_campaign;
+    } elseif ($canal_filter === 'non_campaign') {
+        $by_date = $by_date_nc;
+    } else {
+        $by_date = $by_date_campaign;
+        foreach ($by_date_nc as $d => $row) {
+            if (!isset($by_date[$d])) {
+                $by_date[$d] = $row;
+                continue;
+            }
+            $by_date[$d]['total_revenue'] += $row['total_revenue'];
+            $by_date[$d]['closed_sales']  += $row['closed_sales'];
+            $by_date[$d]['capitas']       += $row['capitas'];
+            foreach ($row['sales_by_op'] as $op => $rev) {
+                $by_date[$d]['sales_by_op'][$op] = ($by_date[$d]['sales_by_op'][$op] ?? 0) + $rev;
+            }
         }
-        $by_date[$d]['total_revenue'] += $price;
-        $by_date[$d]['closed_sales']++;
-        $by_date[$d]['capitas']       += $caps;
-
-        $tip = trim($lead['tipification'] ?? '');
-        if ($tip === '') $tip = 'Sin clasificar';
-        $by_date[$d]['sales_by_op'][$tip] = ($by_date[$d]['sales_by_op'][$tip] ?? 0) + $price;
     }
     ksort($by_date);
 
-    if (empty($by_date)) api_error('Sin ventas cerradas en Supabase para ' . CLIENT_SLUG, 404);
+    // Solo abortamos si NO hay ventas en ningún bucket (caso onboarding). Si hay
+    // ventas en el otro canal pero no en el filtro elegido, devolvemos KPIs en
+    // cero para no romper el frontend al cambiar el dropdown.
+    if (empty($by_date_campaign) && empty($by_date_nc)) {
+        api_error('Sin ventas cerradas en Supabase para ' . CLIENT_SLUG, 404);
+    }
 
-    // 5. Filtrar por período
-    $period = $_GET['period'] ?? '30d';
-    $dates  = array_keys($by_date);
-    $last   = end($dates);
+    // 5. Filtrar por período. Calculamos los límites del período sobre el set
+    //    completo de fechas (campaign + nc), no sólo el bucket filtrado: así
+    //    el rango temporal es consistente entre filtros y no se "encoge" cuando
+    //    el filtro elegido tiene menos datos.
+    $period     = $_GET['period'] ?? '30d';
+    $all_dates  = array_keys(array_merge($by_date_campaign, $by_date_nc));
+    sort($all_dates);
+    $last       = end($all_dates);
 
-    [$start, $end] = period_dates($period, $last, $dates[0] ?? null);
+    [$start, $end] = period_dates($period, $last, $all_dates[0] ?? null);
 
     // Período previo: mismo length, terminando el día antes de $start
     $period_days = (strtotime($end) - strtotime($start)) / 86400 + 1;
@@ -155,11 +205,20 @@ try {
 
     // Conversion rate definido como closed_sales / impressions en el período.
     // Es el ratio de cuánta gente que vio el ad terminó comprando.
-    $period_impr = 0;
+    $period_impr  = 0;
+    $period_spend = 0.0;
     foreach ($impr_by_date as $d => $n) {
         if ($d >= $start && $d <= $end) $period_impr += $n;
     }
+    foreach ($spend_by_date as $d => $s) {
+        if ($d >= $start && $d <= $end) $period_spend += $s;
+    }
     $conversion_rate = $period_impr > 0 ? round($closed_sales / $period_impr * 100, 4) : 0;
+
+    // ROAS: Return On Ad Spend. Ingresos del período (según filtro de canal)
+    // divididos por inversión total en ads del período. Sin redondeo agresivo
+    // (2 decimales) porque la card en frontend lo formatea como Nx.
+    $roas = $period_spend > 0 ? round($total_revenue / $period_spend, 2) : 0;
 
     // 7. Trend: revenue y sales por día
     $trend = build_trend($selected, $period, [
@@ -169,7 +228,7 @@ try {
 
     // 8. Prev — suma del período previo (mismo length que el actual), para deltas correctos.
     $prev_selected = filter_range($by_date, $prev_start, $prev_end);
-    $pr_rev = 0.0; $pr_sales = 0; $pr_cap = 0; $pr_impr = 0;
+    $pr_rev = 0.0; $pr_sales = 0; $pr_cap = 0; $pr_impr = 0; $pr_spend = 0.0;
     foreach ($prev_selected as $r) {
         $pr_rev   += $r['total_revenue'];
         $pr_sales += $r['closed_sales'];
@@ -178,6 +237,9 @@ try {
     foreach ($impr_by_date as $d => $n) {
         if ($d >= $prev_start && $d <= $prev_end) $pr_impr += $n;
     }
+    foreach ($spend_by_date as $d => $s) {
+        if ($d >= $prev_start && $d <= $prev_end) $pr_spend += $s;
+    }
     $prev = [
         'total_revenue'    => round($pr_rev, 2),
         'closed_sales'     => $pr_sales,
@@ -185,6 +247,8 @@ try {
         'conversion_rate'  => $pr_impr > 0 ? round($pr_sales / $pr_impr * 100, 4) : 0,
         'capitas_closed'   => $pr_cap,
         'capitas_per_sale' => $pr_sales > 0 ? round($pr_cap / $pr_sales, 2) : 0,
+        'total_spend'      => round($pr_spend, 2),
+        'roas'             => $pr_spend > 0 ? round($pr_rev / $pr_spend, 2) : 0,
     ];
 
     // 9. Tipification breakdown — top 5 operatorias por revenue
@@ -361,12 +425,15 @@ try {
     });
 
     echo json_encode([
+        'canal'            => $canal_filter,
         'total_revenue'    => round($total_revenue, 2),
         'closed_sales'     => $closed_sales,
         'avg_ticket'       => $avg_ticket,
         'conversion_rate'  => $conversion_rate,
         'capitas_closed'   => $capitas,
         'capitas_per_sale' => $capitas_per_sale,
+        'total_spend'      => round($period_spend, 2),
+        'roas'             => $roas,
         'trend' => $trend,
         'typification' => [
             'labels' => $type_labels,

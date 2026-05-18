@@ -59,6 +59,13 @@ async function refreshDashboard(section, period, extraParams = {}) {
 
   try {
     const params = { period, campaign_id: _currentCampaignId, ...extraParams };
+    // BOFU: si el caller no envió `canal` explícito, leemos el valor del dropdown
+    // para que cualquier refresh (cambio de período, tema, campaña, etc.) respete
+    // el filtro de canal elegido por el usuario.
+    if (section === 'bofu' && params.canal === undefined) {
+      const canalEl = document.getElementById('bofu-canal-filter');
+      if (canalEl) params.canal = canalEl.value || 'campaign';
+    }
     const data = await fetchData(endpointMap[section] || section, params);
     renderSection(section, data);
   } catch (err) {
@@ -859,6 +866,20 @@ function initFilters() {
 
   /* Dropdown de campañas */
   _initCampaignsDropdown();
+
+  /* Dropdown de canal del lead (BOFU). Persistimos en localStorage para que
+     la selección sobreviva al reload y a la navegación entre secciones. */
+  const bofuCanalEl = document.getElementById('bofu-canal-filter');
+  if (bofuCanalEl) {
+    const savedCanal = localStorage.getItem('umoh:bofu_canal');
+    if (savedCanal && ['campaign', 'non_campaign', 'all'].includes(savedCanal)) {
+      bofuCanalEl.value = savedCanal;
+    }
+    bofuCanalEl.addEventListener('change', () => {
+      localStorage.setItem('umoh:bofu_canal', bofuCanalEl.value);
+      refreshDashboard('bofu', _currentPeriod, { ..._periodParams(), canal: bofuCanalEl.value });
+    });
+  }
 }
 
 /* ── Dropdown de campañas — trigger expandir/colapsar ────── */
