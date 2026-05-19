@@ -5732,3 +5732,142 @@ body.sidebar-layout .theme-toggle-switch {
   }
 }
 
+/* ════════════════════════════════════════════════════════════════
+   MOBILE FIXES — overrides quirúrgicos para celular (<640px)
+   Última capa del archivo: gana por orden de cascada.
+   Solo lo necesario para que el dashboard sea usable en cualquier
+   celular sin romper desktop ni tablet.
+═══════════════════════════════════════════════════════════════ */
+@media (max-width: 640px) {
+
+  /* KPI grids: 2 columnas en lugar de 1 — evita scroll infinito
+     y mantiene jerarquía visual de cards lado a lado. */
+  .kpi-grid--6,
+  .kpi-grid--5,
+  .kpi-grid--4,
+  .kpi-grid--3 {
+    grid-template-columns: repeat(2, 1fr);
+    gap: var(--sp-3);
+  }
+  /* kpi-grid--2 quedan stackeados (cards grandes tipo capitas / ticket-capita) */
+
+  /* Padding ajustado: más espacio horizontal para contenido */
+  .dashboard-main {
+    padding: var(--sp-4) var(--sp-3) var(--sp-10);
+  }
+
+  /* KPI cards: padding interno más compacto para que valores grandes
+     (ej "$1.240.500") no se corten ni hagan wrap raro. */
+  .kpi-card {
+    padding: var(--sp-4) var(--sp-4);
+  }
+  .kpi-value {
+    font-size: 22px;
+  }
+
+  /* Tablas anchas (.pending-table 8 cols, .sellers-table 7 cols): scroll
+     horizontal con touch nativo. min-width fuerza a la tabla a pedir scroll
+     en vez de comprimirse a la fuerza. Canvas de Chart.js no overflow, así
+     que aplicar overflow-x al body es seguro. */
+  .chart-card-body {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+  .pending-table,
+  .sellers-table {
+    min-width: 540px;
+  }
+
+  /* Modales: bottom-sheet en mobile. Ya existe para kpi-modal en 768px,
+     extendemos el patrón a journey-stage-modal y lead-detail-modal. */
+  .journey-modal-overlay {
+    align-items: flex-end;
+    padding: 0;
+  }
+  .journey-modal {
+    max-width: 100%;
+    width: 100%;
+    max-height: 92vh;
+    border-radius: var(--r-lg) var(--r-lg) 0 0;
+    padding: var(--sp-6) var(--sp-5) var(--sp-5);
+  }
+
+  .kpi-modal-overlay {
+    align-items: flex-end;
+    padding: 0;
+  }
+  .kpi-modal {
+    max-width: 100%;
+    width: 100%;
+    max-height: 92vh;
+    border-radius: var(--r-lg) var(--r-lg) 0 0;
+    padding: var(--sp-6) var(--sp-5) var(--sp-5);
+  }
+
+  /* Section header: tipografía hero más compacta y menos margen */
+  .section-title--hero {
+    font-size: clamp(28px, 9vw, 40px);
+  }
+  .section-header {
+    margin-bottom: var(--sp-4);
+  }
+
+  /* Charts grids: forzamos 1 columna en celular (90px breakpoint existente
+     ya cubre 2col pero hay charts-grid--full y otros que no, los unificamos) */
+  .charts-grid,
+  .charts-grid--2col,
+  .charts-grid--centered {
+    grid-template-columns: 1fr;
+    gap: var(--sp-3);
+  }
+
+  /* Charts: altura más compacta en mobile para no comer toda la viewport */
+  .chart-body--tall {
+    height: 220px;
+  }
+  .chart-body--donut {
+    min-height: 220px;
+  }
+
+  /* Filtro de canal BOFU: anula gaps del inline style cuando se apila.
+     El style="" inline necesita !important para sobrescribir. */
+  .bofu-canal-filter-wrap {
+    gap: var(--sp-2) !important;
+    margin-top: var(--sp-3) !important;
+  }
+  .bofu-canal-filter-wrap .chart-badge {
+    width: 100%;
+  }
+
+  /* Customer journey: barras más bajas y arrow más chica. El 480px
+     existente ya lo cubre pero subimos el threshold a 640px. */
+  .journey-bar-wrap { height: 160px; }
+  .journey-col { min-width: 56px; }
+  .journey-col-value { font-size: 14px; }
+  .journey-col-pct { font-size: 10px; }
+  .journey-col-label { font-size: 10px; }
+  .journey-arrow { width: 10px; font-size: 10px; padding-bottom: 70px; }
+  .journey-wrap { padding: var(--sp-3) var(--sp-3) var(--sp-4); }
+  .journey-insights { padding: var(--sp-4); }
+
+  /* Sellers ranking: padding más compacto en cells */
+  .sellers-table thead th,
+  .sellers-table td {
+    padding: 8px 6px;
+    font-size: 12px;
+  }
+
+  /* Pending/sales table: padding más compacto */
+  .pending-table thead th,
+  .pending-table td {
+    padding: 8px 6px;
+    font-size: 12px;
+  }
+
+  /* Modal lead-detail: campos en 1 columna (estaban en 2) */
+  .lead-modal-grid,
+  .lead-modal-fields {
+    grid-template-columns: 1fr !important;
+  }
+}
+
