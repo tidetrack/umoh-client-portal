@@ -63,6 +63,19 @@
   --nav-h: 48px;
   --content-max: 1280px;
   --content-pad: var(--sp-6);
+
+  /* ── Breakpoints canónicos — sistema de 3 grupos ────────────
+     Web (Desktop) : ≥ 1024px  — sidebar expandido, grids completos
+     Tablet        : 640–1023px — sidebar colapsado o drawer, grids 2 col
+     Mobile        : < 640px   — drawer cerrado, 1 col, tablas con scroll
+     Nota: el sidebar usa 768px como umbral para activar el drawer
+     (el sidebar de 240px no cabe bien en viewports < 768px incluso
+     con el content offset correcto). Ese breakpoint es la excepción
+     documentada — el resto del layout usa los 3 canónicos de arriba.
+     ─────────────────────────────────────────────────────────── */
+  --bp-desktop:  1024px;
+  --bp-tablet:    640px;
+  --bp-sidebar:   768px; /* solo para el drawer del sidebar */
 }
 
 /* ── Dark Mode overrides ────────────────────────────────────── */
@@ -1275,6 +1288,23 @@ body.nav-hidden .nav-fab {
   outline-offset: 1px;
 }
 
+/* ── BOFU canal filter wrapper ────────────────────────────── */
+/* Base: flex-row con gap, wrappea si no caben los elementos.
+   En mobile (< 640px) cambia a columna — ver bloque @media 640px. */
+.bofu-canal-filter-wrap {
+  margin-top:  var(--sp-4);
+  display:     flex;
+  align-items: center;
+  gap:         var(--sp-3);
+  flex-wrap:   wrap;
+}
+
+.bofu-canal-filter-label {
+  font-size:   0.875rem;
+  color:       var(--text-muted);
+  white-space: nowrap;
+}
+
 .chart-card-body {
   padding: var(--sp-5);
   flex: 1;
@@ -2038,20 +2068,25 @@ body.nav-hidden .nav-fab {
   border-top-color: var(--umoh-primary) !important;
 }
 
-/* ── 12. Responsive ────────────────────────────────────────── */
-@media (max-width: 1200px) {
+/* ── 12. Responsive — Sistema de 3 breakpoints canónicos ──────
+   Web/Desktop : ≥ 1024px  (sin overrides — es el layout base)
+   Tablet      : < 1024px  (grids reducidos, sidebar colapsado)
+   Mobile      : <  640px  (1 col, tablas scroll, modales full)
+   Sidebar     :  < 768px  (excepción documentada — ver :root)
+   ──────────────────────────────────────────────────────────── */
+
+/* ── TABLET (< 1024px) ─────────────────────────────────────── */
+@media (max-width: 1023px) {
+  /* KPI grids anchos → 3 columnas en tablet */
   .kpi-grid--6 {
     grid-template-columns: repeat(3, 1fr);
   }
-}
 
-@media (max-width: 1100px) {
   .kpi-grid--5 {
     grid-template-columns: repeat(3, 1fr);
   }
-}
 
-@media (max-width: 900px) {
+  /* Charts 2-col → 1 columna cuando el viewport es tablet */
   .charts-grid--2col {
     grid-template-columns: 1fr;
   }
@@ -2067,47 +2102,173 @@ body.nav-hidden .nav-fab {
   .charts-grid--centered {
     grid-template-columns: 1fr;
   }
-}
 
-@media (max-width: 768px) {
-  :root {
-    --content-pad: var(--sp-4);
+  /* Commercial summary: 3 columnas en tablet */
+  .cs-grid {
+    grid-template-columns: repeat(3, 1fr);
   }
 
-  .kpi-grid--6,
-  .kpi-grid--5,
+  /* KPI grids medianos → 2 columnas */
   .kpi-grid--4,
   .kpi-grid--3 {
     grid-template-columns: repeat(2, 1fr);
   }
 
-  .kpi-grid--2 {
-    grid-template-columns: 1fr;
+  /* Sellers table: reducir font-size en tablet para respirar */
+  .sellers-table {
+    font-size: 14px;
   }
 
+  .sellers-table .td-name {
+    font-size: 15px;
+  }
+
+  .sellers-table .td-num {
+    font-size: 14px;
+  }
+
+  /* Inicio quick-grid → 2 columnas en tablet */
+  .inicio-quick-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+
+  /* Tablas anchas (sellers 7 cols, pending) — scroll horizontal disponible */
+  .chart-card-body {
+    overflow-x: auto;
+  }
+}
+
+/* ── MOBILE (< 640px) ──────────────────────────────────────── */
+@media (max-width: 640px) {
+  :root {
+    --content-pad: var(--sp-3);
+    --header-h: 56px;
+  }
+
+  body { font-size: 14px; }
+
+  /* Header — colapso compacto */
+  .header-inner {
+    flex-wrap: wrap;
+    gap: var(--sp-2);
+    padding: var(--sp-2) var(--sp-3);
+  }
+  .header-brand   { flex-shrink: 1; min-width: 0; }
+  .brand-agency   { font-size: 14px; }
+  .brand-client   { display: none; }
+  .header-controls { gap: var(--sp-2); flex-wrap: wrap; justify-content: flex-end; }
+  .user-greeting  { display: none; }
+
+  /* Nav tabs — scroll horizontal */
+  .nav-tabs-wrap, .nav-tabs {
+    overflow-x: auto;
+    scrollbar-width: none;
+    -webkit-overflow-scrolling: touch;
+  }
+  .nav-tabs-wrap::-webkit-scrollbar, .nav-tabs::-webkit-scrollbar { display: none; }
+  .nav-tab {
+    white-space: nowrap;
+    flex-shrink: 0;
+    padding: 10px 14px;
+    font-size: 13px;
+  }
+
+  /* Period selector en header (legacy) — scroll horizontal */
   .period-selector {
+    overflow-x: auto;
+    max-width: 100%;
+    scrollbar-width: none;
     gap: 0;
   }
+  .period-selector::-webkit-scrollbar { display: none; }
+  .period-btn { padding: 6px 10px; font-size: 12px; }
 
-  .period-btn {
-    padding: 6px 10px;
+  /* Date picker popover — full width */
+  .date-picker-popover {
+    position: fixed;
+    top: calc(var(--header-h) + 8px);
+    left: var(--sp-3);
+    right: var(--sp-3);
+    min-width: 0;
+  }
+
+  /* KPI cards — 2 columnas en mobile (1 col es demasiado tall) */
+  .kpi-grid,
+  .kpi-grid--6,
+  .kpi-grid--5,
+  .kpi-grid--4,
+  .kpi-grid--3 {
+    grid-template-columns: repeat(2, 1fr);
+    gap: var(--sp-3);
+  }
+
+  /* kpi-grid--2 → 1 columna (solo 2 cards, caben bien en 1 col) */
+  .kpi-grid--2 {
+    grid-template-columns: 1fr;
+    gap: var(--sp-3);
+  }
+
+  .kpi-card { padding: var(--sp-3) var(--sp-4); }
+  .kpi-value { font-size: 22px; }
+  .kpi-label { font-size: 11px; }
+
+  /* Charts grids — 1 columna siempre */
+  .charts-grid,
+  .charts-grid--full,
+  .charts-grid--2col,
+  .charts-grid--centered {
+    grid-template-columns: 1fr;
+    gap: var(--sp-3);
+  }
+
+  /* Chart cards — padding y altura ajustadas */
+  .chart-card { border-radius: var(--r-md); }
+  .chart-card-header { padding: var(--sp-3) var(--sp-4); }
+  .chart-title { font-size: 14px; }
+  .chart-card-body {
+    padding: var(--sp-3);
+    overflow-x: auto; /* tablas dentro del card hacen scroll */
+  }
+  .chart-body--tall  { height: 240px; }
+  .chart-body--donut { height: 220px; }
+
+  /* Commercial summary — 2 columnas en mobile */
+  .cs-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+
+  /* Tablas — font reducido + scroll horizontal via chart-card-body */
+  .terms-table,
+  .geo-table,
+  .pending-table,
+  .sellers-table,
+  .segments-table,
+  table.bofu-segment-table {
     font-size: 12px;
   }
 
-  .nav-tab {
-    padding: 0 var(--sp-4);
-    font-size: 12px;
+  .sellers-table { font-size: 12px; }
+  .sellers-table .td-name { font-size: 13px; }
+  .sellers-table .td-num  { font-size: 12px; }
+  .sellers-table thead th { padding: var(--sp-2) var(--sp-2); }
+  .sellers-table td       { padding: var(--sp-2) var(--sp-2); }
+
+  /* Columnas de tabla largas — truncar para que quepan */
+  .geo-table .geo-city,
+  .pending-table .pending-name { max-width: 140px; }
+  .term-name { width: 140px; max-width: 140px; }
+
+  /* Geo map — altura reducida */
+  .geo-map { height: 240px; }
+
+  /* BOFU canal filter — wrappear bien en mobile */
+  .bofu-canal-filter-wrap {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: var(--sp-2);
   }
 
-  .geo-map {
-    height: 280px;
-  }
-
-  .user-greeting {
-    display: none;
-  }
-
-  /* Modal responsive */
+  /* Modales — bottom-sheet en mobile */
   .kpi-modal-overlay {
     padding: var(--sp-3);
     align-items: flex-end;
@@ -2115,29 +2276,94 @@ body.nav-hidden .nav-fab {
 
   .kpi-modal {
     max-width: 100%;
+    max-height: calc(100vh - 80px);
     border-radius: var(--r-lg) var(--r-lg) 0 0;
-    padding: var(--sp-6) var(--sp-5) var(--sp-5);
-    max-height: 85vh;
+    padding: var(--sp-5) var(--sp-4) var(--sp-4);
     overflow-y: auto;
+  }
+  .kpi-modal-title { font-size: 18px; }
+
+  /* Lead modal reutiliza .kpi-modal — básicamente heredado */
+  .lead-modal-basics-grid {
+    grid-template-columns: 1fr;
+  }
+
+  /* Journey modal */
+  .journey-modal {
+    padding: var(--sp-5) var(--sp-4) var(--sp-4);
+    max-height: 85vh;
+  }
+  .journey-modal-metric-value { font-size: 26px; }
+  .journey-modal-title        { font-size: 18px; }
+
+  /* Footer */
+  .footer-inner {
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: var(--sp-2);
+    text-align: center;
+    padding: var(--sp-3);
+  }
+  .footer-text { font-size: 11px; }
+
+  /* Regen modal */
+  .regen-modal { padding: var(--sp-4); }
+  .regen-modal-cmd-wrap {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+  .regen-modal-copy {
+    width: 100%;
+    justify-content: center;
+  }
+
+  /* Inicio */
+  .inicio-quick-grid {
+    grid-template-columns: 1fr 1fr;
+    gap: var(--sp-3);
+  }
+  .inicio-saludo       { font-size: 22px; }
+  .inicio-ai-card      { padding: var(--sp-4); }
+  .inicio-quick-kpi-value { font-size: 18px; }
+
+  /* Journey bar — más compacta */
+  .journey-bar-wrap  { height: 120px; }
+  .journey-col       { min-width: 44px; }
+  .journey-col-value { font-size: 12px; }
+  .journey-col-label { font-size: 9px; }
+  .journey-arrow     { width: 8px; font-size: 9px; padding-bottom: 50px; }
+  .journey-phases    { display: none; }
+
+  /* Journey card header — stack vertical */
+  .journey-card-header {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+  .journey-card-header-controls {
+    width: 100%;
+    justify-content: flex-start;
+  }
+
+  /* Journey insights — 1 columna */
+  .journey-insights-list {
+    grid-template-columns: 1fr;
   }
 }
 
-@media (max-width: 480px) {
+/* ── Extra-narrow: ≤ 360px (iPhone SE, teléfonos viejos) ────── */
+@media (max-width: 360px) {
+  .kpi-value    { font-size: 20px; }
+  .chart-title  { font-size: 13px; }
+  .nav-tab      { padding: 8px 10px; font-size: 12px; }
 
+  /* KPI a 1 col en pantallas muy chicas */
+  .kpi-grid,
   .kpi-grid--6,
   .kpi-grid--5,
   .kpi-grid--4,
   .kpi-grid--3,
   .kpi-grid--2 {
     grid-template-columns: 1fr;
-  }
-
-  .brand-client {
-    display: none;
-  }
-
-  .header-inner {
-    gap: var(--sp-3);
   }
 }
 
@@ -2147,10 +2373,7 @@ body.nav-hidden .nav-fab {
   grid-template-columns: repeat(6, 1fr);
   gap: var(--sp-4);
 }
-
-@media (max-width: 768px) {
-  .cs-grid { grid-template-columns: repeat(2, 1fr); }
-}
+/* overrides en Tablet y Mobile están arriba en sus bloques canónicos */
 
 .cs-item {
   display: flex;
@@ -2252,16 +2475,7 @@ body.nav-hidden .nav-fab {
   white-space: nowrap;
 }
 
-@media (max-width: 480px) {
-  .journey-card-header {
-    flex-direction: column;
-    align-items: flex-start;
-  }
-  .journey-card-header-controls {
-    width: 100%;
-    justify-content: flex-start;
-  }
-}
+/* journey-card-header mobile: ver bloque @media (max-width: 640px) */
 
 /* Entrance: las barras crecen de 0 a su altura final */
 @keyframes journeyBarGrow {
@@ -3008,14 +3222,7 @@ body.nav-hidden .nav-fab {
   font-style: italic;
 }
 
-@media (max-width: 600px) {
-  .journey-modal {
-    padding: var(--sp-6) var(--sp-5) var(--sp-5);
-    max-height: 85vh;
-  }
-  .journey-modal-metric-value { font-size: 26px; }
-  .journey-modal-title { font-size: 18px; }
-}
+/* journey-modal mobile: ver bloque @media (max-width: 640px) */
 
 /* ── Dark theme overrides ── */
 [data-theme="dark"] .journey-header {
@@ -3046,23 +3253,7 @@ body.nav-hidden .nav-fab {
   box-shadow: 0 6px 20px rgba(0,0,0,0.45);
 }
 
-/* Responsive: en móvil, barras más compactas */
-@media (max-width: 768px) {
-  .journey-bar-wrap { height: 160px; }
-  .journey-col { min-width: 48px; }
-  .journey-col-value { font-size: 13px; }
-  .journey-col-label { font-size: 10px; }
-  .journey-arrow { width: 10px; font-size: 10px; padding-bottom: 68px; }
-  .journey-phases { display: none; }
-}
-
-@media (max-width: 480px) {
-  .journey-bar-wrap { height: 120px; }
-  .journey-col { min-width: 40px; }
-  .journey-col-value { font-size: 12px; }
-  .journey-col-label { font-size: 9px; }
-  .journey-arrow { width: 8px; font-size: 9px; padding-bottom: 50px; }
-}
+/* journey bars responsive: ver bloque @media (max-width: 640px) */
 
 .cs-flat { color: var(--text-muted); }
 /* ── Pending Price Table — Ventas sin monto cargado ─────────── */
@@ -3517,132 +3708,7 @@ body.nav-hidden .nav-fab {
   color: var(--umoh-silver);
 }
 
-@media (max-width: 600px) {
-  .lead-modal-basics-grid {
-    grid-template-columns: 1fr;
-  }
-}
-
-/* ─────────────────────────────────────────────────────────────
-   MOBILE RESPONSIVE — iPhone 14 Pro Max (430px) y menores
-   ───────────────────────────────────────────────────────────── */
-@media (max-width: 480px) {
-  /* Layout general */
-  :root {
-    --content-pad: var(--sp-3);
-    --header-h: 56px;
-  }
-
-  body { font-size: 14px; }
-
-  /* Header — colapso a stack vertical */
-  .header-inner {
-    flex-wrap: wrap;
-    gap: var(--sp-2);
-    padding: var(--sp-2) var(--sp-3);
-  }
-  .header-brand   { flex-shrink: 1; min-width: 0; }
-  .brand-agency   { font-size: 14px; }
-  .header-controls { gap: var(--sp-2); flex-wrap: wrap; justify-content: flex-end; }
-
-  /* Period selector — overflow horizontal en lugar de wrap */
-  .period-selector {
-    overflow-x: auto;
-    max-width: 100%;
-    scrollbar-width: none;
-  }
-  .period-selector::-webkit-scrollbar { display: none; }
-  .period-btn { padding: 6px 10px; font-size: 12px; }
-
-  /* Date picker popover — full width */
-  .date-picker-popover {
-    position: fixed;
-    top: calc(var(--header-h) + 8px);
-    left: var(--sp-3);
-    right: var(--sp-3);
-    min-width: 0;
-  }
-
-  /* Nav tabs — scroll horizontal */
-  .nav-tabs-wrap, .nav-tabs {
-    overflow-x: auto;
-    scrollbar-width: none;
-    -webkit-overflow-scrolling: touch;
-  }
-  .nav-tabs-wrap::-webkit-scrollbar, .nav-tabs::-webkit-scrollbar { display: none; }
-  .nav-tab { white-space: nowrap; flex-shrink: 0; padding: 10px 14px; font-size: 13px; }
-
-  /* KPI cards — siempre 1 columna en mobile */
-  .kpi-grid,
-  .kpi-grid--6,
-  .kpi-grid--5,
-  .kpi-grid--4,
-  .kpi-grid--3,
-  .kpi-grid--2 {
-    grid-template-columns: 1fr;
-    gap: var(--sp-3);
-  }
-  .kpi-card { padding: var(--sp-3) var(--sp-4); }
-  .kpi-value { font-size: 22px; }
-  .kpi-label { font-size: 11px; }
-
-  /* Charts grids — siempre 1 columna */
-  .charts-grid,
-  .charts-grid--full,
-  .charts-grid--2 {
-    grid-template-columns: 1fr !important;
-    gap: var(--sp-3);
-  }
-
-  /* Chart cards — padding y altura ajustadas */
-  .chart-card { border-radius: var(--r-md); }
-  .chart-card-header { padding: var(--sp-3) var(--sp-4); }
-  .chart-title { font-size: 14px; }
-  .chart-card-body { padding: var(--sp-3); }
-  .chart-body--tall { height: 240px; }
-  .chart-body--donut { height: 220px; }
-
-  /* Tables — scroll horizontal cuando son muy anchas */
-  .terms-table,
-  .geo-table,
-  .pending-table,
-  .sellers-table,
-  .segments-table,
-  table.bofu-segment-table {
-    font-size: 12px;
-  }
-  .chart-card-body { overflow-x: auto; }
-
-  .geo-table .geo-city,
-  .pending-table .pending-name { max-width: 140px; }
-
-  .term-name { width: 140px; max-width: 140px; }
-
-  /* Footer */
-  .footer-inner {
-    flex-wrap: wrap;
-    justify-content: center;
-    gap: var(--sp-2);
-    text-align: center;
-    padding: var(--sp-3);
-  }
-  .footer-text { font-size: 11px; }
-
-  /* KPI modal — pantalla casi completa */
-  .kpi-modal {
-    max-width: calc(100vw - 24px);
-    max-height: calc(100vh - 80px);
-    border-radius: var(--r-md);
-  }
-  .kpi-modal-title { font-size: 18px; }
-}
-
-/* Extra-narrow (≤ 360px iPhone SE) */
-@media (max-width: 360px) {
-  .kpi-value { font-size: 20px; }
-  .chart-title { font-size: 13px; }
-  .nav-tab { padding: 8px 10px; font-size: 12px; }
-}
+/* lead-modal-basics-grid + mobile general: ver bloques canónicos @media (max-width: 640px) y @media (max-width: 360px) */
 
 /* ══════════════════════════════════════════════════════════════
    SPRINT UX 2.0 — SIDEBAR LATERAL + SECCIÓN INICIO
@@ -4753,23 +4819,7 @@ body.sidebar-collapsed .dashboard-content {
   margin-top: auto;
 }
 
-/* Responsive quick-grid */
-@media (max-width: 900px) {
-  .inicio-quick-grid {
-    grid-template-columns: repeat(2, 1fr);
-  }
-}
-
-@media (max-width: 480px) {
-  .inicio-quick-grid {
-    grid-template-columns: 1fr 1fr;
-    gap: var(--sp-3);
-  }
-
-  .inicio-saludo { font-size: 22px; }
-  .inicio-ai-card { padding: var(--sp-4); }
-  .inicio-quick-kpi-value { font-size: 18px; }
-}
+/* inicio-quick-grid + inicio-saludo mobile: ver bloque @media (max-width: 1023px) y @media (max-width: 640px) */
 
 /* ── Theme toggle reposicionado para sidebar layout ─────────── */
 body.sidebar-layout .theme-toggle-switch {
@@ -5550,11 +5600,7 @@ body.sidebar-layout .theme-toggle-switch {
   gap:                   var(--sp-3);
 }
 
-@media (max-width: 768px) {
-  .journey-insights-list {
-    grid-template-columns: 1fr;
-  }
-}
+/* journey-insights-list mobile: ver bloque @media (max-width: 640px) */
 
 /* ── 14. journey-insights-header: más presencia ─────────────── */
 .journey-insights-header {
@@ -5718,17 +5764,5 @@ body.sidebar-layout .theme-toggle-switch {
   margin:     0;
 }
 
-@media (max-width: 480px) {
-  .regen-modal {
-    padding: var(--sp-4);
-  }
-  .regen-modal-cmd-wrap {
-    flex-direction: column;
-    align-items: flex-start;
-  }
-  .regen-modal-copy {
-    width: 100%;
-    justify-content: center;
-  }
-}
+/* regen-modal mobile: ver bloque @media (max-width: 640px) */
 
