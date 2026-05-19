@@ -181,43 +181,94 @@ try {
         'closed_sales' => $prev_sales,
     ];
 
-    // 8. Ranking + summary de vendedores — lee de seller_facts (migración 012)
-    //    en vez de calcular runtime. Esto cierra el bug de la card "Mejor
-    //    Vendedor / Efectividad Promedio / Ciclo Promedio..." en Performance,
-    //    que no se renderizaba porque el endpoint no devolvía sellers_summary.
-    // Reutiliza $prev_start / $prev_end calculados en el bloque de período.
+    // 8. Ranking + summary de vendedores — calculado ON-THE-FLY desde la misma
+    //    fuente que el contador `closed_sales` (lead_monetary deduplicado +
+    //    leads de campaña). Garantiza por construcción que la suma del ranking
+    //    coincida con el KPI global. Ver bofu.php para el detalle de por qué
+    //    NO usamos seller_facts: doble filtro de fecha (created + closed) que
+    //    excluía cierres de leads creados fuera del período.
+    //
+    //    summary.php hereda el alcance "solo campaña" del bloque BOFU de arriba
+    //    (los counts globales ya excluyen non_campaign), así que el ranking
+    //    también filtra por is_campaign_lead = true.
 
-    // Helper: lee seller_facts en un rango y agrega por seller_name.
-    $aggregate_sellers = function(string $rs, string $re) use ($campaign_filter) {
-        $q = [
-            'client_slug' => 'eq.' . CLIENT_SLUG,
-            'date'        => 'gte.' . $rs,
-            'select'      => 'seller_name,leads_assigned,sales_count,revenue,capitas_closed,avg_cycle_days,date',
-            'limit'       => '5000',
-        ];
-        if ($campaign_filter !== '' && $campaign_filter !== 'all') {
-            $q['campaign_id'] = 'eq.' . $campaign_filter;
+    // Necesitamos lead_monetary completo (no solo precio/updated_at) para
+    // capitas. El bloque 3 leía un subset minimal; acá pedimos los campos
+    // adicionales solo para el cálculo del ranking.
+    $closed_full_raw = supabase_query('lead_monetary', [
+        'client_slug' => 'eq.' . CLIENT_SLUG,
+        'is_closed'   => 'eq.true',
+        'select'      => 'meistertask_id,capitas,precio_final,updated_at',
+        'limit'       => '5000',
+    ]);
+    $closed_full_by_mid = [];
+    foreach ($closed_full_raw as $row) {
+        $mid = $row['meistertask_id'] ?? null;
+        if ($mid === null) continue;
+        $cur = $closed_full_by_mid[$mid] ?? null;
+        if (!$cur) { $closed_full_by_mid[$mid] = $row; continue; }
+        $cur_p = (float)($cur['precio_final'] ?? 0);
+        $new_p = (float)($row['precio_final'] ?? 0);
+        if ($new_p > 0 && $cur_p <= 0) { $closed_full_by_mid[$mid] = $row; continue; }
+        if ($new_p <= 0 && $cur_p > 0) continue;
+        if (strcmp((string)($row['updated_at'] ?? ''), (string)($cur['updated_at'] ?? '')) > 0) {
+            $closed_full_by_mid[$mid] = $row;
         }
-        $rows = supabase_query('seller_facts', $q);
-        $rows = array_filter($rows, fn($r) => ($r['date'] ?? '') <= $re);
+    }
+    $closed_full = array_values($closed_full_by_mid);
 
+    $lead_by_id = [];
+    foreach ($leads as $l) { $lead_by_id[$l['meistertask_id']] = $l; }
+
+    $aggregate_sellers = function(string $rs, string $re) use ($closed_full, $leads, $lead_by_id) {
         $agg = [];
-        foreach ($rows as $r) {
-            $name = $r['seller_name'] ?? '';
-            if ($name === '') continue;
+        $ensure = function(string $name) use (&$agg) {
             if (!isset($agg[$name])) {
                 $agg[$name] = [
                     'leads' => 0, 'sales' => 0, 'revenue' => 0.0,
                     'capitas' => 0, 'cycle_weighted' => 0.0,
                 ];
             }
-            $sales = (int)($r['sales_count'] ?? 0);
-            $agg[$name]['leads']          += (int)($r['leads_assigned'] ?? 0);
-            $agg[$name]['sales']          += $sales;
-            $agg[$name]['revenue']        += (float)($r['revenue'] ?? 0);
-            $agg[$name]['capitas']        += (int)($r['capitas_closed'] ?? 0);
-            $agg[$name]['cycle_weighted'] += (float)($r['avg_cycle_days'] ?? 0) * $sales;
+        };
+
+        // leads_assigned: leads de campaña creados en el período.
+        foreach ($leads as $l) {
+            if (empty($l['is_campaign_lead'])) continue;
+            $created = $l['lead_created_at'] ?? null;
+            if (!$created) continue;
+            $d = substr($created, 0, 10);
+            if ($d < $rs || $d > $re) continue;
+            $name = trim($l['assignee'] ?? '');
+            if ($name === '') $name = 'Sin asignar';
+            $ensure($name);
+            $agg[$name]['leads']++;
         }
+
+        // sales: ventas cerradas en el período (filtro campaign vía lead_by_id).
+        foreach ($closed_full as $c) {
+            $upd = $c['updated_at'] ?? null;
+            if (!$upd) continue;
+            $d = substr($upd, 0, 10);
+            if ($d < $rs || $d > $re) continue;
+
+            $mid  = $c['meistertask_id'];
+            $lead = $lead_by_id[$mid] ?? null;
+            if (!$lead || empty($lead['is_campaign_lead'])) continue;
+
+            $name = trim($lead['assignee'] ?? '');
+            if ($name === '') $name = 'Sin asignar';
+            $ensure($name);
+            $agg[$name]['sales']++;
+            $agg[$name]['revenue'] += (float)($c['precio_final'] ?? 0);
+            $agg[$name]['capitas'] += (int)($c['capitas'] ?? 0);
+
+            $cr = $lead['lead_created_at'] ?? null;
+            if ($cr) {
+                $diff_days = max(0.0, (strtotime($d) - strtotime(substr($cr, 0, 10))) / 86400);
+                $agg[$name]['cycle_weighted'] += $diff_days;
+            }
+        }
+
         return $agg;
     };
 

@@ -296,48 +296,96 @@ try {
     }
     $type_colors = [$C['navy'], $C['slate'], $C['silver'], $C['mist'], $C['light']];
 
-    // 10. Ranking de vendedores — lee de la tabla seller_facts (migración 012)
-    //     en lugar de calcular en runtime. Esto unifica la fuente de verdad
-    //     con la Sheet espejo, incluye capitas y cycle_days reales (antes en 0)
-    //     y elimina la duplicación de lógica de filtrado por campaign_lead.
+    // 10. Ranking de vendedores — calculado ON-THE-FLY desde la MISMA fuente
+    //     que el KPI closed_sales (lead_monetary deduplicado + leads). Decisión
+    //     Franco 2026-05-18: la suma del ranking DEBE coincidir con el contador
+    //     total de ventas.
     //
-    //     Período actual: $start..$end (calculado arriba via period_dates).
-    //     Período previo: reutiliza $prev_start / $prev_end calculados en el bloque 5.
+    //     El bug anterior venía de leer de seller_facts, que tenía un doble
+    //     filtro en compute_seller_facts (mig. 013):
+    //       WHERE close_date BETWEEN p_start..p_end
+    //         AND lead_created_at BETWEEN p_start..p_end
+    //     Es decir, solo contaba como "venta del vendedor" si el lead se creó
+    //     Y se cerró dentro del mismo período. Resultado: KPI=18, ranking=3
+    //     en períodos cortos donde la mayoría de los cierres son de leads
+    //     creados ANTES (ciclo natural de venta de meses).
+    //
+    //     Calcular acá garantiza por construcción que:
+    //       Σ sellers[].sales   == closed_sales
+    //       Σ sellers[].revenue == total_revenue
+    //       Σ sellers[].capitas == capitas_closed
+    //     usando exactamente el mismo filtro de canal y el mismo criterio
+    //     "1 venta = 1 meistertask_id con is_closed=true en el período".
+    //
+    //     leads_assigned (denominador de effectiveness): leads creados en el
+    //     período asignados al vendedor, con el mismo filtro de canal.
+    //
+    //     cycle_days: (updated_at - lead_created_at) en días, promedio simple
+    //     por vendedor.
+    //
+    //     "Sin asignar" agrupa ventas con assignee vacío para que el ranking
+    //     sume == KPI. Si el cliente prefiere ocultarlas, el frontend puede
+    //     omitir esa fila — pero el dato está disponible y es honesto.
 
-    // Helper interno: lee seller_facts en un rango y agrega por seller_name.
-    // avg_cycle_days se calcula como weighted avg por sales_count (matemática-
-    // mente correcto cuando se promedian días de ciclo de varios cierres).
-    $aggregate_sellers = function(string $rs, string $re) use ($campaign_filter) {
-        $q = [
-            'client_slug' => 'eq.' . CLIENT_SLUG,
-            'date'        => 'gte.' . $rs,
-            'select'      => 'seller_name,leads_assigned,sales_count,revenue,capitas_closed,avg_cycle_days,date',
-            'limit'       => '5000',
-        ];
-        if ($campaign_filter !== '' && $campaign_filter !== 'all') {
-            $q['campaign_id'] = 'eq.' . $campaign_filter;
-        }
-        $rows = supabase_query('seller_facts', $q);
-        // Filtrar manualmente la cota superior (PostgREST no permite 2x date= en una sola query).
-        $rows = array_filter($rows, fn($r) => ($r['date'] ?? '') <= $re);
+    $canal_match = function(array $lead) use ($canal_filter): bool {
+        $is_campaign = !empty($lead['is_campaign_lead']);
+        if ($canal_filter === 'campaign')     return $is_campaign;
+        if ($canal_filter === 'non_campaign') return !$is_campaign;
+        return true;
+    };
 
+    $aggregate_sellers = function(string $rs, string $re) use ($closed, $leads, $lead_by_id, $canal_match) {
         $agg = [];
-        foreach ($rows as $r) {
-            $name = $r['seller_name'] ?? '';
-            if ($name === '') continue;
+        $ensure = function(string $name) use (&$agg) {
             if (!isset($agg[$name])) {
                 $agg[$name] = [
                     'leads' => 0, 'sales' => 0, 'revenue' => 0.0,
                     'capitas' => 0, 'cycle_weighted' => 0.0,
                 ];
             }
-            $sales = (int)($r['sales_count'] ?? 0);
-            $agg[$name]['leads']          += (int)($r['leads_assigned'] ?? 0);
-            $agg[$name]['sales']          += $sales;
-            $agg[$name]['revenue']        += (float)($r['revenue'] ?? 0);
-            $agg[$name]['capitas']        += (int)($r['capitas_closed'] ?? 0);
-            $agg[$name]['cycle_weighted'] += (float)($r['avg_cycle_days'] ?? 0) * $sales;
+        };
+
+        // 1. leads_assigned: leads creados en el período, con el mismo filtro de canal.
+        foreach ($leads as $l) {
+            $created = $l['lead_created_at'] ?? null;
+            if (!$created) continue;
+            $d = substr($created, 0, 10);
+            if ($d < $rs || $d > $re) continue;
+            if (!$canal_match($l)) continue;
+            $name = trim($l['assignee'] ?? '');
+            if ($name === '') $name = 'Sin asignar';
+            $ensure($name);
+            $agg[$name]['leads']++;
         }
+
+        // 2. sales / revenue / capitas / cycle_days: ventas cerradas en el período.
+        //    $closed ya está deduplicado por meistertask_id (1 venta = 1 fila).
+        foreach ($closed as $c) {
+            $upd = $c['updated_at'] ?? null;
+            if (!$upd) continue;
+            $d = substr($upd, 0, 10);
+            if ($d < $rs || $d > $re) continue;
+
+            $mid  = $c['meistertask_id'];
+            $lead = $lead_by_id[$mid] ?? null;
+            if (!$lead) continue;
+            if (!$canal_match($lead)) continue;
+
+            $name = trim($lead['assignee'] ?? '');
+            if ($name === '') $name = 'Sin asignar';
+            $ensure($name);
+
+            $agg[$name]['sales']++;
+            $agg[$name]['revenue'] += (float)($c['precio_final'] ?? 0);
+            $agg[$name]['capitas'] += (int)($c['capitas'] ?? 0);
+
+            $cr = $lead['lead_created_at'] ?? null;
+            if ($cr) {
+                $diff_days = max(0.0, (strtotime($d) - strtotime(substr($cr, 0, 10))) / 86400);
+                $agg[$name]['cycle_weighted'] += $diff_days;
+            }
+        }
+
         return $agg;
     };
 
