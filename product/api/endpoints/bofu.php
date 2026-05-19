@@ -201,12 +201,27 @@ try {
         api_error('Sin ventas cerradas en Supabase para ' . CLIENT_SLUG, 404);
     }
 
-    // 5. Filtrar por período. Calculamos los límites del período sobre el set
-    //    completo de fechas (campaign + nc), no sólo el bucket filtrado: así
-    //    el rango temporal es consistente entre filtros y no se "encoge" cuando
-    //    el filtro elegido tiene menos datos.
+    // 5. Filtrar por período. Calculamos los límites del período sobre el
+    //    UNIVERSO completo de fechas con actividad: ventas (ambos canales) +
+    //    impresiones TOFU + leads MOFU. Esto es crítico para que el rango
+    //    "30d" termine en la MISMA fecha que summary.php (Performance).
+    //
+    //    Bug previo (corregido 2026-05-19, decisión Franco): bofu.php anclaba
+    //    $last solo en sales close_dates. Si la última venta cerrada era
+    //    anterior al último día con ads/leads (caso normal: ads corren a
+    //    diario, ventas son sporádicas), la ventana de BOFU corría días
+    //    para atrás respecto a Performance. Resultado: "Ingresos totales" en
+    //    Sales ≠ "Ingreso por ventas" en Performance, y los ROAS no matcheaban.
+    //
+    //    summary.php usa la misma idea (merge de tofu+mofu+bofu dates) —
+    //    replicamos acá para que ambos endpoints calculen idéntico [start,end].
     $period     = $_GET['period'] ?? '30d';
-    $all_dates  = array_keys(array_merge($by_date_campaign, $by_date_nc));
+    $all_dates  = array_unique(array_merge(
+        array_keys($by_date_campaign),
+        array_keys($by_date_nc),
+        array_keys($impr_by_date),
+        array_keys($leads_by_date)
+    ));
     sort($all_dates);
     $last       = end($all_dates);
 
