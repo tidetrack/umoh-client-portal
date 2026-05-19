@@ -688,8 +688,8 @@ $_asset_v = defined('ASSET_VERSION') ? ASSET_VERSION : filemtime(__DIR__ . '/ass
         <h2 class="section-title--hero">Bottom of Funnel</h2>
         <p class="section-title--sub">Sales</p>
         <p class="section-subtitle">Resultado del trabajo conjunto entre Marketing y Ventas</p>
-        <div class="bofu-canal-filter-wrap">
-          <label for="bofu-canal-filter" class="bofu-canal-filter-label">Canal del lead</label>
+        <div class="bofu-canal-filter-wrap" style="margin-top: var(--sp-4); display:flex; align-items:center; gap:var(--sp-3); flex-wrap:wrap;">
+          <label for="bofu-canal-filter" class="bofu-canal-filter-label" style="font-size:0.875rem; color:var(--text-muted);">Canal del lead</label>
           <select id="bofu-canal-filter" class="chart-filter-select" aria-label="Filtrar BOFU por canal del lead">
             <option value="campaign" selected>Solo campaña</option>
             <option value="non_campaign">Solo particulares</option>
