@@ -2216,6 +2216,53 @@ body.nav-hidden .nav-fab {
    semántica, barras más grandes, stagger entrance, sub-fases.
    ─────────────────────────────────────────────────────────── */
 
+/* Header del card del journey: título + nota a la izquierda, dropdown a la derecha */
+.journey-card-header {
+  flex-wrap: wrap;
+  gap: var(--sp-3) var(--sp-4);
+}
+
+.journey-card-header-main {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  flex: 1;
+  min-width: 0;
+}
+
+/* La .chart-title dentro del journey-card-header no debe tener flex:1
+   ya que ahora el flex está en .journey-card-header-main */
+.journey-card-header .chart-title {
+  flex: unset;
+}
+
+.journey-card-header-controls {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+  flex-shrink: 0;
+}
+
+.journey-canal-label {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  white-space: nowrap;
+}
+
+@media (max-width: 480px) {
+  .journey-card-header {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+  .journey-card-header-controls {
+    width: 100%;
+    justify-content: flex-start;
+  }
+}
+
 /* Entrance: las barras crecen de 0 a su altura final */
 @keyframes journeyBarGrow {
   from { transform: scaleY(0); opacity: 0; }
@@ -2403,19 +2450,31 @@ body.nav-hidden .nav-fab {
   font-variant-numeric: tabular-nums;
 }
 
-/* Breakdown campaña / vendedor: línea pequeña debajo del % en cada columna.
-   Muestra "X camp · Y vend" — sirve para auditar la composición de cada
-   etapa del journey por origen del lead. Vacío si la columna no tiene leads. */
+/* Breakdown campaña / vendedor: línea de composición debajo del % en cada columna.
+   Muestra "X camp · Y vend" — sirve para auditar el origen de los leads por etapa.
+   Se muestra solo cuando hay datos; columnas vacías no muestran nada. */
 .journey-col-breakdown {
-  font-size: 10px;
-  font-weight: 500;
+  font-size: 9.5px;
+  font-weight: 600;
   color: var(--text-muted);
   font-variant-numeric: tabular-nums;
-  margin-top: 1px;
-  letter-spacing: 0.01em;
+  margin-top: 3px;
+  letter-spacing: 0.02em;
   white-space: nowrap;
+  opacity: 0.7;
+  padding: 1px 5px;
+  background: var(--bg-page);
+  border-radius: 3px;
+  border: 1px solid var(--border-subtle);
+  line-height: 1.4;
+  transition: opacity 0.15s;
 }
 .journey-col-breakdown:empty { display: none; }
+
+/* Al hacer hover en la columna, el breakdown se vuelve más visible */
+.journey-col:hover .journey-col-breakdown {
+  opacity: 1;
+}
 
 .journey-col-label {
   font-size: 11px;
@@ -2444,6 +2503,13 @@ body.nav-hidden .nav-fab {
 
 .journey-col:hover .journey-col-label {
   color: var(--text-secondary);
+}
+
+/* Focus visible: accesibilidad por teclado — el outline rodea la columna entera */
+.journey-col:focus-visible {
+  outline: 2px solid var(--umoh-accent, #FF0040);
+  outline-offset: 2px;
+  border-radius: var(--r-sm);
 }
 
 /* Flecha conectora entre etapas */
@@ -2919,6 +2985,8 @@ body.nav-hidden .nav-fab {
   .journey-col-value { font-size: 12px; }
   .journey-col-label { font-size: 9px; }
   .journey-arrow { width: 8px; font-size: 9px; padding-bottom: 50px; }
+  /* En móvil muy pequeño, el breakdown no cabe en columnas de 40px */
+  .journey-col-breakdown { display: none; }
 }
 
 .cs-flat { color: var(--text-muted); }

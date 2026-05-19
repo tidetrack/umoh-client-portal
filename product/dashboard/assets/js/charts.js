@@ -1120,7 +1120,10 @@ function _renderJourney(data) {
     const rect   = col.getBoundingClientRect();
     const tipW   = 200;
     let   left   = rect.left + rect.width / 2 - tipW / 2;
-    const top    = rect.top - 10;
+    // El tooltip usa position:fixed, así que top es relativo al viewport (no al documento).
+    // Posicionamos encima de la columna; si no hay espacio arriba, debajo.
+    const spaceAbove = rect.top;
+    const top = spaceAbove > 90 ? rect.top - 86 : rect.bottom + 8;
     left = Math.max(8, Math.min(left, window.innerWidth - tipW - 8));
 
     tip.querySelector('.journey-tooltip-label').textContent = label;
@@ -1130,9 +1133,9 @@ function _renderJourney(data) {
     phaseEl.textContent = phase.name;
     phaseEl.style.color = phase.color;
 
-    tip.style.position = 'absolute';
+    tip.style.position = 'fixed';
     tip.style.left     = left + 'px';
-    tip.style.top      = (top + window.scrollY) + 'px';
+    tip.style.top      = top + 'px';
     tip.classList.add('is-visible');
   }
 
@@ -1185,7 +1188,9 @@ function _renderJourney(data) {
 
     const col = document.createElement('div');
     col.className = 'journey-col';
-    col.setAttribute('aria-label', label + ': ' + fmtNumber(v) + ' leads (' + pctFmt + ')');
+    col.setAttribute('role', 'button');
+    col.setAttribute('tabindex', '0');
+    col.setAttribute('aria-label', label + ': ' + fmtNumber(v) + ' leads (' + pctFmt + ') — click para ver detalle');
 
     const initialH = reducedMotion ? barH.toFixed(1) + '%' : '0%';
 
@@ -1210,6 +1215,14 @@ function _renderJourney(data) {
     col.addEventListener('mouseleave', hideTip);
     col.addEventListener('click', (function(lbl, vv, tot) {
       return function() { _openJourneyModal(lbl, vv, tot); };
+    }(label, v, total)));
+    col.addEventListener('keydown', (function(lbl, vv, tot) {
+      return function(e) {
+        if (e.key === 'Enter' || e.key === ' ') {
+          e.preventDefault();
+          _openJourneyModal(lbl, vv, tot);
+        }
+      };
     }(label, v, total)));
 
     row.appendChild(col);

@@ -647,9 +647,19 @@ $_asset_v = defined('ASSET_VERSION') ? ASSET_VERSION : filemtime(__DIR__ . '/ass
 
       <div class="charts-grid charts-grid--full">
         <div class="chart-card">
-          <div class="chart-card-header">
-            <h3 class="chart-title">Customer Journey — CRM</h3>
-            <span class="chart-note">Fuente: MeisterTask · 13 etapas en orden del proceso de ventas</span>
+          <div class="chart-card-header journey-card-header">
+            <div class="journey-card-header-main">
+              <h3 class="chart-title">Customer Journey — CRM</h3>
+              <span class="chart-note">Fuente: MeisterTask · 13 etapas en orden del proceso de ventas</span>
+            </div>
+            <div class="journey-card-header-controls">
+              <label for="mofu-canal-filter" class="journey-canal-label">Canal</label>
+              <select id="mofu-canal-filter" class="chart-filter-select" aria-label="Filtrar Customer Journey por canal del lead">
+                <option value="all" selected>Todos los canales</option>
+                <option value="campaign">Solo campaña</option>
+                <option value="non_campaign">Solo particulares</option>
+              </select>
+            </div>
           </div>
           <div class="chart-card-body" style="padding: 0; overflow: hidden;">
             <canvas id="chart-status" aria-label="Distribución por estado de lead" style="display:none;"></canvas>

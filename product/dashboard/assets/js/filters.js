@@ -60,14 +60,18 @@ async function refreshDashboard(section, period, extraParams = {}) {
   try {
     const params = { period, campaign_id: _currentCampaignId, ...extraParams };
     // BOFU + MOFU: si el caller no envió `canal` explícito, leemos el valor del
-    // dropdown. Ambas secciones comparten el mismo selector — el customer
-    // journey de MOFU se mantiene coherente con los KPIs de BOFU al filtrar.
+    // dropdown. BOFU usa #bofu-canal-filter, MOFU usa #mofu-canal-filter como
+    // fuente primaria y cae a #bofu-canal-filter como fallback. Ambos selects
+    // permanecen sincronizados mediante _applyCanalFilter(), así que el valor
+    // es idéntico en los dos. El default difiere: BOFU = 'campaign' (vista
+    // ejecutiva clásica), MOFU = 'all' (journey histórico completo).
     if ((section === 'bofu' || section === 'mofu') && params.canal === undefined) {
-      const canalEl = document.getElementById('bofu-canal-filter');
+      const defaultCanal = section === 'mofu' ? 'all' : 'campaign';
+      const primaryId    = section === 'mofu' ? 'mofu-canal-filter' : 'bofu-canal-filter';
+      const primaryEl    = document.getElementById(primaryId);
+      const fallbackEl   = section === 'mofu' ? document.getElementById('bofu-canal-filter') : null;
+      const canalEl      = primaryEl || fallbackEl;
       if (canalEl) {
-        // BOFU default = 'campaign' (vista ejecutiva clásica).
-        // MOFU default = 'all' (journey histórico inclusivo de vendedor).
-        const defaultCanal = section === 'mofu' ? 'all' : 'campaign';
         params.canal = canalEl.value || defaultCanal;
       }
     }
@@ -891,22 +895,40 @@ function initFilters() {
   /* Dropdown de campañas */
   _initCampaignsDropdown();
 
-  /* Dropdown de canal del lead (BOFU). Persistimos en localStorage para que
-     la selección sobreviva al reload y a la navegación entre secciones.
-     Aplica también a MOFU: el customer journey usa el mismo filtro para
-     que las "Ventas Ganadas" del journey coincidan con las del BOFU. */
+  /* Dropdowns de canal del lead (BOFU + MOFU journey).
+     Ambos selects comparten el mismo estado, persistido en localStorage.
+     Al cambiar uno, el otro se sincroniza sin disparar un segundo evento,
+     y se refresca tanto BOFU como MOFU para mantener coherencia. */
+  const _CANAL_VALID = ['campaign', 'non_campaign', 'all'];
+
+  function _applyCanalFilter(v) {
+    if (!_CANAL_VALID.includes(v)) return;
+    localStorage.setItem('umoh:bofu_canal', v);
+
+    const bofuEl = document.getElementById('bofu-canal-filter');
+    const mofuEl = document.getElementById('mofu-canal-filter');
+    if (bofuEl && bofuEl.value !== v) bofuEl.value = v;
+    if (mofuEl && mofuEl.value !== v) mofuEl.value = v;
+
+    refreshDashboard('bofu', _currentPeriod, { ..._periodParams(), canal: v });
+    refreshDashboard('mofu', _currentPeriod, { ..._periodParams(), canal: v });
+  }
+
+  const savedCanal = localStorage.getItem('umoh:bofu_canal');
+  const initialCanal = (savedCanal && _CANAL_VALID.includes(savedCanal)) ? savedCanal : null;
+
   const bofuCanalEl = document.getElementById('bofu-canal-filter');
   if (bofuCanalEl) {
-    const savedCanal = localStorage.getItem('umoh:bofu_canal');
-    if (savedCanal && ['campaign', 'non_campaign', 'all'].includes(savedCanal)) {
-      bofuCanalEl.value = savedCanal;
-    }
-    bofuCanalEl.addEventListener('change', () => {
-      const v = bofuCanalEl.value;
-      localStorage.setItem('umoh:bofu_canal', v);
-      refreshDashboard('bofu', _currentPeriod, { ..._periodParams(), canal: v });
-      refreshDashboard('mofu', _currentPeriod, { ..._periodParams(), canal: v });
-    });
+    if (initialCanal) bofuCanalEl.value = initialCanal;
+    bofuCanalEl.addEventListener('change', () => _applyCanalFilter(bofuCanalEl.value));
+  }
+
+  const mofuCanalEl = document.getElementById('mofu-canal-filter');
+  if (mofuCanalEl) {
+    // El journey MOFU arranca en "Todos los canales" por defecto (vista histórica completa).
+    // Si hay un valor guardado en localStorage, lo aplicamos también aquí.
+    if (initialCanal) mofuCanalEl.value = initialCanal;
+    mofuCanalEl.addEventListener('change', () => _applyCanalFilter(mofuCanalEl.value));
   }
 }
 
