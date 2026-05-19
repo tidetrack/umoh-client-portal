@@ -1563,9 +1563,43 @@ body.nav-hidden .nav-fab {
   width: 100%;
   max-height: 90vh;
   overflow-y: auto;
+  overscroll-behavior: contain;
   padding: var(--sp-8) var(--sp-8) var(--sp-6);
   position: relative;
   animation: modalIn 0.18s cubic-bezier(0.16, 1, 0.3, 1);
+
+  /* Scrollbar custom: thumb fino, redondeado, hover sutilmente más visible.
+     Firefox usa `scrollbar-width` + `scrollbar-color`; WebKit/Blink usa
+     pseudo-elementos ::-webkit-scrollbar-*. Definimos ambos. */
+  scrollbar-width: thin;
+  scrollbar-color: rgba(90, 112, 128, 0.35) transparent;
+}
+.kpi-modal::-webkit-scrollbar {
+  width: 8px;
+}
+.kpi-modal::-webkit-scrollbar-track {
+  background: transparent;
+  margin: 12px 0;
+}
+.kpi-modal::-webkit-scrollbar-thumb {
+  background: rgba(90, 112, 128, 0.30);
+  border-radius: 8px;
+  border: 2px solid transparent;
+  background-clip: padding-box;
+  transition: background 0.15s ease;
+}
+.kpi-modal::-webkit-scrollbar-thumb:hover {
+  background: rgba(90, 112, 128, 0.55);
+  background-clip: padding-box;
+}
+[data-theme="dark"] .kpi-modal {
+  scrollbar-color: rgba(200, 216, 220, 0.20) transparent;
+}
+[data-theme="dark"] .kpi-modal::-webkit-scrollbar-thumb {
+  background: rgba(200, 216, 220, 0.18);
+}
+[data-theme="dark"] .kpi-modal::-webkit-scrollbar-thumb:hover {
+  background: rgba(200, 216, 220, 0.36);
 }
 
 @keyframes modalIn {

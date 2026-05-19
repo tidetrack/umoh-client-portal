@@ -1854,16 +1854,12 @@ function _openLeadDetailModal(mid) {
     const planHtml = row.plan_code
       ? _escapeHtml(row.plan_code)
       : '<span class="muted">—</span>';
-    const cuotaHtml = row.cuota_mensual && row.cuota_mensual > 0
-      ? fmtCurrency(row.cuota_mensual)
-      : '<span class="muted">—</span>';
     const kpiHtml = row.counted
       ? '<span class="sales-complete-badge">Sí</span>'
       : '<span class="sales-uncounted-badge">No</span>';
 
     commEl.innerHTML = `
       <div class="lead-modal-field"><span class="lead-modal-label">Precio final</span><span class="lead-modal-value">${precioHtml}</span></div>
-      <div class="lead-modal-field"><span class="lead-modal-label">Cuota mensual</span><span class="lead-modal-value">${cuotaHtml}</span></div>
       <div class="lead-modal-field"><span class="lead-modal-label">Cápitas</span><span class="lead-modal-value">${capitasHtml}</span></div>
       <div class="lead-modal-field"><span class="lead-modal-label">Plan</span><span class="lead-modal-value">${planHtml}</span></div>
       <div class="lead-modal-field"><span class="lead-modal-label">Segmento</span><span class="lead-modal-value">${segmentoHtml}</span></div>
@@ -1888,34 +1884,31 @@ function _openLeadDetailModal(mid) {
     `;
   }
 
-  /* ── Acciones rápidas: copiar ID, abrir en MeisterTask, filtrar tabla ── */
+  /* ── Acciones rápidas: copiar ID, filtrar tabla por asesor.
+        Sin emojis (decisión Franco 2026-05-19). El link a MeisterTask se
+        eliminó porque el patrón de URL no funcionaba con todas las cuentas. */
   const actionsEl = document.getElementById('lead-modal-actions');
   if (actionsEl) {
-    const mtUrl = `https://www.meistertask.com/app/task/${encodeURIComponent(mid)}`;
     const sellerEscaped = (row.assignee || '').replace(/"/g, '&quot;');
     actionsEl.innerHTML = `
       <span class="lead-modal-section-label">Acciones</span>
       <div class="lead-modal-actions-row">
         <button type="button" class="lead-modal-action-btn" data-action="copy-id" data-mid="${mid}">
-          <span class="action-icon">📋</span> Copiar ID
+          Copiar ID
         </button>
-        <a class="lead-modal-action-btn" href="${mtUrl}" target="_blank" rel="noopener noreferrer">
-          <span class="action-icon">↗</span> Abrir en MeisterTask
-        </a>
         ${row.assignee ? `
         <button type="button" class="lead-modal-action-btn" data-action="filter-seller" data-seller="${sellerEscaped}">
-          <span class="action-icon">👤</span> Ver ventas de ${_escapeHtml(row.assignee)}
+          Ver ventas de ${_escapeHtml(row.assignee)}
         </button>` : ''}
       </div>
     `;
-    // Bind handlers (re-bind cada vez para que data-attrs estén frescos)
     const copyBtn = actionsEl.querySelector('[data-action="copy-id"]');
     if (copyBtn) {
       copyBtn.onclick = async () => {
         try {
           await navigator.clipboard.writeText(String(mid));
-          copyBtn.innerHTML = '<span class="action-icon">✓</span> ID copiado';
-          setTimeout(() => { copyBtn.innerHTML = '<span class="action-icon">📋</span> Copiar ID'; }, 1500);
+          copyBtn.textContent = 'ID copiado';
+          setTimeout(() => { copyBtn.textContent = 'Copiar ID'; }, 1500);
         } catch (e) { /* clipboard no disponible — ignorar */ }
       };
     }
@@ -1948,26 +1941,37 @@ function _openLeadDetailModal(mid) {
     }
   }
 
-  /* ── Actividad y seguimientos (si el backend trae comments) ───── */
+  /* ── Actividad y seguimientos.
+        Viene desde la tabla `lead_activity` (parseada por el normalizer
+        de MeisterTask desde el campo `comments` del CSV). Cada entrada
+        tiene {author, body, commented_at}. Se renderiza como timeline,
+        ordenada de más reciente a más vieja para que el vendedor lea
+        primero lo último. */
   const actEl   = document.getElementById('lead-modal-activity');
   const actSect = document.getElementById('lead-modal-activity-section');
   if (actEl && actSect) {
-    const raw = (row.comments || '').trim();
-    if (!raw) {
+    const entries = Array.isArray(row.activity) ? row.activity.slice() : [];
+    if (entries.length === 0) {
       actEl.innerHTML = '<p class="lead-modal-empty">Sin actividad registrada por el vendedor todavía.</p>';
     } else {
-      const blocks = raw.split(/\n\s*\n|\r\n\s*\r\n/).map(b => b.trim()).filter(Boolean);
-      const entries = blocks.length ? blocks : raw.split(/\n+/).map(l => l.trim()).filter(Boolean);
-      actEl.innerHTML = '<ol class="lead-modal-activity-list">' + entries.map(text => {
-        const dateMatch = text.match(/^([0-9]{1,2}[/\-][0-9]{1,2}(?:[/\-][0-9]{2,4})?)[:\s.\-]+(.+)$/s);
-        if (dateMatch) {
-          return `<li class="lead-modal-activity-item">
-            <span class="lead-modal-activity-date">${dateMatch[1]}</span>
-            <p class="lead-modal-activity-text">${_escapeHtml(dateMatch[2].trim())}</p>
-          </li>`;
-        }
-        return `<li class="lead-modal-activity-item lead-modal-activity-item--no-date">
-          <p class="lead-modal-activity-text">${_escapeHtml(text)}</p>
+      // Ordenar descendente (más reciente arriba)
+      entries.sort((a, b) => {
+        const da = a.commented_at || '';
+        const db = b.commented_at || '';
+        return db.localeCompare(da);
+      });
+      actEl.innerHTML = '<ol class="lead-modal-activity-list">' + entries.map(entry => {
+        const dateStr = entry.commented_at
+          ? new Date(entry.commented_at).toLocaleDateString('es-AR', {
+              day: '2-digit', month: '2-digit', year: 'numeric',
+            })
+          : '';
+        const author = (entry.author || '').trim();
+        const body   = (entry.body || '').trim();
+        const meta = [dateStr, author].filter(Boolean).join(' · ');
+        return `<li class="lead-modal-activity-item">
+          ${meta ? `<span class="lead-modal-activity-date">${_escapeHtml(meta)}</span>` : ''}
+          <p class="lead-modal-activity-text">${_escapeHtml(body).replace(/\n/g, '<br>')}</p>
         </li>`;
       }).join('') + '</ol>';
     }

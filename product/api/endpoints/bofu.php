@@ -485,6 +485,41 @@ try {
     //     puso el tag de segmento al cerrar la tarea en MeisterTask.
     //     TODO: leer desde config/clients/{slug}.yaml cuando haya multi-cliente.
     $valid_segments = ['voluntario', 'monotributista', 'obligatorio'];
+
+    // Pre-fetch de actividad (comentarios) para todos los leads en sección
+    // closed_won. La tabla `lead_activity` viene poblada por el normalizer
+    // de MeisterTask que parsea el campo `comments` del CSV en entradas
+    // {author, body, commented_at}. Acá se hace UNA query con `in.(...)`
+    // y se agrupa por meistertask_id para attacharlo a cada sales_list row.
+    $closed_won_mids = [];
+    foreach ($leads as $l) {
+        $sec = $l['section'] ?? '';
+        if (isset($closed_won_sections[$sec])) {
+            $closed_won_mids[] = $l['meistertask_id'];
+        }
+    }
+
+    $activity_by_mid = [];
+    if (!empty($closed_won_mids)) {
+        $mid_list = '(' . implode(',', array_map('intval', $closed_won_mids)) . ')';
+        $activity_rows = supabase_query('lead_activity', [
+            'client_slug'    => 'eq.' . CLIENT_SLUG,
+            'meistertask_id' => 'in.' . $mid_list,
+            'select'         => 'meistertask_id,author,body,commented_at',
+            'order'          => 'commented_at.asc',
+            'limit'          => '10000',
+        ]);
+        foreach ($activity_rows as $a) {
+            $mid_k = $a['meistertask_id'];
+            if (!isset($activity_by_mid[$mid_k])) $activity_by_mid[$mid_k] = [];
+            $activity_by_mid[$mid_k][] = [
+                'author'       => $a['author'] ?? '',
+                'body'         => $a['body'] ?? '',
+                'commented_at' => $a['commented_at'] ?? null,
+            ];
+        }
+    }
+
     $sales_list = [];
     $uncounted_count = 0;
     foreach ($leads as $l) {
@@ -523,9 +558,9 @@ try {
             'precio_final'    => $precio,
             'capitas'         => $capitas_v,
             'plan_code'       => $plan,
-            'cuota_mensual'   => $mon ? ($mon['cuota_mensual'] ?? null) : null,
             'data_source'     => $mon ? ($mon['data_source'] ?? null) : null,
             'is_campaign'     => !empty($l['is_campaign_lead']),
+            'activity'        => $activity_by_mid[$mid] ?? [],
             'missing'         => $missing,        // array de strings para el badge
             'complete'        => empty($missing),  // true si precio+capitas+plan están presentes
             'counted'         => $counted,         // true si entra en KPI closed_sales
