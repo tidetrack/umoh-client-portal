@@ -68,6 +68,29 @@ function app_today(): string {
 }
 
 /**
+ * Convierte un timestamp ISO 8601 (UTC con 'Z' o offset) al YYYY-MM-DD del
+ * día calendario correspondiente en APP_TZ.
+ *
+ * MOTIVO: los timestamps de Supabase / MeisterTask CSV vienen en UTC. Si
+ * usamos `substr($iso, 0, 10)` para extraer la fecha, una tarea creada a
+ * las 22:00 hs Argentina (= 01:00 UTC del día siguiente) queda contada en
+ * el día siguiente — off-by-one que NO matchea con "la fecha que aparece
+ * en la tarea" en MeisterTask UI (que sí muestra hora local).
+ *
+ * Devuelve null si el input es vacío o no parseable.
+ */
+function to_app_date(?string $iso): ?string {
+    if (!$iso) return null;
+    try {
+        $dt = new DateTime($iso);
+        $dt->setTimezone(new DateTimeZone(APP_TZ));
+        return $dt->format('Y-m-d');
+    } catch (Exception $e) {
+        return null;
+    }
+}
+
+/**
  * ÚNICA fuente de verdad del rango temporal del portal.
  *
  * Resuelve [start, end] (YYYY-MM-DD) anclando "now" en HOY (APP_TZ), no en

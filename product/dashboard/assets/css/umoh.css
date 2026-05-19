@@ -2403,6 +2403,20 @@ body.nav-hidden .nav-fab {
   font-variant-numeric: tabular-nums;
 }
 
+/* Breakdown campaña / vendedor: línea pequeña debajo del % en cada columna.
+   Muestra "X camp · Y vend" — sirve para auditar la composición de cada
+   etapa del journey por origen del lead. Vacío si la columna no tiene leads. */
+.journey-col-breakdown {
+  font-size: 10px;
+  font-weight: 500;
+  color: var(--text-muted);
+  font-variant-numeric: tabular-nums;
+  margin-top: 1px;
+  letter-spacing: 0.01em;
+  white-space: nowrap;
+}
+.journey-col-breakdown:empty { display: none; }
+
 .journey-col-label {
   font-size: 11px;
   font-weight: 600;

@@ -57,10 +57,9 @@ try {
     ]);
     $mofu = []; $nc_leads = 0;
     foreach ($leads as $l) {
-        $created = $l['lead_created_at'] ?? null;
-        if (!$created) continue;
+        $d = to_app_date($l['lead_created_at'] ?? null);
+        if (!$d) continue;
         if (empty($l['is_campaign_lead'])) { $nc_leads++; continue; }
-        $d = substr($created, 0, 10);
         $mofu[$d] = ($mofu[$d] ?? 0) + 1;
     }
 
@@ -97,13 +96,12 @@ try {
     }
     $bofu = []; $nc_revenue = 0.0; $nc_sales = 0;
     foreach ($closed as $c) {
-        $upd = $c['updated_at'] ?? null;
-        if (!$upd) continue;
+        $d = to_app_date($c['updated_at'] ?? null);
+        if (!$d) continue;
         $price = (float)($c['precio_final'] ?? 0);
         if (empty($is_campaign_by_id[$c['meistertask_id']])) {
             $nc_revenue += $price; $nc_sales++; continue;
         }
-        $d = substr($upd, 0, 10);
         if (!isset($bofu[$d])) $bofu[$d] = ['revenue' => 0.0, 'sales' => 0];
         $bofu[$d]['revenue'] += $price;
         $bofu[$d]['sales']++;
@@ -235,10 +233,8 @@ try {
         // leads_assigned: leads de campaña creados en el período.
         foreach ($leads as $l) {
             if (empty($l['is_campaign_lead'])) continue;
-            $created = $l['lead_created_at'] ?? null;
-            if (!$created) continue;
-            $d = substr($created, 0, 10);
-            if ($d < $rs || $d > $re) continue;
+            $d = to_app_date($l['lead_created_at'] ?? null);
+            if (!$d || $d < $rs || $d > $re) continue;
             $name = trim($l['assignee'] ?? '');
             if ($name === '') $name = 'Sin asignar';
             $ensure($name);
@@ -247,10 +243,8 @@ try {
 
         // sales: ventas cerradas en el período (filtro campaign vía lead_by_id).
         foreach ($closed_full as $c) {
-            $upd = $c['updated_at'] ?? null;
-            if (!$upd) continue;
-            $d = substr($upd, 0, 10);
-            if ($d < $rs || $d > $re) continue;
+            $d = to_app_date($c['updated_at'] ?? null);
+            if (!$d || $d < $rs || $d > $re) continue;
 
             $mid  = $c['meistertask_id'];
             $lead = $lead_by_id[$mid] ?? null;
@@ -263,9 +257,9 @@ try {
             $agg[$name]['revenue'] += (float)($c['precio_final'] ?? 0);
             $agg[$name]['capitas'] += (int)($c['capitas'] ?? 0);
 
-            $cr = $lead['lead_created_at'] ?? null;
-            if ($cr) {
-                $diff_days = max(0.0, (strtotime($d) - strtotime(substr($cr, 0, 10))) / 86400);
+            $cr_d = to_app_date($lead['lead_created_at'] ?? null);
+            if ($cr_d) {
+                $diff_days = max(0.0, (strtotime($d) - strtotime($cr_d)) / 86400);
                 $agg[$name]['cycle_weighted'] += $diff_days;
             }
         }

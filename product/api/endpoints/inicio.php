@@ -208,10 +208,8 @@ if ($supabase_url && $supabase_key) {
 
         $count = 0; $revenue = 0.0;
         foreach ($closed_by_mid as $mid => $c) {
-            $upd = $c['updated_at'] ?? null;
-            if (!$upd) continue;
-            $d = substr($upd, 0, 10);
-            if ($d < $g_start || $d > $g_end) continue;
+            $d = to_app_date($c['updated_at'] ?? null);
+            if (!$d || $d < $g_start || $d > $g_end) continue;
             // Solo campaña — coherente con Performance (summary.php) que también
             // separa campaign de non_campaign para los KPIs principales.
             if (empty($is_campaign_by_id[$mid])) continue;

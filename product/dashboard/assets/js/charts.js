@@ -981,6 +981,19 @@ function _updateJourneyInsights(el, labels, vals, total) {
  * Llamado siempre desde renderMofu().
  * @param {object} data - objeto de datos MOFU completo (necesita data.status)
  */
+/**
+ * Devuelve el texto del breakdown por canal para una columna del journey.
+ * Ej: "10 camp · 4 vend"   "0 camp · 3 vend"   o "" si no hay desglose.
+ * Si los dos son 0 (columna vacía) no mostramos nada para no ensuciar.
+ */
+function _journeyBreakdownText(pair) {
+  if (!pair) return '';
+  const c  = Number(pair.campaign)     || 0;
+  const nc = Number(pair.non_campaign) || 0;
+  if (c === 0 && nc === 0) return '';
+  return `${c} camp · ${nc} vend`;
+}
+
 function _renderJourney(data) {
   _destroyChart('chart-status');
   const ctxSt = document.getElementById('chart-status');
@@ -993,10 +1006,19 @@ function _renderJourney(data) {
   if (prevTip) prevTip.remove();
   ctxSt.style.display = 'none';
 
+  // Desglose campaign/non_campaign por sección, paralelo al array status.data.
+  const bdC  = Array.isArray(data.status.breakdown_campaign)     ? data.status.breakdown_campaign     : [];
+  const bdNC = Array.isArray(data.status.breakdown_non_campaign) ? data.status.breakdown_non_campaign : [];
+
   // Filtrar "Tareas Finalizadas" — columna excluida del display del cliente
   const filteredPairs = data.status.labels.reduce((acc, lbl, i) => {
     if (lbl !== 'Tareas Finalizadas') {
-      acc.push({ label: lbl, val: data.status.data[i] || 0 });
+      acc.push({
+        label:        lbl,
+        val:          data.status.data[i] || 0,
+        campaign:     bdC[i]  || 0,
+        non_campaign: bdNC[i] || 0,
+      });
     }
     return acc;
   }, []);
@@ -1026,6 +1048,7 @@ function _renderJourney(data) {
     existingCols.forEach((col, i) => {
       if (i >= labels.length) return;
       const v     = vals[i];
+      const pair  = filteredPairs[i];
       const pct   = total > 0 ? (v / total) * 100 : 0;
       const barH  = Math.max((v / maxVal) * 100, v > 0 ? 5 : 0);
       const bar   = existingBars[i];
@@ -1043,8 +1066,10 @@ function _renderJourney(data) {
 
       const valEl = col.querySelector('.journey-col-value');
       const pctEl = col.querySelector('.journey-col-pct');
+      const bdEl  = col.querySelector('.journey-col-breakdown');
       if (valEl) valEl.textContent = fmtNumber(v);
       if (pctEl) pctEl.textContent = pct.toFixed(1) + '%';
+      if (bdEl)  bdEl.textContent  = _journeyBreakdownText(pair);
     });
 
     const headerVal = existingWrap.querySelector('.journey-header-value');
@@ -1164,6 +1189,7 @@ function _renderJourney(data) {
 
     const initialH = reducedMotion ? barH.toFixed(1) + '%' : '0%';
 
+    const breakdownTxt = _journeyBreakdownText(filteredPairs[i]);
     col.innerHTML =
       '<div class="journey-col-inner">' +
         '<div class="journey-bar-wrap">' +
@@ -1175,6 +1201,7 @@ function _renderJourney(data) {
         '<div class="journey-col-footer">' +
           '<span class="journey-col-value">' + fmtNumber(v) + '</span>' +
           '<span class="journey-col-pct">' + pctFmt + '</span>' +
+          '<span class="journey-col-breakdown">' + breakdownTxt + '</span>' +
           '<span class="journey-col-label">' + label + '</span>' +
         '</div>' +
       '</div>';

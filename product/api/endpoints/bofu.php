@@ -105,9 +105,8 @@ try {
     //    leads_by_date por si se necesita para otras métricas.
     $leads_by_date = [];
     foreach ($leads as $l) {
-        $created = $l['lead_created_at'] ?? null;
-        if (!$created) continue;
-        $d = substr($created, 0, 10);
+        $d = to_app_date($l['lead_created_at'] ?? null);
+        if (!$d) continue;
         $leads_by_date[$d] = ($leads_by_date[$d] ?? 0) + 1;
     }
 
@@ -149,9 +148,8 @@ try {
     };
 
     foreach ($closed as $c) {
-        $upd = $c['updated_at'] ?? null;
-        if (!$upd) continue;
-        $d = substr($upd, 0, 10);
+        $d = to_app_date($c['updated_at'] ?? null);
+        if (!$d) continue;
 
         $price = (float)($c['precio_final'] ?? 0);
         $caps  = (int)($c['capitas'] ?? 0);
@@ -354,10 +352,8 @@ try {
 
         // 1. leads_assigned: leads creados en el período, con el mismo filtro de canal.
         foreach ($leads as $l) {
-            $created = $l['lead_created_at'] ?? null;
-            if (!$created) continue;
-            $d = substr($created, 0, 10);
-            if ($d < $rs || $d > $re) continue;
+            $d = to_app_date($l['lead_created_at'] ?? null);
+            if (!$d || $d < $rs || $d > $re) continue;
             if (!$canal_match($l)) continue;
             $name = trim($l['assignee'] ?? '');
             if ($name === '') $name = 'Sin asignar';
@@ -368,10 +364,8 @@ try {
         // 2. sales / revenue / capitas / cycle_days: ventas cerradas en el período.
         //    $closed ya está deduplicado por meistertask_id (1 venta = 1 fila).
         foreach ($closed as $c) {
-            $upd = $c['updated_at'] ?? null;
-            if (!$upd) continue;
-            $d = substr($upd, 0, 10);
-            if ($d < $rs || $d > $re) continue;
+            $d = to_app_date($c['updated_at'] ?? null);
+            if (!$d || $d < $rs || $d > $re) continue;
 
             $mid  = $c['meistertask_id'];
             $lead = $lead_by_id[$mid] ?? null;
@@ -386,9 +380,9 @@ try {
             $agg[$name]['revenue'] += (float)($c['precio_final'] ?? 0);
             $agg[$name]['capitas'] += (int)($c['capitas'] ?? 0);
 
-            $cr = $lead['lead_created_at'] ?? null;
-            if ($cr) {
-                $diff_days = max(0.0, (strtotime($d) - strtotime(substr($cr, 0, 10))) / 86400);
+            $cr_d = to_app_date($lead['lead_created_at'] ?? null);
+            if ($cr_d) {
+                $diff_days = max(0.0, (strtotime($d) - strtotime($cr_d)) / 86400);
                 $agg[$name]['cycle_weighted'] += $diff_days;
             }
         }
