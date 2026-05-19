@@ -1784,72 +1784,171 @@ function _openLeadDetailModal(mid) {
   const overlay = document.getElementById('lead-detail-modal');
   if (!overlay) return;
 
-  /* Título */
-  const titleEl = document.getElementById('lead-modal-title');
-  if (titleEl) titleEl.textContent = `${row.nombre || '#' + mid} (${row.canal || 'sin canal'})`;
+  /* ── Helpers locales ─────────────────────────────────────── */
+  const fmtDate = (dateStr) => {
+    if (!dateStr) return '—';
+    const d = new Date(dateStr);
+    return isNaN(d) ? '—' : d.toLocaleDateString('es-AR', { day: '2-digit', month: '2-digit', year: 'numeric' });
+  };
 
-  /* Calcular días en CRM */
-  const creado = row.lead_created_at ? new Date(row.lead_created_at) : null;
-  const diasCRM = creado
+  /* Días en CRM */
+  const creado  = row.lead_created_at ? new Date(row.lead_created_at) : null;
+  const diasCRM = creado && !isNaN(creado)
     ? Math.floor((Date.now() - creado.getTime()) / 86400000)
     : null;
-  const diasStr = diasCRM !== null ? `${diasCRM} día${diasCRM === 1 ? '' : 's'}` : '—';
+  const diasStr  = diasCRM !== null ? `${diasCRM} día${diasCRM === 1 ? '' : 's'}` : '—';
+  const fechaStr = fmtDate(row.lead_created_at);
+  const closeStr = fmtDate(row.close_date);
 
-  const fechaStr = creado
-    ? creado.toLocaleDateString('es-AR', { day: '2-digit', month: '2-digit', year: 'numeric' })
-    : '—';
+  /* ── Header: título, subtítulo, badges ───────────────────── */
+  const titleEl = document.getElementById('lead-modal-title');
+  if (titleEl) titleEl.textContent = row.nombre || `#${mid}`;
 
-  /* Grid de datos básicos */
+  const subEl = document.getElementById('lead-modal-subtitle');
+  if (subEl) {
+    const parts = [
+      `ID ${mid}`,
+      row.canal ? `Canal: ${row.canal}` : null,
+      row.close_date ? `Cerrada el ${closeStr}` : null,
+    ].filter(Boolean);
+    subEl.textContent = parts.join(' · ');
+  }
+
+  /* Badges: mismos que aparecen en la tabla — counted / completo / missing */
+  const badgesEl = document.getElementById('lead-modal-badges');
+  if (badgesEl) {
+    const badges = [];
+    if (row.counted === false) {
+      badges.push('<span class="sales-uncounted-badge" title="No entra en el KPI: falta cargar lead_monetary">Sin contabilizar</span>');
+    } else if (row.complete) {
+      badges.push('<span class="sales-complete-badge">Completo</span>');
+    }
+    (row.missing || []).forEach(m => {
+      badges.push(`<span class="sales-missing-tag">${_escapeHtml(m)}</span>`);
+    });
+    // Pill de campaña / vendedor — útil para entender el origen del lead.
+    if (row.is_campaign === true) {
+      badges.push('<span class="origin-badge origin-campaign">Campaña</span>');
+    } else if (row.is_campaign === false) {
+      badges.push('<span class="origin-badge origin-vendor">Vendedor</span>');
+    }
+    badgesEl.innerHTML = badges.join(' ');
+  }
+
+  /* ── Datos comerciales: precio, cápitas, plan, segmento, asesor, KPI ── */
+  const commEl   = document.getElementById('lead-modal-commercial');
+  const commSect = document.getElementById('lead-modal-commercial-section');
+  if (commEl && commSect) {
+    const segVal   = (row.tipification || '').trim();
+    const segValid = /^(voluntario|monotributista|obligatorio)$/i.test(segVal);
+    const segmentoHtml = segValid
+      ? `<span class="sales-segment sales-segment--${segVal.toLowerCase()}">${_escapeHtml(segVal)}</span>`
+      : '<span class="muted">Sin tipificación</span>';
+
+    const precioHtml = row.precio_final > 0
+      ? fmtCurrency(row.precio_final)
+      : '<span class="muted">—</span>';
+    const capitasHtml = row.capitas > 0
+      ? row.capitas
+      : '<span class="muted">—</span>';
+    const planHtml = row.plan_code
+      ? _escapeHtml(row.plan_code)
+      : '<span class="muted">—</span>';
+    const cuotaHtml = row.cuota_mensual && row.cuota_mensual > 0
+      ? fmtCurrency(row.cuota_mensual)
+      : '<span class="muted">—</span>';
+    const kpiHtml = row.counted
+      ? '<span class="sales-complete-badge">Sí</span>'
+      : '<span class="sales-uncounted-badge">No</span>';
+
+    commEl.innerHTML = `
+      <div class="lead-modal-field"><span class="lead-modal-label">Precio final</span><span class="lead-modal-value">${precioHtml}</span></div>
+      <div class="lead-modal-field"><span class="lead-modal-label">Cuota mensual</span><span class="lead-modal-value">${cuotaHtml}</span></div>
+      <div class="lead-modal-field"><span class="lead-modal-label">Cápitas</span><span class="lead-modal-value">${capitasHtml}</span></div>
+      <div class="lead-modal-field"><span class="lead-modal-label">Plan</span><span class="lead-modal-value">${planHtml}</span></div>
+      <div class="lead-modal-field"><span class="lead-modal-label">Segmento</span><span class="lead-modal-value">${segmentoHtml}</span></div>
+      <div class="lead-modal-field"><span class="lead-modal-label">Asesor</span><span class="lead-modal-value">${_escapeHtml(row.assignee || '—')}</span></div>
+      <div class="lead-modal-field"><span class="lead-modal-label">Fecha de cierre</span><span class="lead-modal-value">${closeStr}</span></div>
+      <div class="lead-modal-field"><span class="lead-modal-label">¿Cuenta en KPI?</span><span class="lead-modal-value">${kpiHtml}</span></div>
+    `;
+    commSect.hidden = false;
+  }
+
+  /* ── Datos del lead: canal, etapa, fecha ingreso, días, origen ───── */
   const gridEl = document.getElementById('lead-modal-basics');
   if (gridEl) {
+    const origenStr = row.is_campaign === true ? 'Campaña' :
+                      row.is_campaign === false ? 'Vendedor (manual)' : '—';
     gridEl.innerHTML = `
-      <div class="lead-modal-field"><span class="lead-modal-label">Canal</span><span class="lead-modal-value">${row.canal || '—'}</span></div>
-      <div class="lead-modal-field"><span class="lead-modal-label">Asesor</span><span class="lead-modal-value">${row.assignee || '—'}</span></div>
-      <div class="lead-modal-field"><span class="lead-modal-label">Tipificación</span><span class="lead-modal-value">${row.tipification || '—'}</span></div>
-      <div class="lead-modal-field"><span class="lead-modal-label">Etapa actual</span><span class="lead-modal-value">${row.section || '—'}</span></div>
+      <div class="lead-modal-field"><span class="lead-modal-label">Canal</span><span class="lead-modal-value">${_escapeHtml(row.canal || '—')}</span></div>
+      <div class="lead-modal-field"><span class="lead-modal-label">Origen</span><span class="lead-modal-value">${origenStr}</span></div>
+      <div class="lead-modal-field"><span class="lead-modal-label">Etapa actual</span><span class="lead-modal-value">${_escapeHtml(row.section || '—')}</span></div>
       <div class="lead-modal-field"><span class="lead-modal-label">Fecha de ingreso</span><span class="lead-modal-value">${fechaStr}</span></div>
       <div class="lead-modal-field"><span class="lead-modal-label">Días en CRM</span><span class="lead-modal-value">${diasStr}</span></div>
     `;
   }
 
-  /* Historial de cambios de sección */
+  /* ── Acciones rápidas: copiar ID, abrir en MeisterTask, filtrar tabla ── */
+  const actionsEl = document.getElementById('lead-modal-actions');
+  if (actionsEl) {
+    const mtUrl = `https://www.meistertask.com/app/task/${encodeURIComponent(mid)}`;
+    const sellerEscaped = (row.assignee || '').replace(/"/g, '&quot;');
+    actionsEl.innerHTML = `
+      <span class="lead-modal-section-label">Acciones</span>
+      <div class="lead-modal-actions-row">
+        <button type="button" class="lead-modal-action-btn" data-action="copy-id" data-mid="${mid}">
+          <span class="action-icon">📋</span> Copiar ID
+        </button>
+        <a class="lead-modal-action-btn" href="${mtUrl}" target="_blank" rel="noopener noreferrer">
+          <span class="action-icon">↗</span> Abrir en MeisterTask
+        </a>
+        ${row.assignee ? `
+        <button type="button" class="lead-modal-action-btn" data-action="filter-seller" data-seller="${sellerEscaped}">
+          <span class="action-icon">👤</span> Ver ventas de ${_escapeHtml(row.assignee)}
+        </button>` : ''}
+      </div>
+    `;
+    // Bind handlers (re-bind cada vez para que data-attrs estén frescos)
+    const copyBtn = actionsEl.querySelector('[data-action="copy-id"]');
+    if (copyBtn) {
+      copyBtn.onclick = async () => {
+        try {
+          await navigator.clipboard.writeText(String(mid));
+          copyBtn.innerHTML = '<span class="action-icon">✓</span> ID copiado';
+          setTimeout(() => { copyBtn.innerHTML = '<span class="action-icon">📋</span> Copiar ID'; }, 1500);
+        } catch (e) { /* clipboard no disponible — ignorar */ }
+      };
+    }
+    const filterBtn = actionsEl.querySelector('[data-action="filter-seller"]');
+    if (filterBtn) {
+      filterBtn.onclick = () => {
+        const seller = filterBtn.dataset.seller || '';
+        const sellerSelect = document.getElementById('sales-list-filter-seller');
+        if (sellerSelect) {
+          sellerSelect.value = seller;
+          if (typeof _applySalesListFilters === 'function') _applySalesListFilters();
+        }
+        _closeLeadDetailModal();
+        const tableEl = document.getElementById('sales-list-table');
+        if (tableEl) tableEl.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      };
+    }
+  }
+
+  /* ── Historial de cambios de sección (si el backend lo provee algún día) ── */
   const histEl = document.getElementById('lead-modal-history');
   if (histEl) {
     if (row.lead_section_history && row.lead_section_history.length) {
       histEl.innerHTML = row.lead_section_history.map(h => {
-        const d = new Date(h.date).toLocaleDateString('es-AR', { day: '2-digit', month: '2-digit', year: 'numeric' });
-        return `<li class="lead-modal-history-item"><span class="lead-modal-history-date">${d}</span><span class="lead-modal-history-move">${h.from} &rarr; ${h.to}</span></li>`;
+        const d = fmtDate(h.date);
+        return `<li class="lead-modal-history-item"><span class="lead-modal-history-date">${d}</span><span class="lead-modal-history-move">${_escapeHtml(h.from)} &rarr; ${_escapeHtml(h.to)}</span></li>`;
       }).join('');
     } else {
       histEl.innerHTML = '<li class="lead-modal-history-empty">Sin historial disponible.</li>';
     }
   }
 
-  /* Datos monetarios */
-  const moneyEl     = document.getElementById('lead-modal-monetary');
-  const moneySect   = document.getElementById('lead-modal-monetary-section');
-  if (moneyEl && moneySect) {
-    if (row.lead_monetary) {
-      const m = row.lead_monetary;
-      const updatedAt = m.updated_at
-        ? new Date(m.updated_at).toLocaleDateString('es-AR', { day: '2-digit', month: '2-digit', year: 'numeric' })
-        : '—';
-      moneyEl.innerHTML = `
-        <div class="lead-modal-field"><span class="lead-modal-label">Precio final</span><span class="lead-modal-value">${m.precio_final != null ? fmtCurrency(m.precio_final) : '—'}</span></div>
-        <div class="lead-modal-field"><span class="lead-modal-label">Capitas</span><span class="lead-modal-value">${m.capitas != null ? m.capitas : '—'}</span></div>
-        <div class="lead-modal-field"><span class="lead-modal-label">Cerrado</span><span class="lead-modal-value">${m.is_closed ? 'Si' : 'No'}</span></div>
-        <div class="lead-modal-field"><span class="lead-modal-label">Actualizado</span><span class="lead-modal-value">${updatedAt}</span></div>
-      `;
-      moneySect.hidden = false;
-    } else {
-      moneySect.hidden = true;
-    }
-  }
-
-  /* Actividad y seguimientos: viene de leads.comments — el textarea de
-     MeisterTask donde el vendedor escribe notas, llamadas, observaciones.
-     Cada bloque suele venir separado por saltos de línea o con prefijos
-     tipo "DD/MM:" — los detectamos para formatear como timeline. */
+  /* ── Actividad y seguimientos (si el backend trae comments) ───── */
   const actEl   = document.getElementById('lead-modal-activity');
   const actSect = document.getElementById('lead-modal-activity-section');
   if (actEl && actSect) {
@@ -1857,9 +1956,6 @@ function _openLeadDetailModal(mid) {
     if (!raw) {
       actEl.innerHTML = '<p class="lead-modal-empty">Sin actividad registrada por el vendedor todavía.</p>';
     } else {
-      // Cortar por línea/párrafo y filtrar vacíos. Cada bloque es una "entrada"
-      // del vendedor. Si el bloque arranca con un patrón fecha (DD/MM o DD-MM),
-      // lo extraemos como header del item.
       const blocks = raw.split(/\n\s*\n|\r\n\s*\r\n/).map(b => b.trim()).filter(Boolean);
       const entries = blocks.length ? blocks : raw.split(/\n+/).map(l => l.trim()).filter(Boolean);
       actEl.innerHTML = '<ol class="lead-modal-activity-list">' + entries.map(text => {

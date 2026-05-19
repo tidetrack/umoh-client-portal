@@ -517,11 +517,14 @@ try {
             'assignee'        => $l['assignee'] ?? '',
             'tipification'    => $l['tipification'] ?? '',
             'canal'           => $l['canal'] ?? '',
+            'section'         => $l['section'] ?? '',   // etapa actual en el CRM
             'lead_created_at' => $l['lead_created_at'] ?? null,
             'close_date'      => $mon ? ($mon['updated_at'] ?? null) : null,
             'precio_final'    => $precio,
             'capitas'         => $capitas_v,
             'plan_code'       => $plan,
+            'cuota_mensual'   => $mon ? ($mon['cuota_mensual'] ?? null) : null,
+            'data_source'     => $mon ? ($mon['data_source'] ?? null) : null,
             'is_campaign'     => !empty($l['is_campaign_lead']),
             'missing'         => $missing,        // array de strings para el badge
             'complete'        => empty($missing),  // true si precio+capitas+plan están presentes

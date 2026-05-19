@@ -943,21 +943,32 @@ $_asset_v = defined('ASSET_VERSION') ? ASSET_VERSION : filemtime(__DIR__ . '/ass
   <div id="lead-detail-modal" class="kpi-modal-overlay" role="dialog" aria-modal="true" aria-labelledby="lead-modal-title" tabindex="-1" hidden>
     <div class="kpi-modal lead-modal">
       <button class="kpi-modal-close" id="lead-modal-close" aria-label="Cerrar">&times;</button>
-      <h2 class="kpi-modal-title" id="lead-modal-title">—</h2>
 
+      <!-- Header: título + subtítulo (ID · canal · fecha cierre) + badges estado -->
+      <div class="lead-modal-header">
+        <h2 class="kpi-modal-title" id="lead-modal-title">—</h2>
+        <div class="lead-modal-subtitle" id="lead-modal-subtitle"></div>
+        <div class="lead-modal-badges" id="lead-modal-badges"></div>
+      </div>
+
+      <!-- Datos comerciales: precio, cápitas, plan, segmento, asesor, ¿KPI? -->
+      <div class="lead-modal-section" id="lead-modal-commercial-section" hidden>
+        <span class="lead-modal-section-label">Datos comerciales</span>
+        <div class="lead-modal-basics-grid" id="lead-modal-commercial"></div>
+      </div>
+
+      <!-- Datos del lead: canal, etapa, fecha ingreso, días en CRM, origen -->
       <div class="lead-modal-section">
         <span class="lead-modal-section-label">Datos del lead</span>
         <div class="lead-modal-basics-grid" id="lead-modal-basics"></div>
       </div>
 
+      <!-- Acciones rápidas -->
+      <div class="lead-modal-section lead-modal-actions" id="lead-modal-actions"></div>
+
       <div class="lead-modal-section">
         <span class="lead-modal-section-label">Historial de etapas</span>
         <ul class="lead-modal-history-list" id="lead-modal-history"></ul>
-      </div>
-
-      <div class="lead-modal-section" id="lead-modal-monetary-section" hidden>
-        <span class="lead-modal-section-label">Datos monetarios</span>
-        <div class="lead-modal-basics-grid" id="lead-modal-monetary"></div>
       </div>
 
       <div class="lead-modal-section" id="lead-modal-activity-section">

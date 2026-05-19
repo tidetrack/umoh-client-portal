@@ -3089,7 +3089,71 @@ body.nav-hidden .nav-fab {
 
 /* Reutiliza .kpi-modal-overlay y .kpi-modal — solo extiende con .lead-modal */
 .lead-modal {
-  max-width: 680px;
+  max-width: 760px;
+}
+
+/* Header del modal: título + subtítulo + fila de badges. La línea de
+   subtítulo da contexto "qué tipo de venta estoy mirando" (ID, canal,
+   fecha cierre) y los badges replican exactamente las etiquetas de la
+   tabla — el usuario las reconoce de un vistazo. */
+.lead-modal-header {
+  margin-bottom: var(--sp-5);
+  padding-bottom: var(--sp-4);
+  border-bottom: 1px solid var(--border-subtle);
+}
+.lead-modal-subtitle {
+  font-size: 13px;
+  color: var(--text-muted);
+  margin-top: 4px;
+  font-variant-numeric: tabular-nums;
+}
+.lead-modal-badges {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: var(--sp-3);
+}
+.lead-modal-badges:empty { display: none; }
+
+/* Acciones rápidas: chips clickeables. Copiar ID, abrir MeisterTask,
+   filtrar tabla por asesor. Hover sutil para invitación a tocar. */
+.lead-modal-actions-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--sp-2);
+}
+.lead-modal-action-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 14px;
+  border-radius: 8px;
+  font-size: 13px;
+  font-weight: 600;
+  font-family: var(--font);
+  border: 1px solid var(--border-subtle);
+  background: var(--bg-card);
+  color: var(--text-primary);
+  cursor: pointer;
+  text-decoration: none;
+  transition: background 0.15s ease, border-color 0.15s ease, transform 0.1s ease;
+}
+.lead-modal-action-btn:hover {
+  background: var(--bg-muted, rgba(0,0,0,0.04));
+  border-color: rgba(0, 0, 0, 0.15);
+}
+.lead-modal-action-btn:active { transform: scale(0.98); }
+[data-theme="dark"] .lead-modal-action-btn {
+  background: rgba(255, 255, 255, 0.04);
+  border-color: rgba(255, 255, 255, 0.12);
+}
+[data-theme="dark"] .lead-modal-action-btn:hover {
+  background: rgba(255, 255, 255, 0.08);
+  border-color: rgba(255, 255, 255, 0.22);
+}
+.lead-modal-action-btn .action-icon {
+  font-size: 14px;
+  line-height: 1;
 }
 
 .lead-modal-section {
