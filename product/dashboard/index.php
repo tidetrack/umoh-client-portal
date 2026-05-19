@@ -913,6 +913,23 @@ $_asset_v = defined('ASSET_VERSION') ? ASSET_VERSION : filemtime(__DIR__ . '/ass
         <span class="journey-modal-metric-label">leads</span>
         <span class="journey-modal-metric-pct" id="journey-modal-metric-pct"></span>
       </div>
+      <div class="journey-modal-breakdown" id="journey-modal-breakdown" hidden>
+        <span class="journey-modal-breakdown-title">Origen de los leads</span>
+        <div class="journey-modal-breakdown-rows">
+          <div class="journey-modal-bd-row journey-modal-bd-row--camp">
+            <span class="journey-modal-bd-dot"></span>
+            <span class="journey-modal-bd-label">Campaña</span>
+            <span class="journey-modal-bd-val" id="journey-modal-bd-camp-val">—</span>
+            <span class="journey-modal-bd-pct" id="journey-modal-bd-camp-pct">—</span>
+          </div>
+          <div class="journey-modal-bd-row journey-modal-bd-row--vend">
+            <span class="journey-modal-bd-dot"></span>
+            <span class="journey-modal-bd-label">Vendedor</span>
+            <span class="journey-modal-bd-val" id="journey-modal-bd-vend-val">—</span>
+            <span class="journey-modal-bd-pct" id="journey-modal-bd-vend-pct">—</span>
+          </div>
+        </div>
+      </div>
       <div class="journey-modal-section">
         <span class="journey-modal-section-label">Que significa esta etapa</span>
         <p class="journey-modal-section-text" id="journey-modal-description"></p>

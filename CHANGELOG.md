@@ -7,6 +7,16 @@ Formato basado en [Keep a Changelog](https://keepachangelog.com/es/1.0.0/).
 
 ## [Unreleased]
 
+### Fixed
+- Customer Journey: dropdown de canal (MOFU + BOFU) ahora actualiza ambas secciones — `_applyCanalFilter` esperaba secuencialmente los refreshes (antes el guard `_loading` descartaba la 2da llamada y dejaba la sección no-activa stale)
+- Customer Journey: la sección SALES vuelve a respetar el filtro de canal del journey al cambiarlo (consecuencia del fix anterior)
+
+### Changed
+- Customer Journey: removidas las micro-etiquetas `journey-col-breakdown` ("X camp · Y vend") debajo de cada columna — eran ruido visual redundante con el dropdown de canal. El desglose campaña/vendedor ahora vive en el tooltip de hover y en el modal de detalle, donde el dato es contextual
+- Journey modal: nueva fila "Origen de los leads" con desglose campaña vs vendedor (porcentaje + valor absoluto)
+- Journey tooltip: incluye desglose campaña / vendedor cuando hay datos disponibles
+
+### Backlog
 - Fase 2: conexión de datos reales al dashboard (PHP → Google Sheets → charts)
 - Fase 3: integración Meta Ads API
 - Fase 4: login real con MySQL por subdominio

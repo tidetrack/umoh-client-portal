@@ -2450,32 +2450,6 @@ body.nav-hidden .nav-fab {
   font-variant-numeric: tabular-nums;
 }
 
-/* Breakdown campaña / vendedor: línea de composición debajo del % en cada columna.
-   Muestra "X camp · Y vend" — sirve para auditar el origen de los leads por etapa.
-   Se muestra solo cuando hay datos; columnas vacías no muestran nada. */
-.journey-col-breakdown {
-  font-size: 9.5px;
-  font-weight: 600;
-  color: var(--text-muted);
-  font-variant-numeric: tabular-nums;
-  margin-top: 3px;
-  letter-spacing: 0.02em;
-  white-space: nowrap;
-  opacity: 0.7;
-  padding: 1px 5px;
-  background: var(--bg-page);
-  border-radius: 3px;
-  border: 1px solid var(--border-subtle);
-  line-height: 1.4;
-  transition: opacity 0.15s;
-}
-.journey-col-breakdown:empty { display: none; }
-
-/* Al hacer hover en la columna, el breakdown se vuelve más visible */
-.journey-col:hover .journey-col-breakdown {
-  opacity: 1;
-}
-
 .journey-col-label {
   font-size: 11px;
   font-weight: 600;
@@ -2590,6 +2564,42 @@ body.nav-hidden .nav-fab {
   border-top: 1px solid rgba(255,255,255,0.1);
   display: block;
 }
+
+/* Desglose campaña / vendedor dentro del tooltip — solo aparece cuando hay datos. */
+.journey-tooltip-breakdown {
+  margin-top: var(--sp-2);
+  padding-top: var(--sp-2);
+  border-top: 1px solid rgba(255,255,255,0.1);
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.journey-tooltip-breakdown[hidden] { display: none; }
+
+.journey-tooltip-bd-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 11px;
+  font-weight: 500;
+  color: rgba(255,255,255,0.7);
+}
+
+.journey-tooltip-bd-row strong {
+  margin-left: auto;
+  font-weight: 700;
+  color: #fff;
+  font-variant-numeric: tabular-nums;
+}
+
+.journey-tooltip-bd-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+.journey-tooltip-bd-dot--camp { background: #63B3ED; }
+.journey-tooltip-bd-dot--vend { background: #F6AD55; }
 
 /* ── Insights del Journey (reemplaza el bloque .journey-description/.jd-grid) ──
    Interpreta los datos reales del período y detecta cuellos de botella,
@@ -2852,6 +2862,73 @@ body.nav-hidden .nav-fab {
   margin-left: var(--sp-1);
 }
 
+/* Desglose campaña / vendedor — bloque opcional debajo del KPI principal del modal.
+   Reemplaza al viejo .journey-col-breakdown que ensuciaba cada columna del journey. */
+.journey-modal-breakdown {
+  margin-top: calc(var(--sp-5) * -1);
+  margin-bottom: var(--sp-5);
+  padding: var(--sp-3) var(--sp-4);
+  background: var(--bg-page);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--r-md);
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-2);
+}
+.journey-modal-breakdown[hidden] { display: none; }
+
+.journey-modal-breakdown-title {
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+
+.journey-modal-breakdown-rows {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.journey-modal-bd-row {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+  font-size: 13px;
+  color: var(--text-secondary);
+}
+
+.journey-modal-bd-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+.journey-modal-bd-row--camp .journey-modal-bd-dot { background: #63B3ED; }
+.journey-modal-bd-row--vend .journey-modal-bd-dot { background: #F6AD55; }
+
+.journey-modal-bd-label {
+  font-weight: 600;
+  color: var(--text-secondary);
+}
+
+.journey-modal-bd-val {
+  margin-left: auto;
+  font-weight: 700;
+  color: var(--text-primary);
+  font-variant-numeric: tabular-nums;
+}
+
+.journey-modal-bd-pct {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-muted);
+  font-variant-numeric: tabular-nums;
+  min-width: 36px;
+  text-align: right;
+}
+
 /* Secciones de contenido */
 .journey-modal-section {
   margin-bottom: var(--sp-4);
@@ -2985,8 +3062,6 @@ body.nav-hidden .nav-fab {
   .journey-col-value { font-size: 12px; }
   .journey-col-label { font-size: 9px; }
   .journey-arrow { width: 8px; font-size: 9px; padding-bottom: 50px; }
-  /* En móvil muy pequeño, el breakdown no cabe en columnas de 40px */
-  .journey-col-breakdown { display: none; }
 }
 
 .cs-flat { color: var(--text-muted); }

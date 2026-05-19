@@ -901,7 +901,7 @@ function initFilters() {
      y se refresca tanto BOFU como MOFU para mantener coherencia. */
   const _CANAL_VALID = ['campaign', 'non_campaign', 'all'];
 
-  function _applyCanalFilter(v) {
+  async function _applyCanalFilter(v) {
     if (!_CANAL_VALID.includes(v)) return;
     localStorage.setItem('umoh:bofu_canal', v);
 
@@ -910,8 +910,14 @@ function initFilters() {
     if (bofuEl && bofuEl.value !== v) bofuEl.value = v;
     if (mofuEl && mofuEl.value !== v) mofuEl.value = v;
 
-    refreshDashboard('bofu', _currentPeriod, { ..._periodParams(), canal: v });
-    refreshDashboard('mofu', _currentPeriod, { ..._periodParams(), canal: v });
+    // Refrescos secuenciales: refreshDashboard tiene un guard `if (_loading) return`,
+    // así que dos llamadas back-to-back descartan la segunda. Awaiting garantiza
+    // que ambas secciones (BOFU + MOFU) se actualicen siempre.
+    // Priorizamos la sección activa para que el render visible llegue primero.
+    const order = _currentSection === 'mofu' ? ['mofu', 'bofu'] : ['bofu', 'mofu'];
+    for (const sec of order) {
+      await refreshDashboard(sec, _currentPeriod, { ..._periodParams(), canal: v });
+    }
   }
 
   const savedCanal = localStorage.getItem('umoh:bofu_canal');

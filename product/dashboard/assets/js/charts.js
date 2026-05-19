@@ -767,7 +767,7 @@ var _JOURNEY_STAGE_INFO = {
  * @param {number} val   - cantidad de leads en esta etapa
  * @param {number} total - total de leads del período
  */
-function _openJourneyModal(label, val, total) {
+function _openJourneyModal(label, val, total, breakdown) {
   var modal = document.getElementById('journey-stage-modal');
   if (!modal) return;
 
@@ -793,6 +793,24 @@ function _openJourneyModal(label, val, total) {
 
   var phaseDot = document.getElementById('journey-modal-phase-dot');
   phaseDot.style.background = phase.color;
+
+  /* Desglose campaña / vendedor — solo se muestra si la fila tiene datos. */
+  var bdWrap = document.getElementById('journey-modal-breakdown');
+  if (bdWrap) {
+    var bd = breakdown || { campaign: 0, non_campaign: 0 };
+    var totalBd = bd.campaign + bd.non_campaign;
+    if (totalBd > 0) {
+      var pctCamp = ((bd.campaign / totalBd) * 100).toFixed(0);
+      var pctVend = ((bd.non_campaign / totalBd) * 100).toFixed(0);
+      document.getElementById('journey-modal-bd-camp-val').textContent = fmtNumber(bd.campaign);
+      document.getElementById('journey-modal-bd-camp-pct').textContent = pctCamp + '%';
+      document.getElementById('journey-modal-bd-vend-val').textContent = fmtNumber(bd.non_campaign);
+      document.getElementById('journey-modal-bd-vend-pct').textContent = pctVend + '%';
+      bdWrap.hidden = false;
+    } else {
+      bdWrap.hidden = true;
+    }
+  }
 
   var exampleText = val === 0
     ? 'No hay leads en esta etapa en el período seleccionado.'
@@ -982,16 +1000,15 @@ function _updateJourneyInsights(el, labels, vals, total) {
  * @param {object} data - objeto de datos MOFU completo (necesita data.status)
  */
 /**
- * Devuelve el texto del breakdown por canal para una columna del journey.
- * Ej: "10 camp · 4 vend"   "0 camp · 3 vend"   o "" si no hay desglose.
- * Si los dos son 0 (columna vacía) no mostramos nada para no ensuciar.
+ * Devuelve el desglose campaña / vendedor de una columna del journey,
+ * normalizado a números. Usado para enriquecer tooltip y modal.
  */
-function _journeyBreakdownText(pair) {
-  if (!pair) return '';
-  const c  = Number(pair.campaign)     || 0;
-  const nc = Number(pair.non_campaign) || 0;
-  if (c === 0 && nc === 0) return '';
-  return `${c} camp · ${nc} vend`;
+function _journeyBreakdownPair(pair) {
+  if (!pair) return { campaign: 0, non_campaign: 0 };
+  return {
+    campaign:     Number(pair.campaign)     || 0,
+    non_campaign: Number(pair.non_campaign) || 0,
+  };
 }
 
 function _renderJourney(data) {
@@ -1066,10 +1083,12 @@ function _renderJourney(data) {
 
       const valEl = col.querySelector('.journey-col-value');
       const pctEl = col.querySelector('.journey-col-pct');
-      const bdEl  = col.querySelector('.journey-col-breakdown');
       if (valEl) valEl.textContent = fmtNumber(v);
       if (pctEl) pctEl.textContent = pct.toFixed(1) + '%';
-      if (bdEl)  bdEl.textContent  = _journeyBreakdownText(pair);
+      // El desglose camp/vend se actualiza vía dataset para reusarlo en tooltip/modal
+      const bd = _journeyBreakdownPair(pair);
+      col.dataset.campaign     = String(bd.campaign);
+      col.dataset.nonCampaign  = String(bd.non_campaign);
     });
 
     const headerVal = existingWrap.querySelector('.journey-header-value');
@@ -1092,7 +1111,8 @@ function _renderJourney(data) {
       var lbl  = labels[i];
       var vCur = vals[i];
       var tot  = total;
-      col.onclick = function() { _openJourneyModal(lbl, vCur, tot); };
+      var bd   = _journeyBreakdownPair(filteredPairs[i]);
+      col.onclick = function() { _openJourneyModal(lbl, vCur, tot, bd); };
     });
 
     return; // No reconstruir el DOM
@@ -1111,19 +1131,25 @@ function _renderJourney(data) {
       '<span class="journey-tooltip-label"></span>' +
       '<span class="journey-tooltip-value"></span>' +
       '<span class="journey-tooltip-pct"></span>' +
-      '<span class="journey-tooltip-phase"></span>';
+      '<span class="journey-tooltip-phase"></span>' +
+      '<div class="journey-tooltip-breakdown" hidden>' +
+        '<span class="journey-tooltip-bd-row"><span class="journey-tooltip-bd-dot journey-tooltip-bd-dot--camp"></span>Campaña <strong class="journey-tooltip-bd-camp"></strong></span>' +
+        '<span class="journey-tooltip-bd-row"><span class="journey-tooltip-bd-dot journey-tooltip-bd-dot--vend"></span>Vendedor <strong class="journey-tooltip-bd-vend"></strong></span>' +
+      '</div>';
     document.body.appendChild(tip);
   }
 
-  function showTip(col, label, val, pctFmt) {
+  function showTip(col, label, val, pctFmt, breakdown) {
     const phase  = _JOURNEY_PHASE_MAP[label] || { name: '', color: '#8FA5A8' };
     const rect   = col.getBoundingClientRect();
-    const tipW   = 200;
+    const tipW   = 220;
     let   left   = rect.left + rect.width / 2 - tipW / 2;
-    // El tooltip usa position:fixed, así que top es relativo al viewport (no al documento).
-    // Posicionamos encima de la columna; si no hay espacio arriba, debajo.
+    // El tooltip usa position:fixed; top relativo al viewport. Si no hay espacio
+    // arriba (hover en columnas de la parte superior), lo desplazamos abajo.
+    const hasBd     = breakdown && (breakdown.campaign > 0 || breakdown.non_campaign > 0);
+    const tipHeight = hasBd ? 130 : 90;
     const spaceAbove = rect.top;
-    const top = spaceAbove > 90 ? rect.top - 86 : rect.bottom + 8;
+    const top = spaceAbove > tipHeight + 8 ? rect.top - tipHeight - 4 : rect.bottom + 8;
     left = Math.max(8, Math.min(left, window.innerWidth - tipW - 8));
 
     tip.querySelector('.journey-tooltip-label').textContent = label;
@@ -1132,6 +1158,15 @@ function _renderJourney(data) {
     const phaseEl = tip.querySelector('.journey-tooltip-phase');
     phaseEl.textContent = phase.name;
     phaseEl.style.color = phase.color;
+
+    const bdEl = tip.querySelector('.journey-tooltip-breakdown');
+    if (hasBd) {
+      tip.querySelector('.journey-tooltip-bd-camp').textContent = fmtNumber(breakdown.campaign);
+      tip.querySelector('.journey-tooltip-bd-vend').textContent = fmtNumber(breakdown.non_campaign);
+      bdEl.hidden = false;
+    } else {
+      bdEl.hidden = true;
+    }
 
     tip.style.position = 'fixed';
     tip.style.left     = left + 'px';
@@ -1194,7 +1229,10 @@ function _renderJourney(data) {
 
     const initialH = reducedMotion ? barH.toFixed(1) + '%' : '0%';
 
-    const breakdownTxt = _journeyBreakdownText(filteredPairs[i]);
+    const bd = _journeyBreakdownPair(filteredPairs[i]);
+    col.dataset.campaign    = String(bd.campaign);
+    col.dataset.nonCampaign = String(bd.non_campaign);
+
     col.innerHTML =
       '<div class="journey-col-inner">' +
         '<div class="journey-bar-wrap">' +
@@ -1206,24 +1244,23 @@ function _renderJourney(data) {
         '<div class="journey-col-footer">' +
           '<span class="journey-col-value">' + fmtNumber(v) + '</span>' +
           '<span class="journey-col-pct">' + pctFmt + '</span>' +
-          '<span class="journey-col-breakdown">' + breakdownTxt + '</span>' +
           '<span class="journey-col-label">' + label + '</span>' +
         '</div>' +
       '</div>';
 
-    col.addEventListener('mouseenter', function() { showTip(col, label, v, pctFmt); });
+    col.addEventListener('mouseenter', function() { showTip(col, label, v, pctFmt, bd); });
     col.addEventListener('mouseleave', hideTip);
-    col.addEventListener('click', (function(lbl, vv, tot) {
-      return function() { _openJourneyModal(lbl, vv, tot); };
-    }(label, v, total)));
-    col.addEventListener('keydown', (function(lbl, vv, tot) {
+    col.addEventListener('click', (function(lbl, vv, tot, b) {
+      return function() { _openJourneyModal(lbl, vv, tot, b); };
+    }(label, v, total, bd)));
+    col.addEventListener('keydown', (function(lbl, vv, tot, b) {
       return function(e) {
         if (e.key === 'Enter' || e.key === ' ') {
           e.preventDefault();
-          _openJourneyModal(lbl, vv, tot);
+          _openJourneyModal(lbl, vv, tot, b);
         }
       };
-    }(label, v, total)));
+    }(label, v, total, bd)));
 
     row.appendChild(col);
 
