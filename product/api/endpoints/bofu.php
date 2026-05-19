@@ -464,23 +464,45 @@ try {
         $monetary_full[$c['meistertask_id']] = $c;
     }
 
+    //     `counted`: indica si la venta entra en el KPI `closed_sales`. Es true
+    //     cuando existe una fila en `lead_monetary` con is_closed=true para ese
+    //     meistertask_id (es decir, está en $monetary_full / $closed dedup). Si
+    //     no, la venta está marcada como Ganada en MeisterTask pero el vendedor
+    //     todavía no cargó la data monetaria → no la contamos en el KPI y queda
+    //     visible en ámbar para que el equipo la complete.
+    //
+    //     Segmentos válidos de tipificación para Prepagas (definidos en
+    //     `config/clients/prepagas.yaml`). Si la tipificación del lead no
+    //     cae en este set (vacío o etiqueta inesperada), se marca como
+    //     "Sin tipificación" en el badge de completitud — el vendedor no
+    //     puso el tag de segmento al cerrar la tarea en MeisterTask.
+    //     TODO: leer desde config/clients/{slug}.yaml cuando haya multi-cliente.
+    $valid_segments = ['voluntario', 'monotributista', 'obligatorio'];
     $sales_list = [];
+    $uncounted_count = 0;
     foreach ($leads as $l) {
         $sec = $l['section'] ?? '';
         if (!isset($closed_won_sections[$sec])) continue;  // Solo sección "Ventas Ganadas"
 
         $mid = $l['meistertask_id'];
         $mon = $monetary_full[$mid] ?? null;
+        $counted = ($mon !== null);
 
         $precio   = $mon ? (float)($mon['precio_final'] ?? 0) : 0.0;
         $capitas_v = $mon ? ((int)($mon['capitas'] ?? 0)) : 0;
         $plan     = $mon ? ($mon['plan_code'] ?? null) : null;
+
+        $tip_raw  = trim((string)($l['tipification'] ?? ''));
+        $has_segment = $tip_raw !== '' && in_array(strtolower($tip_raw), $valid_segments, true);
 
         // Badge de completitud: campos faltantes en la venta
         $missing = [];
         if ($precio <= 0)    $missing[] = 'Sin precio';
         if ($capitas_v <= 0) $missing[] = 'Sin cápitas';
         if (!$plan)          $missing[] = 'Sin plan';
+        if (!$has_segment)   $missing[] = 'Sin tipificación';
+
+        if (!$counted) $uncounted_count++;
 
         $sales_list[] = [
             'meistertask_id'  => $mid,
@@ -496,6 +518,7 @@ try {
             'is_campaign'     => !empty($l['is_campaign_lead']),
             'missing'         => $missing,        // array de strings para el badge
             'complete'        => empty($missing),  // true si precio+capitas+plan están presentes
+            'counted'         => $counted,         // true si entra en KPI closed_sales
         ];
     }
 
@@ -522,9 +545,10 @@ try {
             'data'   => $type_data,
             'colors' => array_slice($type_colors, 0, count($type_labels)),
         ],
-        'sellers'       => $sellers,
-        'pending_price' => $pending_price,
-        'sales_list'    => $sales_list,
+        'sellers'         => $sellers,
+        'pending_price'   => $pending_price,
+        'sales_list'      => $sales_list,
+        'uncounted_count' => $uncounted_count,
         'non_campaign' => [
             'closed_sales'   => $nc_sales,
             'total_revenue'  => round($nc_revenue, 2),

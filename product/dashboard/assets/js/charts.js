@@ -263,19 +263,22 @@ function _renderCommercialSummary(s) {
 function renderPerformance(data) {
   const prev = data.prev || {};
 
-  const roi     = data.ad_spend  > 0 ? ((data.revenue - data.ad_spend) / data.ad_spend) * 100 : 0;
-  const prevRoi = prev.ad_spend  > 0 ? ((prev.revenue - prev.ad_spend) / prev.ad_spend) * 100 : 0;
+  // ROAS = revenue / ad_spend. Reemplaza al ROI viejo (decisión Franco
+  // 2026-05-19): una sola métrica de rentabilidad en todo el dashboard,
+  // unidad inequívoca (Nx) y consistente con BOFU. 1x = empate, >1 = ganás.
+  const roas     = data.ad_spend > 0 ? data.revenue / data.ad_spend : 0;
+  const prevRoas = prev.ad_spend > 0 ? prev.revenue / prev.ad_spend : 0;
 
   setKPI('kpi-revenue',     fmtCurrency(data.revenue));
   setKPI('kpi-spend',       fmtCurrency(data.ad_spend));
-  setKPI('kpi-roi',         fmtPercent(roi));
+  setKPI('kpi-roas',        roas > 0 ? roas.toFixed(2) + 'x' : '—');
   setKPI('kpi-impressions', fmtNumber(data.impressions));
   setKPI('kpi-leads',       fmtNumber(data.leads));
   setKPI('kpi-sales',       fmtNumber(data.closed_sales));
 
   _setDelta('delta-revenue',     data.revenue,      prev.revenue);
   _setDelta('delta-spend',       data.ad_spend,     prev.ad_spend,    true);
-  _setDelta('delta-roi',         roi,               prevRoi);
+  _setDelta('delta-roas',        roas,              prevRoas);
   _setDelta('delta-impressions', data.impressions,  prev.impressions);
   _setDelta('delta-leads',       data.leads,        prev.leads);
   _setDelta('delta-sales',       data.closed_sales, prev.closed_sales);
@@ -1673,6 +1676,7 @@ function _applySalesListFilters() {
 
   const filtered = _salesListRows.filter(r => {
     if (sellerVal && r.assignee !== sellerVal) return false;
+    if (completeVal === 'uncounted'  && r.counted !== false) return false;
     if (completeVal === 'incomplete' && r.complete) return false;
     if (completeVal === 'complete'   && !r.complete) return false;
     if (canalVal === 'campaign'     && r.is_campaign !== true)  return false;
@@ -1683,17 +1687,21 @@ function _applySalesListFilters() {
   /* Totales del subset filtrado — viven en el <tfoot> de la tabla */
   const totalRevenue = filtered.reduce((a, r) => a + (Number(r.precio_final) || 0), 0);
   const totalCapitas = filtered.reduce((a, r) => a + (Number(r.capitas)       || 0), 0);
+  const uncountedInView = filtered.reduce((a, r) => a + (r.counted === false ? 1 : 0), 0);
   const totalRevEl   = document.getElementById('sales-list-total-revenue');
   const totalCapEl   = document.getElementById('sales-list-total-capitas');
-  const totalCntEl   = document.getElementById('sales-list-total-count');
   const badgeEl      = document.getElementById('sales-list-count');
   if (totalRevEl) totalRevEl.textContent = totalRevenue > 0 ? fmtCurrency(totalRevenue) : '—';
   if (totalCapEl) totalCapEl.textContent = totalCapitas > 0 ? fmtNumber(totalCapitas) : '—';
-  if (totalCntEl) totalCntEl.textContent = filtered.length + (filtered.length === 1 ? ' venta' : ' ventas');
-  if (badgeEl)    badgeEl.textContent    = `${filtered.length} venta${filtered.length === 1 ? '' : 's'}`;
+  if (badgeEl) {
+    const base = `${filtered.length} venta${filtered.length === 1 ? '' : 's'}`;
+    badgeEl.textContent = uncountedInView > 0
+      ? `${base} · ${uncountedInView} sin contabilizar`
+      : base;
+  }
 
   if (filtered.length === 0) {
-    tbody.innerHTML = '<tr><td colspan="7" class="pending-empty">Sin ventas para los filtros seleccionados.</td></tr>';
+    tbody.innerHTML = '<tr><td colspan="8" class="pending-empty">Sin ventas para los filtros seleccionados.</td></tr>';
     return;
   }
 
@@ -1709,23 +1717,39 @@ function _applySalesListFilters() {
     const caps   = r.capitas > 0 ? r.capitas : '<span class="muted">—</span>';
     const plan   = r.plan_code || '<span class="muted">—</span>';
 
-    /* Badge de faltante */
+    /* Segmento: Voluntario / Monotributista / Obligatorio. Si el tag no fue
+       cargado en MeisterTask, queda vacío y mostramos un guión muted — el
+       badge "Sin tipificación" en la columna Faltante refuerza la señal. */
+    const segVal   = (r.tipification || '').trim();
+    const segValid = /^(voluntario|monotributista|obligatorio)$/i.test(segVal);
+    const segmento = segValid
+      ? `<span class="sales-segment sales-segment--${segVal.toLowerCase()}">${segVal}</span>`
+      : '<span class="muted">—</span>';
+
+    /* Badge de faltante. Si la venta no entra en el KPI (counted=false),
+       priorizamos un badge ámbar "Sin contabilizar" que indica al equipo
+       que falta cargar la data monetaria para que entre en el total. */
     let missingBadge;
-    if (r.complete) {
+    if (r.counted === false) {
+      missingBadge = '<span class="sales-uncounted-badge" title="No entra en el KPI: falta cargar lead_monetary">Sin contabilizar</span>';
+    } else if (r.complete) {
       missingBadge = '<span class="sales-complete-badge">Completo</span>';
     } else {
       const tags = (r.missing || []).map(m => `<span class="sales-missing-tag">${m}</span>`).join(' ');
       missingBadge = tags || '<span class="muted">—</span>';
     }
 
+    const rowClass = r.counted === false ? 'pending-row sales-row-uncounted' : 'pending-row';
+
     return `
-      <tr class="pending-row" data-mid="${r.meistertask_id}" style="cursor:pointer" role="button" tabindex="0" aria-label="Ver detalle de ${nombre}">
+      <tr class="${rowClass}" data-mid="${r.meistertask_id}" style="cursor:pointer" role="button" tabindex="0" aria-label="Ver detalle de ${nombre}">
         <td class="pending-name">${nombre}</td>
         <td class="pending-asesor">${asesor}</td>
         <td class="pending-date th-num">${closeFmt}</td>
         <td class="pending-date th-num">${precio}</td>
         <td class="pending-date th-num">${caps}</td>
         <td class="pending-tip">${plan}</td>
+        <td class="pending-segment">${segmento}</td>
         <td class="pending-origin">${missingBadge}</td>
       </tr>
     `;
@@ -1950,7 +1974,7 @@ function _renderSparkline(id, values, positive, labels) {
  * Renders sparklines for all 6 Performance KPI cards.
  * Prefers doubled sparkline data (current + previous period) when available.
  * Revenue and spend come directly from trend data.
- * ROI, impressions, leads, sales are derived point-by-point.
+ * ROAS, impressions, leads, sales are derived point-by-point.
  */
 function renderSparklines(data) {
   if (!data.trend) return;
@@ -1961,9 +1985,9 @@ function renderSparklines(data) {
   const revenue = src.revenue;
   const spend   = src.spend;
 
-  /* ROI per data point */
-  const roi = revenue.map((r, i) =>
-    spend[i] > 0 ? ((r - spend[i]) / spend[i]) * 100 : 0
+  /* ROAS por punto: revenue/spend (mismo criterio que el KPI). */
+  const roas = revenue.map((r, i) =>
+    spend[i] > 0 ? r / spend[i] : 0
   );
 
   /* Impressions: scale proportionally from revenue shape */
@@ -1985,7 +2009,7 @@ function renderSparklines(data) {
 
   _renderSparkline('sparkline-revenue',     revenue,     isUp(revenue),     labels);
   _renderSparkline('sparkline-spend',       spend,       !isUp(spend),      labels); /* lower spend = better */
-  _renderSparkline('sparkline-roi',         roi,         isUp(roi),         labels);
+  _renderSparkline('sparkline-roas',        roas,        isUp(roas),        labels);
   _renderSparkline('sparkline-impressions', impressions, isUp(impressions), labels);
   _renderSparkline('sparkline-leads',       leads,       isUp(leads),       labels);
   _renderSparkline('sparkline-sales',       sales,       isUp(sales),       labels);

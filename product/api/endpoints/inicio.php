@@ -207,16 +207,19 @@ if (!$bofu_data) {
 }
 
 $spend = $tofu_data['spend'] ?? 0;
-$roi   = ($spend > 0 && isset($bofu_data['total_revenue']))
-    ? (($bofu_data['total_revenue'] - $spend) / $spend)
+// Unificación 2026-05-19: una sola métrica de rentabilidad en todo el portal,
+// el ROAS (revenue/spend, formato Nx). Antes acá había un híbrido inconsistente
+// (variable $roi pero valor en formato "Nx" que en realidad era ROAS).
+$roas = ($spend > 0 && isset($bofu_data['total_revenue']))
+    ? ($bofu_data['total_revenue'] / $spend)
     : 0;
 
 // ── Section KPIs ─────────────────────────────────────────────────────────────
 
 $section_kpis = [
     'performance' => [
-        'label'     => 'ROI',
-        'value'     => $roi >= 0 ? sprintf('%.1fx', ($bofu_data['total_revenue'] / max($spend, 1))) : '—',
+        'label'     => 'ROAS',
+        'value'     => $roas > 0 ? sprintf('%.2fx', $roas) : '—',
         'delta_pct' => 0,
     ],
     'tofu' => [
@@ -350,10 +353,10 @@ if ($closed_sales > 0 && $conv_rate > 0) {
     );
 }
 
-if ($roi > 0) {
+if ($roas > 1) {
     $highlights[] = sprintf(
-        'ROI positivo de %.1fx: cada peso invertido generó %.1f pesos en ingresos.',
-        ($revenue / max($spend, 1)), ($revenue / max($spend, 1))
+        'ROAS positivo de %.2fx: cada peso invertido generó %.2f pesos en ingresos.',
+        $roas, $roas
     );
 } elseif ($revenue === 0 && $spend > 0) {
     $highlights[] = sprintf(
@@ -377,8 +380,8 @@ if ($ctr < 2 && $impressions > 5000) {
     $recommendation = 'La tasa de conversión de leads a ventas está baja. El equipo comercial debería revisar la velocidad de contacto y la calidad de los leads que ingresan al CRM.';
 } elseif ($total_leads === 0 && $impressions > 0) {
     $recommendation = 'Hay tráfico pero sin leads. Revisá el formulario de contacto y la landing page — puede haber un problema de UX que está impidiendo que los visitantes conviertan.';
-} elseif ($roi > 2) {
-    $recommendation = 'El ROI está en terreno muy positivo. Este es el momento ideal para escalar presupuesto en las campañas con mejor CPC y mantener el mix de palabras clave ganador.';
+} elseif ($roas > 3) {
+    $recommendation = 'El ROAS está en terreno muy positivo (>3x). Este es el momento ideal para escalar presupuesto en las campañas con mejor CPC y mantener el mix de palabras clave ganador.';
 } else {
     $recommendation = 'Revisá los datos del período anterior para identificar variaciones significativas. Un análisis semanal del CPL y la tasa de tipificación puede revelar oportunidades de optimización.';
 }

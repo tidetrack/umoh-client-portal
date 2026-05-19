@@ -2902,12 +2902,6 @@ body.nav-hidden .nav-fab {
   text-transform: uppercase;
   color:          var(--text-muted);
 }
-.pending-table tfoot .sales-totals-meta {
-  font-size:      12px;
-  font-weight:    500;
-  color:          var(--text-muted);
-  text-align:     right;
-}
 .pending-table thead th {
   font-size: 12px;
   font-weight: 700;
@@ -3019,6 +3013,77 @@ body.nav-hidden .nav-fab {
   margin-right: 3px;
 }
 [data-theme="dark"] .sales-missing-tag { color: #ff7675; background: rgba(255, 118, 117, 0.12); }
+
+/* Ventas marcadas como ganadas en MeisterTask pero sin lead_monetary cargado:
+   no entran en el KPI closed_sales. Las pintamos en ámbar para que el equipo
+   las detecte de un vistazo y complete la carga. */
+.sales-uncounted-badge {
+  display: inline-block;
+  padding: 2px 8px;
+  border-radius: 10px;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  background: rgba(255, 191, 36, 0.18);
+  color: #a67004;
+  border: 1px solid rgba(255, 191, 36, 0.40);
+}
+[data-theme="dark"] .sales-uncounted-badge {
+  color: #f5c150;
+  background: rgba(245, 193, 80, 0.14);
+  border-color: rgba(245, 193, 80, 0.35);
+}
+
+.pending-table tbody tr.sales-row-uncounted {
+  background: rgba(255, 191, 36, 0.06);
+  border-color: rgba(255, 191, 36, 0.35);
+  box-shadow: 0 2px 8px rgba(255, 191, 36, 0.08), 0 1px 2px rgba(0, 0, 0, 0.04);
+}
+.pending-table tbody tr.sales-row-uncounted:hover {
+  border-color: rgba(255, 191, 36, 0.55);
+  box-shadow: 0 6px 20px rgba(255, 191, 36, 0.14), 0 2px 6px rgba(0, 0, 0, 0.06);
+}
+[data-theme="dark"] .pending-table tbody tr.sales-row-uncounted {
+  background: rgba(245, 193, 80, 0.06);
+  border-color: rgba(245, 193, 80, 0.30);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.30), 0 1px 2px rgba(0, 0, 0, 0.18);
+}
+[data-theme="dark"] .pending-table tbody tr.sales-row-uncounted:hover {
+  border-color: rgba(245, 193, 80, 0.50);
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.50), 0 2px 6px rgba(245, 193, 80, 0.10);
+}
+
+/* Pills de Segmento (Voluntario / Monotributista / Obligatorio) en la
+   columna Segmento de la tabla "Ventas Ganadas". Cada segmento tiene un
+   tono distinto, suave, para identificarlos de un vistazo sin gritar. */
+.pending-table .pending-segment { font-size: 13px; }
+.sales-segment {
+  display: inline-block;
+  padding: 2px 9px;
+  border-radius: 10px;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  border: 1px solid transparent;
+}
+.sales-segment--voluntario {
+  background: rgba(99, 102, 241, 0.10);
+  color: #4338ca;
+  border-color: rgba(99, 102, 241, 0.25);
+}
+.sales-segment--monotributista {
+  background: rgba(14, 165, 233, 0.10);
+  color: #0369a1;
+  border-color: rgba(14, 165, 233, 0.25);
+}
+.sales-segment--obligatorio {
+  background: rgba(168, 85, 247, 0.10);
+  color: #7e22ce;
+  border-color: rgba(168, 85, 247, 0.25);
+}
+[data-theme="dark"] .sales-segment--voluntario     { color: #a5b4fc; background: rgba(99, 102, 241, 0.16); border-color: rgba(99, 102, 241, 0.35); }
+[data-theme="dark"] .sales-segment--monotributista { color: #7dd3fc; background: rgba(14, 165, 233, 0.16); border-color: rgba(14, 165, 233, 0.35); }
+[data-theme="dark"] .sales-segment--obligatorio    { color: #d8b4fe; background: rgba(168, 85, 247, 0.16); border-color: rgba(168, 85, 247, 0.35); }
 
 /* ── Lead Detail Modal (F.4.d) ─────────────────────────────── */
 

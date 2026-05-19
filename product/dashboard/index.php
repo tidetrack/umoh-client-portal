@@ -388,11 +388,11 @@ $_asset_v = defined('ASSET_VERSION') ? ASSET_VERSION : filemtime(__DIR__ . '/ass
           <span class="kpi-delta" id="delta-spend"></span>
           <canvas class="kpi-sparkline" id="sparkline-spend" aria-hidden="true"></canvas>
         </div>
-        <div class="kpi-card" data-kpi="roi">
-          <span class="kpi-label">ROI</span>
-          <span class="kpi-value" id="kpi-roi">—</span>
-          <span class="kpi-delta" id="delta-roi"></span>
-          <canvas class="kpi-sparkline" id="sparkline-roi" aria-hidden="true"></canvas>
+        <div class="kpi-card" data-kpi="roas" title="ROAS: Ingresos del período ÷ Inversión en ads del período. Click para ver explicación.">
+          <span class="kpi-label">ROAS</span>
+          <span class="kpi-value" id="kpi-roas">—</span>
+          <span class="kpi-delta" id="delta-roas"></span>
+          <canvas class="kpi-sparkline" id="sparkline-roas" aria-hidden="true"></canvas>
         </div>
         <div class="kpi-card" data-kpi="impressions">
           <span class="kpi-label">Total Impresiones</span>
@@ -830,8 +830,9 @@ $_asset_v = defined('ASSET_VERSION') ? ASSET_VERSION : filemtime(__DIR__ . '/ass
               </select>
               <select id="sales-list-filter-complete" class="chart-filter-select" aria-label="Filtrar por estado">
                 <option value="">Todos los estados</option>
-                <option value="incomplete">Solo incompletos</option>
-                <option value="complete">Solo completos</option>
+                <option value="uncounted">Solo no contabilizadas</option>
+                <option value="incomplete">Solo incompletas</option>
+                <option value="complete">Solo completas</option>
               </select>
               <span class="chart-badge" id="sales-list-count">0 ventas</span>
             </div>
@@ -846,6 +847,7 @@ $_asset_v = defined('ASSET_VERSION') ? ASSET_VERSION : filemtime(__DIR__ . '/ass
                   <th class="th-num">Precio final</th>
                   <th class="th-num">Cápitas</th>
                   <th>Plan</th>
+                  <th>Segmento</th>
                   <th>Faltante</th>
                 </tr>
               </thead>
@@ -855,7 +857,9 @@ $_asset_v = defined('ASSET_VERSION') ? ASSET_VERSION : filemtime(__DIR__ . '/ass
                   <td colspan="3" class="sales-totals-label">Totales (filtrados)</td>
                   <td class="th-num" id="sales-list-total-revenue">—</td>
                   <td class="th-num" id="sales-list-total-capitas">—</td>
-                  <td colspan="2" class="sales-totals-meta" id="sales-list-total-count">—</td>
+                  <td></td>
+                  <td></td>
+                  <td></td>
                 </tr>
               </tfoot>
             </table>

@@ -277,18 +277,6 @@ const KPI_INFO = {
       return `Se invirtieron ${_fc(spend)} ${diffTxt}. Cada peso publicitario generó ${ratio} pesos en ingresos.`.trim();
     }
   },
-  roi: {
-    name: 'ROI — Retorno sobre Inversión',
-    formula: '(Ingresos − Inversión) ÷ Inversión × 100',
-    desc: 'Mide cuánto rendimiento generó cada peso invertido en publicidad. Un ROI positivo indica que los ingresos superan la inversión.',
-    example: d => {
-      const rev   = d.revenue  || 0;
-      const spend = d.ad_spend || 0;
-      const roi   = spend > 0 ? ((rev - spend) / spend * 100).toFixed(1) : '—';
-      const net   = rev - spend;
-      return `Con ${_fc(rev)} de ingresos y ${_fc(spend)} de inversión, el ROI fue de ${roi}%. La ganancia neta sobre la inversión fue de ${_fc(net)}.`;
-    }
-  },
   impressions: {
     name: 'Total Impresiones',
     formula: '',
@@ -444,13 +432,15 @@ const KPI_INFO = {
   'roas': {
     name: 'ROAS — Retorno sobre Inversión Publicitaria',
     formula: 'Ingresos del período ÷ Inversión en ads del período',
-    desc: 'Por cada $1 invertido en publicidad, cuánto dinero se generó en ventas. Un ROAS de 4.5x significa que cada peso invertido devolvió $4,50 en ingresos. Es la métrica que conecta el gasto en TOFU con el revenue del BOFU — el indicador de rentabilidad de las campañas.',
+    desc: 'Por cada $1 invertido en publicidad, cuánto dinero se generó en ventas. Un ROAS de 4.5x significa que cada peso invertido devolvió $4,50 en ingresos. 1x es el punto de equilibrio: por debajo se pierde plata, por encima se gana. Métrica unificada en todo el dashboard (Performance + BOFU).',
     example: d => {
-      const rev   = d.total_revenue || 0;
-      const spend = d.total_spend   || 0;
-      const roas  = d.roas || (spend > 0 ? rev / spend : 0);
+      // Soporta ambos shapes: BOFU usa total_revenue/total_spend, Performance usa revenue/ad_spend.
+      const rev   = d.total_revenue ?? d.revenue  ?? 0;
+      const spend = d.total_spend   ?? d.ad_spend ?? 0;
       if (spend <= 0) return 'Sin inversión publicitaria registrada en el período — el ROAS no se puede calcular.';
-      return `${_fc(rev)} en ventas con ${_fc(spend)} invertidos = ${roas.toFixed(2)}x de retorno.`;
+      const roas = d.roas || (rev / spend);
+      const net  = rev - spend;
+      return `${_fc(rev)} en ventas con ${_fc(spend)} invertidos = ${roas.toFixed(2)}x de retorno. Ganancia neta: ${_fc(net)}.`;
     }
   },
   'bofu-ticket': {
@@ -579,9 +569,6 @@ function _renderModalChart(kpiKey) {
     values = revenue; color = isUp(revenue) ? '#22C55E' : '#FF0040'; label = 'Ingreso';
   } else if (kpiKey === 'spend') {
     values = spend; color = !isUp(spend) ? '#22C55E' : '#EF4444'; label = 'Inversión';
-  } else if (kpiKey === 'roi') {
-    values = revenue.map((r, i) => spend[i] > 0 ? ((r - spend[i]) / spend[i]) * 100 : 0);
-    color = isUp(values) ? '#22C55E' : '#FF0040'; label = 'ROI %';
   } else if (kpiKey === 'impressions') {
     const tot = revenue.reduce((a, b) => a + b, 0);
     values = revenue.map(r => tot > 0 ? Math.round((r / tot) * data.impressions) : 0);
@@ -653,10 +640,18 @@ function _renderModalChart(kpiKey) {
     values = salesArr.map(_ => ratio);
     color = '#22C55E'; label = 'Cápitas/Venta';
   } else if (kpiKey === 'roas') {
-    // ROAS no tiene serie diaria propia — usamos la evolución de revenue como
-    // proxy visual (spend en TOFU suele ser estable día a día).
-    values = data.trend && data.trend.revenue ? data.trend.revenue : [];
-    color = isUp(values) ? '#22C55E' : '#FF0040'; label = 'Ingresos (proxy ROAS)';
+    // ROAS = revenue / spend por punto. Si el trend tiene ambas series (caso
+    // Performance), calculamos la serie real. Si solo tiene revenue (caso
+    // BOFU, cuyo endpoint no devuelve spend en el trend), usamos revenue
+    // como proxy visual y lo marcamos en el label.
+    if (spend && spend.length && spend.length === revenue.length) {
+      values = revenue.map((r, i) => spend[i] > 0 ? r / spend[i] : 0);
+      label = 'ROAS';
+    } else {
+      values = revenue || [];
+      label = 'Ingresos (proxy ROAS)';
+    }
+    color = isUp(values) ? '#22C55E' : '#FF0040';
   } else {
     return false;
   }
@@ -699,7 +694,6 @@ function _renderModalChart(kpiKey) {
               // bofu-ticket-capita ahora es ratio (cápitas/venta), NO moneda.
               const currencyKeys = ['tofu-cpc', 'mofu-cpl', 'bofu-revenue', 'bofu-ticket'];
               if (currencyKeys.includes(kpiKey)) return ` ${label}: $${Math.round(v).toLocaleString('es-AR')}`;
-              if (kpiKey === 'roi')  return ` ${label}: ${v.toFixed(1)}%`;
               if (kpiKey === 'roas') return ` ${label}: ${v.toFixed(2)}x`;
               if (kpiKey === 'bofu-ticket-capita') return ` ${label}: ${v.toFixed(2)} cap.`;
               return ` ${label}: ${Number.isInteger(v) ? v.toLocaleString('es-AR') : v.toFixed(1)}`;
@@ -718,7 +712,6 @@ function _renderModalChart(kpiKey) {
           ticks: {
             font: { size: 10, family: 'Outfit' }, color: 'rgba(90,112,128,0.7)',
             callback: v => {
-              if (kpiKey === 'roi')  return v.toFixed(0) + '%';
               if (kpiKey === 'roas') return v.toFixed(1) + 'x';
               if (kpiKey === 'bofu-ticket-capita') return v.toFixed(1);
               if (kpiKey === 'tofu-impressions' || kpiKey === 'tofu-clicks') {
