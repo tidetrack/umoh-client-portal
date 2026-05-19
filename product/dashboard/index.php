@@ -79,26 +79,26 @@ $_asset_v = defined('ASSET_VERSION') ? ASSET_VERSION : filemtime(__DIR__ . '/ass
   ══════════════════════════════════════════════ -->
   <aside class="dashboard-sidebar" id="dashboard-sidebar" aria-label="Panel de navegación">
 
-    <!-- A. Header del sidebar: logo + nombre + botón colapsar
-         Logo dinámico según rol de sesión:
-           - admin → asterisco UMOH (interno del equipo)
-           - client → logo del cliente activo (ej: Prevención Salud)
-         TODO Fase 4 multi-cliente: resolver client-logo.webp por CLIENT_SLUG. -->
+    <!-- A. Header del sidebar: logo PNG asterisco UMOH + nombre + botón colapsar -->
     <?php
+      // Resolución del avatar de usuario según rol de sesión.
+      // Usado más abajo en sb-user-avatar (trigger) y sb-user-avatar-menu (dropdown).
+      //   - admin (equipo UMOH) → asterisco UMOH
+      //   - client → logo del cliente activo (hoy: Prevención Salud)
       $_role = $_SESSION['umoh_role'] ?? 'client';
-      $_is_admin = ($_role === 'admin');
-      $_logo_src = $_is_admin ? 'assets/img/umoh-asterisk.png' : 'assets/img/client-logo.webp';
-      $_logo_alt = $_is_admin ? 'UMOH' : 'Logo cliente';
-      $_brand_label = $_is_admin ? 'Equipo UMOH' : 'Prevención Salud';
+      $_is_admin_avatar = ($_role === 'admin');
     ?>
     <div class="sb-header">
       <div class="sb-brand">
+        <!-- Logo del cliente — ocupa el lugar del asterisco UMOH en el header del sidebar.
+             El asterisco UMOH se mantiene disponible para uso en login/loading screens.
+             TODO Fase 4 multi-cliente: resolver client-logo.webp dinámicamente via CLIENT_SLUG -->
         <div class="sb-client-logo-wrap" aria-hidden="true">
-          <img src="<?php echo $_logo_src; ?>" alt="<?php echo $_logo_alt; ?>" class="sb-client-logo">
+          <img src="assets/img/client-logo.webp" alt="Logo cliente" class="sb-client-logo">
         </div>
         <div class="sb-brand-text sb-label">
           <span class="sb-brand-agency">umoh</span>
-          <span class="sb-brand-client"><?php echo $_brand_label; ?></span>
+          <span class="sb-brand-client">Prevención Salud</span>
         </div>
       </div>
       <button class="sb-collapse-btn" id="sb-collapse-btn" aria-label="Colapsar sidebar" title="Colapsar">
@@ -275,11 +275,14 @@ $_asset_v = defined('ASSET_VERSION') ? ASSET_VERSION : filemtime(__DIR__ . '/ass
       <div class="sb-user-dropdown" id="sb-user-dropdown" role="menu">
         <div class="user-menu-header">
           <div class="user-menu-avatar-lg">
-            <!-- Avatar real del usuario -->
-            <!-- TODO: cuando tengamos roles, condicionar avatar admin aquí -->
+            <!-- Avatar real del usuario: admin ve asterisco UMOH, client ve su logo. -->
             <div class="sb-user-avatar sb-user-avatar--lg" id="sb-user-avatar-menu">
-              <img src="assets/img/umoh-asterisk-light.png" alt="Avatar" class="avatar-light">
-              <img src="assets/img/umoh-asterisk-dark.png"  alt="Avatar" class="avatar-dark">
+              <?php if ($_is_admin_avatar): ?>
+                <img src="assets/img/umoh-asterisk-light.png" alt="UMOH" class="avatar-light">
+                <img src="assets/img/umoh-asterisk-dark.png"  alt="UMOH" class="avatar-dark">
+              <?php else: ?>
+                <img src="assets/img/client-logo.webp" alt="Logo cliente">
+              <?php endif; ?>
             </div>
           </div>
           <div>
@@ -299,10 +302,14 @@ $_asset_v = defined('ASSET_VERSION') ? ASSET_VERSION : filemtime(__DIR__ . '/ass
       </div>
       <!-- Trigger -->
       <button class="sb-user-trigger" id="sb-user-trigger" aria-haspopup="true" aria-expanded="false">
-        <!-- TODO: cuando tengamos roles, condicionar avatar admin aquí -->
+        <!-- Avatar: admin ve asterisco UMOH (con variantes light/dark), client ve su logo. -->
         <div class="sb-user-avatar" id="sb-user-avatar">
-          <img src="assets/img/umoh-asterisk-light.png" alt="Avatar" class="avatar-light">
-          <img src="assets/img/umoh-asterisk-dark.png"  alt="Avatar" class="avatar-dark">
+          <?php if ($_is_admin_avatar): ?>
+            <img src="assets/img/umoh-asterisk-light.png" alt="UMOH" class="avatar-light">
+            <img src="assets/img/umoh-asterisk-dark.png"  alt="UMOH" class="avatar-dark">
+          <?php else: ?>
+            <img src="assets/img/client-logo.webp" alt="Logo cliente">
+          <?php endif; ?>
         </div>
         <div class="sb-user-info sb-label">
           <span class="sb-user-name" id="sb-user-name">Usuario</span>
