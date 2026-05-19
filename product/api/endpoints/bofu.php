@@ -201,20 +201,13 @@ try {
         api_error('Sin ventas cerradas en Supabase para ' . CLIENT_SLUG, 404);
     }
 
-    // 5. Filtrar por período. Calculamos los límites del período sobre el
-    //    UNIVERSO completo de fechas con actividad: ventas (ambos canales) +
-    //    impresiones TOFU + leads MOFU. Esto es crítico para que el rango
-    //    "30d" termine en la MISMA fecha que summary.php (Performance).
+    // 5. Filtrar por período. Rango unificado anclado en HOY (APP_TZ) —
+    //    ver lib/config.php::global_period_dates. TODOS los endpoints del
+    //    portal usan el mismo helper, garantizando que la ventana [start,end]
+    //    sea idéntica entre Inicio / Performance / TOFU / MOFU / BOFU.
     //
-    //    Bug previo (corregido 2026-05-19, decisión Franco): bofu.php anclaba
-    //    $last solo en sales close_dates. Si la última venta cerrada era
-    //    anterior al último día con ads/leads (caso normal: ads corren a
-    //    diario, ventas son sporádicas), la ventana de BOFU corría días
-    //    para atrás respecto a Performance. Resultado: "Ingresos totales" en
-    //    Sales ≠ "Ingreso por ventas" en Performance, y los ROAS no matcheaban.
-    //
-    //    summary.php usa la misma idea (merge de tofu+mofu+bofu dates) —
-    //    replicamos acá para que ambos endpoints calculen idéntico [start,end].
+    //    $all_dates se calcula solo para el caso 'historical' (necesita el
+    //    primer día con datos como floor). Para 7d/30d/90d/custom no se usa.
     $period     = $_GET['period'] ?? '30d';
     $all_dates  = array_unique(array_merge(
         array_keys($by_date_campaign),
@@ -223,9 +216,8 @@ try {
         array_keys($leads_by_date)
     ));
     sort($all_dates);
-    $last       = end($all_dates);
 
-    [$start, $end] = period_dates($period, $last, $all_dates[0] ?? null);
+    [$start, $end] = global_period_dates($period, $all_dates[0] ?? null);
 
     // Período previo: mismo length, terminando el día antes de $start
     $period_days = (strtotime($end) - strtotime($start)) / 86400 + 1;

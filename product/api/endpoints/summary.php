@@ -109,14 +109,15 @@ try {
         $bofu[$d]['sales']++;
     }
 
-    // 4. Calcular período
+    // 4. Calcular período — rango unificado anclado en HOY (APP_TZ).
+    //    Ver lib/config.php::global_period_dates. Mismo helper que el resto
+    //    de los endpoints, garantiza [start,end] idéntico en toda la request.
     ksort($tofu); ksort($mofu); ksort($bofu);
     $all_dates = array_unique(array_merge(array_keys($tofu), array_keys($mofu), array_keys($bofu)));
     sort($all_dates);
     if (empty($all_dates)) api_error('Sin datos en Supabase para ' . CLIENT_SLUG, 404);
-    $last = end($all_dates);
 
-    [$start, $end] = period_dates($period, $last, $all_dates[0] ?? null);
+    [$start, $end] = global_period_dates($period, $all_dates[0] ?? null);
 
     // Período previo: mismo length, terminando el día antes de $start
     $period_days = (strtotime($end) - strtotime($start)) / 86400 + 1;

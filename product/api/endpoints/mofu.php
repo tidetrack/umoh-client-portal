@@ -103,9 +103,10 @@ try {
     $period = $_GET['period'] ?? '30d';
     $dates  = array_keys($by_date);
     if (empty($dates)) api_error('Sin leads en Supabase para ' . CLIENT_SLUG, 404);
-    $last = end($dates);
 
-    [$start, $end] = period_dates($period, $last, $dates[0] ?? null);
+    // Rango temporal unificado (ver lib/config.php::global_period_dates).
+    // Anclado en HOY (APP_TZ) para que todos los endpoints calculen idéntica ventana.
+    [$start, $end] = global_period_dates($period, $dates[0] ?? null);
 
     // Período previo: mismo length, terminando el día antes de $start
     $period_days = (strtotime($end) - strtotime($start)) / 86400 + 1;
