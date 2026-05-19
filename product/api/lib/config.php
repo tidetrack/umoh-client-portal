@@ -50,43 +50,104 @@ function api_headers(): void {
     header('Cache-Control: no-store');
 }
 
+// Zona horaria de referencia para todos los rangos temporales del portal.
+// Single source of truth — si en el futuro hay clientes en otras zonas, esto
+// se moverá a config por cliente. Hoy: Prepagas (Mendoza).
+const APP_TZ = 'America/Argentina/Mendoza';
+
 /**
- * Calcula las fechas de inicio y fin para un período dado.
- * $last_date = última fecha disponible en los datos.
- *
- * Soporta:
- *   '7d', '30d', '90d' → últimos N días desde $last_date
- *   'custom'           → lee $_GET['start'] y $_GET['end'] (YYYY-MM-DD)
- *   'historical'       → desde la primera fecha con datos hasta $last_date
- *
- * Devuelve [start, end] como strings YYYY-MM-DD.
+ * Devuelve la fecha de "hoy" en zona horaria de la app (YYYY-MM-DD).
+ * NO uses date('Y-m-d') directo — Hostinger corre en UTC y eso provoca
+ * off-by-one en la madrugada argentina.
  */
-function period_dates(string $period, string $last_date, ?string $first_date = null): array {
+function app_today(): string {
+    static $cached = null;
+    if ($cached !== null) return $cached;
+    $cached = (new DateTime('now', new DateTimeZone(APP_TZ)))->format('Y-m-d');
+    return $cached;
+}
+
+/**
+ * Convierte un timestamp ISO 8601 (UTC con 'Z' o offset) al YYYY-MM-DD del
+ * día calendario correspondiente en APP_TZ.
+ *
+ * MOTIVO: los timestamps de Supabase / MeisterTask CSV vienen en UTC. Si
+ * usamos `substr($iso, 0, 10)` para extraer la fecha, una tarea creada a
+ * las 22:00 hs Argentina (= 01:00 UTC del día siguiente) queda contada en
+ * el día siguiente — off-by-one que NO matchea con "la fecha que aparece
+ * en la tarea" en MeisterTask UI (que sí muestra hora local).
+ *
+ * Devuelve null si el input es vacío o no parseable.
+ */
+function to_app_date(?string $iso): ?string {
+    if (!$iso) return null;
+    try {
+        $dt = new DateTime($iso);
+        $dt->setTimezone(new DateTimeZone(APP_TZ));
+        return $dt->format('Y-m-d');
+    } catch (Exception $e) {
+        return null;
+    }
+}
+
+/**
+ * ÚNICA fuente de verdad del rango temporal del portal.
+ *
+ * Resuelve [start, end] (YYYY-MM-DD) anclando "now" en HOY (APP_TZ), no en
+ * el último día con datos. Esto garantiza que TODOS los endpoints
+ * (inicio/tofu/mofu/bofu/summary) computen la misma ventana en cada request
+ * sin tener que coordinarse entre sí.
+ *
+ * Semántica:
+ *   '7d'         → 7 días inclusivos terminando hoy (today-6 → today).
+ *   '30d'        → 30 días inclusivos terminando hoy (today-29 → today).
+ *   '90d'        → 90 días inclusivos terminando hoy (today-89 → today).
+ *   'custom'     → lee $_GET['start'] y $_GET['end'] (validados).
+ *   'historical' → desde $fallback_first (o 2020-01-01) hasta hoy.
+ *
+ * Decisión Franco 2026-05-19 (auditoría de período): anclar en HOY y no en
+ * "último dato disponible" porque (1) match al modelo mental del usuario,
+ * (2) hace que el rango no se encoja cuando un endpoint tiene menos datos
+ * que otro, (3) elimina la necesidad de cada endpoint de mergear sus dates
+ * con los de las otras tablas para calcular un anchor común.
+ */
+function global_period_dates(string $period, ?string $fallback_first = null): array {
+    $today = app_today();
+
     if ($period === 'custom') {
         $start = $_GET['start'] ?? null;
         $end   = $_GET['end']   ?? null;
-        // Validación mínima: formato YYYY-MM-DD
         $valid = fn($d) => is_string($d) && preg_match('/^\d{4}-\d{2}-\d{2}$/', $d);
         if (!$valid($start) || !$valid($end)) {
             // Fallback a 30d si los params son inválidos
-            $start = date('Y-m-d', strtotime($last_date . ' -29 days'));
-            $end   = $last_date;
+            $start = date('Y-m-d', strtotime($today . ' -29 days'));
+            $end   = $today;
         } elseif ($start > $end) {
-            // Swap si vienen invertidos
             [$start, $end] = [$end, $start];
         }
         return [$start, $end];
     }
 
     if ($period === 'historical') {
-        return [$first_date ?? '2020-01-01', $last_date];
+        return [$fallback_first ?? '2020-01-01', $today];
     }
 
     $days_back = ['7d' => 6, '30d' => 29, '90d' => 89];
     $days      = $days_back[$period] ?? 29;
-    $end       = $last_date;
+    $end       = $today;
     $start     = date('Y-m-d', strtotime($end . ' -' . $days . ' days'));
     return [$start, $end];
+}
+
+/**
+ * @deprecated 2026-05-19 — usar global_period_dates() en su lugar.
+ *
+ * Wrapper de compatibilidad: ignora $last_date/$first_date (eran fuente de
+ * inconsistencia entre endpoints) y delega al helper unificado. Se mantiene
+ * para no romper llamadas mientras se completa la migración.
+ */
+function period_dates(string $period, string $last_date = '', ?string $first_date = null): array {
+    return global_period_dates($period, $first_date);
 }
 
 /**

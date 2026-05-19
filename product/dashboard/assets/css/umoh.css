@@ -1563,9 +1563,43 @@ body.nav-hidden .nav-fab {
   width: 100%;
   max-height: 90vh;
   overflow-y: auto;
+  overscroll-behavior: contain;
   padding: var(--sp-8) var(--sp-8) var(--sp-6);
   position: relative;
   animation: modalIn 0.18s cubic-bezier(0.16, 1, 0.3, 1);
+
+  /* Scrollbar custom: thumb fino, redondeado, hover sutilmente más visible.
+     Firefox usa `scrollbar-width` + `scrollbar-color`; WebKit/Blink usa
+     pseudo-elementos ::-webkit-scrollbar-*. Definimos ambos. */
+  scrollbar-width: thin;
+  scrollbar-color: rgba(90, 112, 128, 0.35) transparent;
+}
+.kpi-modal::-webkit-scrollbar {
+  width: 8px;
+}
+.kpi-modal::-webkit-scrollbar-track {
+  background: transparent;
+  margin: 12px 0;
+}
+.kpi-modal::-webkit-scrollbar-thumb {
+  background: rgba(90, 112, 128, 0.30);
+  border-radius: 8px;
+  border: 2px solid transparent;
+  background-clip: padding-box;
+  transition: background 0.15s ease;
+}
+.kpi-modal::-webkit-scrollbar-thumb:hover {
+  background: rgba(90, 112, 128, 0.55);
+  background-clip: padding-box;
+}
+[data-theme="dark"] .kpi-modal {
+  scrollbar-color: rgba(200, 216, 220, 0.20) transparent;
+}
+[data-theme="dark"] .kpi-modal::-webkit-scrollbar-thumb {
+  background: rgba(200, 216, 220, 0.18);
+}
+[data-theme="dark"] .kpi-modal::-webkit-scrollbar-thumb:hover {
+  background: rgba(200, 216, 220, 0.36);
 }
 
 @keyframes modalIn {
@@ -2182,6 +2216,53 @@ body.nav-hidden .nav-fab {
    semántica, barras más grandes, stagger entrance, sub-fases.
    ─────────────────────────────────────────────────────────── */
 
+/* Header del card del journey: título + nota a la izquierda, dropdown a la derecha */
+.journey-card-header {
+  flex-wrap: wrap;
+  gap: var(--sp-3) var(--sp-4);
+}
+
+.journey-card-header-main {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  flex: 1;
+  min-width: 0;
+}
+
+/* La .chart-title dentro del journey-card-header no debe tener flex:1
+   ya que ahora el flex está en .journey-card-header-main */
+.journey-card-header .chart-title {
+  flex: unset;
+}
+
+.journey-card-header-controls {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+  flex-shrink: 0;
+}
+
+.journey-canal-label {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  white-space: nowrap;
+}
+
+@media (max-width: 480px) {
+  .journey-card-header {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+  .journey-card-header-controls {
+    width: 100%;
+    justify-content: flex-start;
+  }
+}
+
 /* Entrance: las barras crecen de 0 a su altura final */
 @keyframes journeyBarGrow {
   from { transform: scaleY(0); opacity: 0; }
@@ -2398,6 +2479,13 @@ body.nav-hidden .nav-fab {
   color: var(--text-secondary);
 }
 
+/* Focus visible: accesibilidad por teclado — el outline rodea la columna entera */
+.journey-col:focus-visible {
+  outline: 2px solid var(--umoh-accent, #FF0040);
+  outline-offset: 2px;
+  border-radius: var(--r-sm);
+}
+
 /* Flecha conectora entre etapas */
 .journey-arrow {
   flex-shrink: 0;
@@ -2476,6 +2564,42 @@ body.nav-hidden .nav-fab {
   border-top: 1px solid rgba(255,255,255,0.1);
   display: block;
 }
+
+/* Desglose campaña / vendedor dentro del tooltip — solo aparece cuando hay datos. */
+.journey-tooltip-breakdown {
+  margin-top: var(--sp-2);
+  padding-top: var(--sp-2);
+  border-top: 1px solid rgba(255,255,255,0.1);
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.journey-tooltip-breakdown[hidden] { display: none; }
+
+.journey-tooltip-bd-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 11px;
+  font-weight: 500;
+  color: rgba(255,255,255,0.7);
+}
+
+.journey-tooltip-bd-row strong {
+  margin-left: auto;
+  font-weight: 700;
+  color: #fff;
+  font-variant-numeric: tabular-nums;
+}
+
+.journey-tooltip-bd-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+.journey-tooltip-bd-dot--camp { background: #63B3ED; }
+.journey-tooltip-bd-dot--vend { background: #F6AD55; }
 
 /* ── Insights del Journey (reemplaza el bloque .journey-description/.jd-grid) ──
    Interpreta los datos reales del período y detecta cuellos de botella,
@@ -2738,6 +2862,73 @@ body.nav-hidden .nav-fab {
   margin-left: var(--sp-1);
 }
 
+/* Desglose campaña / vendedor — bloque opcional debajo del KPI principal del modal.
+   Reemplaza al viejo .journey-col-breakdown que ensuciaba cada columna del journey. */
+.journey-modal-breakdown {
+  margin-top: calc(var(--sp-5) * -1);
+  margin-bottom: var(--sp-5);
+  padding: var(--sp-3) var(--sp-4);
+  background: var(--bg-page);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--r-md);
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-2);
+}
+.journey-modal-breakdown[hidden] { display: none; }
+
+.journey-modal-breakdown-title {
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+
+.journey-modal-breakdown-rows {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.journey-modal-bd-row {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+  font-size: 13px;
+  color: var(--text-secondary);
+}
+
+.journey-modal-bd-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+.journey-modal-bd-row--camp .journey-modal-bd-dot { background: #63B3ED; }
+.journey-modal-bd-row--vend .journey-modal-bd-dot { background: #F6AD55; }
+
+.journey-modal-bd-label {
+  font-weight: 600;
+  color: var(--text-secondary);
+}
+
+.journey-modal-bd-val {
+  margin-left: auto;
+  font-weight: 700;
+  color: var(--text-primary);
+  font-variant-numeric: tabular-nums;
+}
+
+.journey-modal-bd-pct {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-muted);
+  font-variant-numeric: tabular-nums;
+  min-width: 36px;
+  text-align: right;
+}
+
 /* Secciones de contenido */
 .journey-modal-section {
   margin-bottom: var(--sp-4);
@@ -2902,12 +3093,6 @@ body.nav-hidden .nav-fab {
   text-transform: uppercase;
   color:          var(--text-muted);
 }
-.pending-table tfoot .sales-totals-meta {
-  font-size:      12px;
-  font-weight:    500;
-  color:          var(--text-muted);
-  text-align:     right;
-}
 .pending-table thead th {
   font-size: 12px;
   font-weight: 700;
@@ -3020,11 +3205,146 @@ body.nav-hidden .nav-fab {
 }
 [data-theme="dark"] .sales-missing-tag { color: #ff7675; background: rgba(255, 118, 117, 0.12); }
 
+/* Ventas marcadas como ganadas en MeisterTask pero sin lead_monetary cargado:
+   no entran en el KPI closed_sales. Las pintamos en ámbar para que el equipo
+   las detecte de un vistazo y complete la carga. */
+.sales-uncounted-badge {
+  display: inline-block;
+  padding: 2px 8px;
+  border-radius: 10px;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  background: rgba(255, 191, 36, 0.18);
+  color: #a67004;
+  border: 1px solid rgba(255, 191, 36, 0.40);
+}
+[data-theme="dark"] .sales-uncounted-badge {
+  color: #f5c150;
+  background: rgba(245, 193, 80, 0.14);
+  border-color: rgba(245, 193, 80, 0.35);
+}
+
+.pending-table tbody tr.sales-row-uncounted {
+  background: rgba(255, 191, 36, 0.06);
+  border-color: rgba(255, 191, 36, 0.35);
+  box-shadow: 0 2px 8px rgba(255, 191, 36, 0.08), 0 1px 2px rgba(0, 0, 0, 0.04);
+}
+.pending-table tbody tr.sales-row-uncounted:hover {
+  border-color: rgba(255, 191, 36, 0.55);
+  box-shadow: 0 6px 20px rgba(255, 191, 36, 0.14), 0 2px 6px rgba(0, 0, 0, 0.06);
+}
+[data-theme="dark"] .pending-table tbody tr.sales-row-uncounted {
+  background: rgba(245, 193, 80, 0.06);
+  border-color: rgba(245, 193, 80, 0.30);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.30), 0 1px 2px rgba(0, 0, 0, 0.18);
+}
+[data-theme="dark"] .pending-table tbody tr.sales-row-uncounted:hover {
+  border-color: rgba(245, 193, 80, 0.50);
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.50), 0 2px 6px rgba(245, 193, 80, 0.10);
+}
+
+/* Pills de Segmento (Voluntario / Monotributista / Obligatorio) en la
+   columna Segmento de la tabla "Ventas Ganadas". Cada segmento tiene un
+   tono distinto, suave, para identificarlos de un vistazo sin gritar. */
+.pending-table .pending-segment { font-size: 13px; }
+.sales-segment {
+  display: inline-block;
+  padding: 2px 9px;
+  border-radius: 10px;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  border: 1px solid transparent;
+}
+.sales-segment--voluntario {
+  background: rgba(99, 102, 241, 0.10);
+  color: #4338ca;
+  border-color: rgba(99, 102, 241, 0.25);
+}
+.sales-segment--monotributista {
+  background: rgba(14, 165, 233, 0.10);
+  color: #0369a1;
+  border-color: rgba(14, 165, 233, 0.25);
+}
+.sales-segment--obligatorio {
+  background: rgba(168, 85, 247, 0.10);
+  color: #7e22ce;
+  border-color: rgba(168, 85, 247, 0.25);
+}
+[data-theme="dark"] .sales-segment--voluntario     { color: #a5b4fc; background: rgba(99, 102, 241, 0.16); border-color: rgba(99, 102, 241, 0.35); }
+[data-theme="dark"] .sales-segment--monotributista { color: #7dd3fc; background: rgba(14, 165, 233, 0.16); border-color: rgba(14, 165, 233, 0.35); }
+[data-theme="dark"] .sales-segment--obligatorio    { color: #d8b4fe; background: rgba(168, 85, 247, 0.16); border-color: rgba(168, 85, 247, 0.35); }
+
 /* ── Lead Detail Modal (F.4.d) ─────────────────────────────── */
 
 /* Reutiliza .kpi-modal-overlay y .kpi-modal — solo extiende con .lead-modal */
 .lead-modal {
-  max-width: 680px;
+  max-width: 760px;
+}
+
+/* Header del modal: título + subtítulo + fila de badges. La línea de
+   subtítulo da contexto "qué tipo de venta estoy mirando" (ID, canal,
+   fecha cierre) y los badges replican exactamente las etiquetas de la
+   tabla — el usuario las reconoce de un vistazo. */
+.lead-modal-header {
+  margin-bottom: var(--sp-5);
+  padding-bottom: var(--sp-4);
+  border-bottom: 1px solid var(--border-subtle);
+}
+.lead-modal-subtitle {
+  font-size: 13px;
+  color: var(--text-muted);
+  margin-top: 4px;
+  font-variant-numeric: tabular-nums;
+}
+.lead-modal-badges {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: var(--sp-3);
+}
+.lead-modal-badges:empty { display: none; }
+
+/* Acciones rápidas: chips clickeables. Copiar ID, abrir MeisterTask,
+   filtrar tabla por asesor. Hover sutil para invitación a tocar. */
+.lead-modal-actions-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--sp-2);
+}
+.lead-modal-action-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 14px;
+  border-radius: 8px;
+  font-size: 13px;
+  font-weight: 600;
+  font-family: var(--font);
+  border: 1px solid var(--border-subtle);
+  background: var(--bg-card);
+  color: var(--text-primary);
+  cursor: pointer;
+  text-decoration: none;
+  transition: background 0.15s ease, border-color 0.15s ease, transform 0.1s ease;
+}
+.lead-modal-action-btn:hover {
+  background: var(--bg-muted, rgba(0,0,0,0.04));
+  border-color: rgba(0, 0, 0, 0.15);
+}
+.lead-modal-action-btn:active { transform: scale(0.98); }
+[data-theme="dark"] .lead-modal-action-btn {
+  background: rgba(255, 255, 255, 0.04);
+  border-color: rgba(255, 255, 255, 0.12);
+}
+[data-theme="dark"] .lead-modal-action-btn:hover {
+  background: rgba(255, 255, 255, 0.08);
+  border-color: rgba(255, 255, 255, 0.22);
+}
+.lead-modal-action-btn .action-icon {
+  font-size: 14px;
+  line-height: 1;
 }
 
 .lead-modal-section {
@@ -5409,6 +5729,145 @@ body.sidebar-layout .theme-toggle-switch {
   .regen-modal-copy {
     width: 100%;
     justify-content: center;
+  }
+}
+
+/* ════════════════════════════════════════════════════════════════
+   MOBILE FIXES — overrides quirúrgicos para celular (<640px)
+   Última capa del archivo: gana por orden de cascada.
+   Solo lo necesario para que el dashboard sea usable en cualquier
+   celular sin romper desktop ni tablet.
+═══════════════════════════════════════════════════════════════ */
+@media (max-width: 640px) {
+
+  /* KPI grids: 2 columnas en lugar de 1 — evita scroll infinito
+     y mantiene jerarquía visual de cards lado a lado. */
+  .kpi-grid--6,
+  .kpi-grid--5,
+  .kpi-grid--4,
+  .kpi-grid--3 {
+    grid-template-columns: repeat(2, 1fr);
+    gap: var(--sp-3);
+  }
+  /* kpi-grid--2 quedan stackeados (cards grandes tipo capitas / ticket-capita) */
+
+  /* Padding ajustado: más espacio horizontal para contenido */
+  .dashboard-main {
+    padding: var(--sp-4) var(--sp-3) var(--sp-10);
+  }
+
+  /* KPI cards: padding interno más compacto para que valores grandes
+     (ej "$1.240.500") no se corten ni hagan wrap raro. */
+  .kpi-card {
+    padding: var(--sp-4) var(--sp-4);
+  }
+  .kpi-value {
+    font-size: 22px;
+  }
+
+  /* Tablas anchas (.pending-table 8 cols, .sellers-table 7 cols): scroll
+     horizontal con touch nativo. min-width fuerza a la tabla a pedir scroll
+     en vez de comprimirse a la fuerza. Canvas de Chart.js no overflow, así
+     que aplicar overflow-x al body es seguro. */
+  .chart-card-body {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+  .pending-table,
+  .sellers-table {
+    min-width: 540px;
+  }
+
+  /* Modales: bottom-sheet en mobile. Ya existe para kpi-modal en 768px,
+     extendemos el patrón a journey-stage-modal y lead-detail-modal. */
+  .journey-modal-overlay {
+    align-items: flex-end;
+    padding: 0;
+  }
+  .journey-modal {
+    max-width: 100%;
+    width: 100%;
+    max-height: 92vh;
+    border-radius: var(--r-lg) var(--r-lg) 0 0;
+    padding: var(--sp-6) var(--sp-5) var(--sp-5);
+  }
+
+  .kpi-modal-overlay {
+    align-items: flex-end;
+    padding: 0;
+  }
+  .kpi-modal {
+    max-width: 100%;
+    width: 100%;
+    max-height: 92vh;
+    border-radius: var(--r-lg) var(--r-lg) 0 0;
+    padding: var(--sp-6) var(--sp-5) var(--sp-5);
+  }
+
+  /* Section header: tipografía hero más compacta y menos margen */
+  .section-title--hero {
+    font-size: clamp(28px, 9vw, 40px);
+  }
+  .section-header {
+    margin-bottom: var(--sp-4);
+  }
+
+  /* Charts grids: forzamos 1 columna en celular (90px breakpoint existente
+     ya cubre 2col pero hay charts-grid--full y otros que no, los unificamos) */
+  .charts-grid,
+  .charts-grid--2col,
+  .charts-grid--centered {
+    grid-template-columns: 1fr;
+    gap: var(--sp-3);
+  }
+
+  /* Charts: altura más compacta en mobile para no comer toda la viewport */
+  .chart-body--tall {
+    height: 220px;
+  }
+  .chart-body--donut {
+    min-height: 220px;
+  }
+
+  /* Filtro de canal BOFU: anula gaps del inline style cuando se apila.
+     El style="" inline necesita !important para sobrescribir. */
+  .bofu-canal-filter-wrap {
+    gap: var(--sp-2) !important;
+    margin-top: var(--sp-3) !important;
+  }
+  .bofu-canal-filter-wrap .chart-badge {
+    width: 100%;
+  }
+
+  /* Customer journey: barras más bajas y arrow más chica. El 480px
+     existente ya lo cubre pero subimos el threshold a 640px. */
+  .journey-bar-wrap { height: 160px; }
+  .journey-col { min-width: 56px; }
+  .journey-col-value { font-size: 14px; }
+  .journey-col-pct { font-size: 10px; }
+  .journey-col-label { font-size: 10px; }
+  .journey-arrow { width: 10px; font-size: 10px; padding-bottom: 70px; }
+  .journey-wrap { padding: var(--sp-3) var(--sp-3) var(--sp-4); }
+  .journey-insights { padding: var(--sp-4); }
+
+  /* Sellers ranking: padding más compacto en cells */
+  .sellers-table thead th,
+  .sellers-table td {
+    padding: 8px 6px;
+    font-size: 12px;
+  }
+
+  /* Pending/sales table: padding más compacto */
+  .pending-table thead th,
+  .pending-table td {
+    padding: 8px 6px;
+    font-size: 12px;
+  }
+
+  /* Modal lead-detail: campos en 1 columna (estaban en 2) */
+  .lead-modal-grid,
+  .lead-modal-fields {
+    grid-template-columns: 1fr !important;
   }
 }
 

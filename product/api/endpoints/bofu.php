@@ -105,9 +105,8 @@ try {
     //    leads_by_date por si se necesita para otras métricas.
     $leads_by_date = [];
     foreach ($leads as $l) {
-        $created = $l['lead_created_at'] ?? null;
-        if (!$created) continue;
-        $d = substr($created, 0, 10);
+        $d = to_app_date($l['lead_created_at'] ?? null);
+        if (!$d) continue;
         $leads_by_date[$d] = ($leads_by_date[$d] ?? 0) + 1;
     }
 
@@ -149,9 +148,8 @@ try {
     };
 
     foreach ($closed as $c) {
-        $upd = $c['updated_at'] ?? null;
-        if (!$upd) continue;
-        $d = substr($upd, 0, 10);
+        $d = to_app_date($c['updated_at'] ?? null);
+        if (!$d) continue;
 
         $price = (float)($c['precio_final'] ?? 0);
         $caps  = (int)($c['capitas'] ?? 0);
@@ -201,16 +199,23 @@ try {
         api_error('Sin ventas cerradas en Supabase para ' . CLIENT_SLUG, 404);
     }
 
-    // 5. Filtrar por período. Calculamos los límites del período sobre el set
-    //    completo de fechas (campaign + nc), no sólo el bucket filtrado: así
-    //    el rango temporal es consistente entre filtros y no se "encoge" cuando
-    //    el filtro elegido tiene menos datos.
+    // 5. Filtrar por período. Rango unificado anclado en HOY (APP_TZ) —
+    //    ver lib/config.php::global_period_dates. TODOS los endpoints del
+    //    portal usan el mismo helper, garantizando que la ventana [start,end]
+    //    sea idéntica entre Inicio / Performance / TOFU / MOFU / BOFU.
+    //
+    //    $all_dates se calcula solo para el caso 'historical' (necesita el
+    //    primer día con datos como floor). Para 7d/30d/90d/custom no se usa.
     $period     = $_GET['period'] ?? '30d';
-    $all_dates  = array_keys(array_merge($by_date_campaign, $by_date_nc));
+    $all_dates  = array_unique(array_merge(
+        array_keys($by_date_campaign),
+        array_keys($by_date_nc),
+        array_keys($impr_by_date),
+        array_keys($leads_by_date)
+    ));
     sort($all_dates);
-    $last       = end($all_dates);
 
-    [$start, $end] = period_dates($period, $last, $all_dates[0] ?? null);
+    [$start, $end] = global_period_dates($period, $all_dates[0] ?? null);
 
     // Período previo: mismo length, terminando el día antes de $start
     $period_days = (strtotime($end) - strtotime($start)) / 86400 + 1;
@@ -296,48 +301,92 @@ try {
     }
     $type_colors = [$C['navy'], $C['slate'], $C['silver'], $C['mist'], $C['light']];
 
-    // 10. Ranking de vendedores — lee de la tabla seller_facts (migración 012)
-    //     en lugar de calcular en runtime. Esto unifica la fuente de verdad
-    //     con la Sheet espejo, incluye capitas y cycle_days reales (antes en 0)
-    //     y elimina la duplicación de lógica de filtrado por campaign_lead.
+    // 10. Ranking de vendedores — calculado ON-THE-FLY desde la MISMA fuente
+    //     que el KPI closed_sales (lead_monetary deduplicado + leads). Decisión
+    //     Franco 2026-05-18: la suma del ranking DEBE coincidir con el contador
+    //     total de ventas.
     //
-    //     Período actual: $start..$end (calculado arriba via period_dates).
-    //     Período previo: reutiliza $prev_start / $prev_end calculados en el bloque 5.
+    //     El bug anterior venía de leer de seller_facts, que tenía un doble
+    //     filtro en compute_seller_facts (mig. 013):
+    //       WHERE close_date BETWEEN p_start..p_end
+    //         AND lead_created_at BETWEEN p_start..p_end
+    //     Es decir, solo contaba como "venta del vendedor" si el lead se creó
+    //     Y se cerró dentro del mismo período. Resultado: KPI=18, ranking=3
+    //     en períodos cortos donde la mayoría de los cierres son de leads
+    //     creados ANTES (ciclo natural de venta de meses).
+    //
+    //     Calcular acá garantiza por construcción que:
+    //       Σ sellers[].sales   == closed_sales
+    //       Σ sellers[].revenue == total_revenue
+    //       Σ sellers[].capitas == capitas_closed
+    //     usando exactamente el mismo filtro de canal y el mismo criterio
+    //     "1 venta = 1 meistertask_id con is_closed=true en el período".
+    //
+    //     leads_assigned (denominador de effectiveness): leads creados en el
+    //     período asignados al vendedor, con el mismo filtro de canal.
+    //
+    //     cycle_days: (updated_at - lead_created_at) en días, promedio simple
+    //     por vendedor.
+    //
+    //     "Sin asignar" agrupa ventas con assignee vacío para que el ranking
+    //     sume == KPI. Si el cliente prefiere ocultarlas, el frontend puede
+    //     omitir esa fila — pero el dato está disponible y es honesto.
 
-    // Helper interno: lee seller_facts en un rango y agrega por seller_name.
-    // avg_cycle_days se calcula como weighted avg por sales_count (matemática-
-    // mente correcto cuando se promedian días de ciclo de varios cierres).
-    $aggregate_sellers = function(string $rs, string $re) use ($campaign_filter) {
-        $q = [
-            'client_slug' => 'eq.' . CLIENT_SLUG,
-            'date'        => 'gte.' . $rs,
-            'select'      => 'seller_name,leads_assigned,sales_count,revenue,capitas_closed,avg_cycle_days,date',
-            'limit'       => '5000',
-        ];
-        if ($campaign_filter !== '' && $campaign_filter !== 'all') {
-            $q['campaign_id'] = 'eq.' . $campaign_filter;
-        }
-        $rows = supabase_query('seller_facts', $q);
-        // Filtrar manualmente la cota superior (PostgREST no permite 2x date= en una sola query).
-        $rows = array_filter($rows, fn($r) => ($r['date'] ?? '') <= $re);
+    $canal_match = function(array $lead) use ($canal_filter): bool {
+        $is_campaign = !empty($lead['is_campaign_lead']);
+        if ($canal_filter === 'campaign')     return $is_campaign;
+        if ($canal_filter === 'non_campaign') return !$is_campaign;
+        return true;
+    };
 
+    $aggregate_sellers = function(string $rs, string $re) use ($closed, $leads, $lead_by_id, $canal_match) {
         $agg = [];
-        foreach ($rows as $r) {
-            $name = $r['seller_name'] ?? '';
-            if ($name === '') continue;
+        $ensure = function(string $name) use (&$agg) {
             if (!isset($agg[$name])) {
                 $agg[$name] = [
                     'leads' => 0, 'sales' => 0, 'revenue' => 0.0,
                     'capitas' => 0, 'cycle_weighted' => 0.0,
                 ];
             }
-            $sales = (int)($r['sales_count'] ?? 0);
-            $agg[$name]['leads']          += (int)($r['leads_assigned'] ?? 0);
-            $agg[$name]['sales']          += $sales;
-            $agg[$name]['revenue']        += (float)($r['revenue'] ?? 0);
-            $agg[$name]['capitas']        += (int)($r['capitas_closed'] ?? 0);
-            $agg[$name]['cycle_weighted'] += (float)($r['avg_cycle_days'] ?? 0) * $sales;
+        };
+
+        // 1. leads_assigned: leads creados en el período, con el mismo filtro de canal.
+        foreach ($leads as $l) {
+            $d = to_app_date($l['lead_created_at'] ?? null);
+            if (!$d || $d < $rs || $d > $re) continue;
+            if (!$canal_match($l)) continue;
+            $name = trim($l['assignee'] ?? '');
+            if ($name === '') $name = 'Sin asignar';
+            $ensure($name);
+            $agg[$name]['leads']++;
         }
+
+        // 2. sales / revenue / capitas / cycle_days: ventas cerradas en el período.
+        //    $closed ya está deduplicado por meistertask_id (1 venta = 1 fila).
+        foreach ($closed as $c) {
+            $d = to_app_date($c['updated_at'] ?? null);
+            if (!$d || $d < $rs || $d > $re) continue;
+
+            $mid  = $c['meistertask_id'];
+            $lead = $lead_by_id[$mid] ?? null;
+            if (!$lead) continue;
+            if (!$canal_match($lead)) continue;
+
+            $name = trim($lead['assignee'] ?? '');
+            if ($name === '') $name = 'Sin asignar';
+            $ensure($name);
+
+            $agg[$name]['sales']++;
+            $agg[$name]['revenue'] += (float)($c['precio_final'] ?? 0);
+            $agg[$name]['capitas'] += (int)($c['capitas'] ?? 0);
+
+            $cr_d = to_app_date($lead['lead_created_at'] ?? null);
+            if ($cr_d) {
+                $diff_days = max(0.0, (strtotime($d) - strtotime($cr_d)) / 86400);
+                $agg[$name]['cycle_weighted'] += $diff_days;
+            }
+        }
+
         return $agg;
     };
 
@@ -416,23 +465,80 @@ try {
         $monetary_full[$c['meistertask_id']] = $c;
     }
 
+    //     `counted`: indica si la venta entra en el KPI `closed_sales`. Es true
+    //     cuando existe una fila en `lead_monetary` con is_closed=true para ese
+    //     meistertask_id (es decir, está en $monetary_full / $closed dedup). Si
+    //     no, la venta está marcada como Ganada en MeisterTask pero el vendedor
+    //     todavía no cargó la data monetaria → no la contamos en el KPI y queda
+    //     visible en ámbar para que el equipo la complete.
+    //
+    //     Segmentos válidos de tipificación para Prepagas (definidos en
+    //     `config/clients/prepagas.yaml`). Si la tipificación del lead no
+    //     cae en este set (vacío o etiqueta inesperada), se marca como
+    //     "Sin tipificación" en el badge de completitud — el vendedor no
+    //     puso el tag de segmento al cerrar la tarea en MeisterTask.
+    //     TODO: leer desde config/clients/{slug}.yaml cuando haya multi-cliente.
+    $valid_segments = ['voluntario', 'monotributista', 'obligatorio'];
+
+    // Pre-fetch de actividad (comentarios) para todos los leads en sección
+    // closed_won. La tabla `lead_activity` viene poblada por el normalizer
+    // de MeisterTask que parsea el campo `comments` del CSV en entradas
+    // {author, body, commented_at}. Acá se hace UNA query con `in.(...)`
+    // y se agrupa por meistertask_id para attacharlo a cada sales_list row.
+    $closed_won_mids = [];
+    foreach ($leads as $l) {
+        $sec = $l['section'] ?? '';
+        if (isset($closed_won_sections[$sec])) {
+            $closed_won_mids[] = $l['meistertask_id'];
+        }
+    }
+
+    $activity_by_mid = [];
+    if (!empty($closed_won_mids)) {
+        $mid_list = '(' . implode(',', array_map('intval', $closed_won_mids)) . ')';
+        $activity_rows = supabase_query('lead_activity', [
+            'client_slug'    => 'eq.' . CLIENT_SLUG,
+            'meistertask_id' => 'in.' . $mid_list,
+            'select'         => 'meistertask_id,author,body,commented_at',
+            'order'          => 'commented_at.asc',
+            'limit'          => '10000',
+        ]);
+        foreach ($activity_rows as $a) {
+            $mid_k = $a['meistertask_id'];
+            if (!isset($activity_by_mid[$mid_k])) $activity_by_mid[$mid_k] = [];
+            $activity_by_mid[$mid_k][] = [
+                'author'       => $a['author'] ?? '',
+                'body'         => $a['body'] ?? '',
+                'commented_at' => $a['commented_at'] ?? null,
+            ];
+        }
+    }
+
     $sales_list = [];
+    $uncounted_count = 0;
     foreach ($leads as $l) {
         $sec = $l['section'] ?? '';
         if (!isset($closed_won_sections[$sec])) continue;  // Solo sección "Ventas Ganadas"
 
         $mid = $l['meistertask_id'];
         $mon = $monetary_full[$mid] ?? null;
+        $counted = ($mon !== null);
 
         $precio   = $mon ? (float)($mon['precio_final'] ?? 0) : 0.0;
         $capitas_v = $mon ? ((int)($mon['capitas'] ?? 0)) : 0;
         $plan     = $mon ? ($mon['plan_code'] ?? null) : null;
+
+        $tip_raw  = trim((string)($l['tipification'] ?? ''));
+        $has_segment = $tip_raw !== '' && in_array(strtolower($tip_raw), $valid_segments, true);
 
         // Badge de completitud: campos faltantes en la venta
         $missing = [];
         if ($precio <= 0)    $missing[] = 'Sin precio';
         if ($capitas_v <= 0) $missing[] = 'Sin cápitas';
         if (!$plan)          $missing[] = 'Sin plan';
+        if (!$has_segment)   $missing[] = 'Sin tipificación';
+
+        if (!$counted) $uncounted_count++;
 
         $sales_list[] = [
             'meistertask_id'  => $mid,
@@ -440,14 +546,18 @@ try {
             'assignee'        => $l['assignee'] ?? '',
             'tipification'    => $l['tipification'] ?? '',
             'canal'           => $l['canal'] ?? '',
+            'section'         => $l['section'] ?? '',   // etapa actual en el CRM
             'lead_created_at' => $l['lead_created_at'] ?? null,
             'close_date'      => $mon ? ($mon['updated_at'] ?? null) : null,
             'precio_final'    => $precio,
             'capitas'         => $capitas_v,
             'plan_code'       => $plan,
+            'data_source'     => $mon ? ($mon['data_source'] ?? null) : null,
             'is_campaign'     => !empty($l['is_campaign_lead']),
+            'activity'        => $activity_by_mid[$mid] ?? [],
             'missing'         => $missing,        // array de strings para el badge
             'complete'        => empty($missing),  // true si precio+capitas+plan están presentes
+            'counted'         => $counted,         // true si entra en KPI closed_sales
         ];
     }
 
@@ -474,9 +584,10 @@ try {
             'data'   => $type_data,
             'colors' => array_slice($type_colors, 0, count($type_labels)),
         ],
-        'sellers'       => $sellers,
-        'pending_price' => $pending_price,
-        'sales_list'    => $sales_list,
+        'sellers'         => $sellers,
+        'pending_price'   => $pending_price,
+        'sales_list'      => $sales_list,
+        'uncounted_count' => $uncounted_count,
         'non_campaign' => [
             'closed_sales'   => $nc_sales,
             'total_revenue'  => round($nc_revenue, 2),

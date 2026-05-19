@@ -388,11 +388,11 @@ $_asset_v = defined('ASSET_VERSION') ? ASSET_VERSION : filemtime(__DIR__ . '/ass
           <span class="kpi-delta" id="delta-spend"></span>
           <canvas class="kpi-sparkline" id="sparkline-spend" aria-hidden="true"></canvas>
         </div>
-        <div class="kpi-card" data-kpi="roi">
-          <span class="kpi-label">ROI</span>
-          <span class="kpi-value" id="kpi-roi">—</span>
-          <span class="kpi-delta" id="delta-roi"></span>
-          <canvas class="kpi-sparkline" id="sparkline-roi" aria-hidden="true"></canvas>
+        <div class="kpi-card" data-kpi="roas" title="ROAS: Ingresos del período ÷ Inversión en ads del período. Click para ver explicación.">
+          <span class="kpi-label">ROAS</span>
+          <span class="kpi-value" id="kpi-roas">—</span>
+          <span class="kpi-delta" id="delta-roas"></span>
+          <canvas class="kpi-sparkline" id="sparkline-roas" aria-hidden="true"></canvas>
         </div>
         <div class="kpi-card" data-kpi="impressions">
           <span class="kpi-label">Total Impresiones</span>
@@ -647,9 +647,19 @@ $_asset_v = defined('ASSET_VERSION') ? ASSET_VERSION : filemtime(__DIR__ . '/ass
 
       <div class="charts-grid charts-grid--full">
         <div class="chart-card">
-          <div class="chart-card-header">
-            <h3 class="chart-title">Customer Journey — CRM</h3>
-            <span class="chart-note">Fuente: MeisterTask · 13 etapas en orden del proceso de ventas</span>
+          <div class="chart-card-header journey-card-header">
+            <div class="journey-card-header-main">
+              <h3 class="chart-title">Customer Journey — CRM</h3>
+              <span class="chart-note">Fuente: MeisterTask · 13 etapas en orden del proceso de ventas</span>
+            </div>
+            <div class="journey-card-header-controls">
+              <label for="mofu-canal-filter" class="journey-canal-label">Canal</label>
+              <select id="mofu-canal-filter" class="chart-filter-select" aria-label="Filtrar Customer Journey por canal del lead">
+                <option value="all" selected>Todos los canales</option>
+                <option value="campaign">Solo campaña</option>
+                <option value="non_campaign">Solo particulares</option>
+              </select>
+            </div>
           </div>
           <div class="chart-card-body" style="padding: 0; overflow: hidden;">
             <canvas id="chart-status" aria-label="Distribución por estado de lead" style="display:none;"></canvas>
@@ -830,8 +840,9 @@ $_asset_v = defined('ASSET_VERSION') ? ASSET_VERSION : filemtime(__DIR__ . '/ass
               </select>
               <select id="sales-list-filter-complete" class="chart-filter-select" aria-label="Filtrar por estado">
                 <option value="">Todos los estados</option>
-                <option value="incomplete">Solo incompletos</option>
-                <option value="complete">Solo completos</option>
+                <option value="uncounted">Solo no contabilizadas</option>
+                <option value="incomplete">Solo incompletas</option>
+                <option value="complete">Solo completas</option>
               </select>
               <span class="chart-badge" id="sales-list-count">0 ventas</span>
             </div>
@@ -846,6 +857,7 @@ $_asset_v = defined('ASSET_VERSION') ? ASSET_VERSION : filemtime(__DIR__ . '/ass
                   <th class="th-num">Precio final</th>
                   <th class="th-num">Cápitas</th>
                   <th>Plan</th>
+                  <th>Segmento</th>
                   <th>Faltante</th>
                 </tr>
               </thead>
@@ -855,7 +867,9 @@ $_asset_v = defined('ASSET_VERSION') ? ASSET_VERSION : filemtime(__DIR__ . '/ass
                   <td colspan="3" class="sales-totals-label">Totales (filtrados)</td>
                   <td class="th-num" id="sales-list-total-revenue">—</td>
                   <td class="th-num" id="sales-list-total-capitas">—</td>
-                  <td colspan="2" class="sales-totals-meta" id="sales-list-total-count">—</td>
+                  <td></td>
+                  <td></td>
+                  <td></td>
                 </tr>
               </tfoot>
             </table>
@@ -899,6 +913,23 @@ $_asset_v = defined('ASSET_VERSION') ? ASSET_VERSION : filemtime(__DIR__ . '/ass
         <span class="journey-modal-metric-label">leads</span>
         <span class="journey-modal-metric-pct" id="journey-modal-metric-pct"></span>
       </div>
+      <div class="journey-modal-breakdown" id="journey-modal-breakdown" hidden>
+        <span class="journey-modal-breakdown-title">Origen de los leads</span>
+        <div class="journey-modal-breakdown-rows">
+          <div class="journey-modal-bd-row journey-modal-bd-row--camp">
+            <span class="journey-modal-bd-dot"></span>
+            <span class="journey-modal-bd-label">Campaña</span>
+            <span class="journey-modal-bd-val" id="journey-modal-bd-camp-val">—</span>
+            <span class="journey-modal-bd-pct" id="journey-modal-bd-camp-pct">—</span>
+          </div>
+          <div class="journey-modal-bd-row journey-modal-bd-row--vend">
+            <span class="journey-modal-bd-dot"></span>
+            <span class="journey-modal-bd-label">Vendedor</span>
+            <span class="journey-modal-bd-val" id="journey-modal-bd-vend-val">—</span>
+            <span class="journey-modal-bd-pct" id="journey-modal-bd-vend-pct">—</span>
+          </div>
+        </div>
+      </div>
       <div class="journey-modal-section">
         <span class="journey-modal-section-label">Que significa esta etapa</span>
         <p class="journey-modal-section-text" id="journey-modal-description"></p>
@@ -939,21 +970,32 @@ $_asset_v = defined('ASSET_VERSION') ? ASSET_VERSION : filemtime(__DIR__ . '/ass
   <div id="lead-detail-modal" class="kpi-modal-overlay" role="dialog" aria-modal="true" aria-labelledby="lead-modal-title" tabindex="-1" hidden>
     <div class="kpi-modal lead-modal">
       <button class="kpi-modal-close" id="lead-modal-close" aria-label="Cerrar">&times;</button>
-      <h2 class="kpi-modal-title" id="lead-modal-title">—</h2>
 
+      <!-- Header: título + subtítulo (ID · canal · fecha cierre) + badges estado -->
+      <div class="lead-modal-header">
+        <h2 class="kpi-modal-title" id="lead-modal-title">—</h2>
+        <div class="lead-modal-subtitle" id="lead-modal-subtitle"></div>
+        <div class="lead-modal-badges" id="lead-modal-badges"></div>
+      </div>
+
+      <!-- Datos comerciales: precio, cápitas, plan, segmento, asesor, ¿KPI? -->
+      <div class="lead-modal-section" id="lead-modal-commercial-section" hidden>
+        <span class="lead-modal-section-label">Datos comerciales</span>
+        <div class="lead-modal-basics-grid" id="lead-modal-commercial"></div>
+      </div>
+
+      <!-- Datos del lead: canal, etapa, fecha ingreso, días en CRM, origen -->
       <div class="lead-modal-section">
         <span class="lead-modal-section-label">Datos del lead</span>
         <div class="lead-modal-basics-grid" id="lead-modal-basics"></div>
       </div>
 
+      <!-- Acciones rápidas -->
+      <div class="lead-modal-section lead-modal-actions" id="lead-modal-actions"></div>
+
       <div class="lead-modal-section">
         <span class="lead-modal-section-label">Historial de etapas</span>
         <ul class="lead-modal-history-list" id="lead-modal-history"></ul>
-      </div>
-
-      <div class="lead-modal-section" id="lead-modal-monetary-section" hidden>
-        <span class="lead-modal-section-label">Datos monetarios</span>
-        <div class="lead-modal-basics-grid" id="lead-modal-monetary"></div>
       </div>
 
       <div class="lead-modal-section" id="lead-modal-activity-section">

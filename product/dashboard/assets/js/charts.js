@@ -263,19 +263,22 @@ function _renderCommercialSummary(s) {
 function renderPerformance(data) {
   const prev = data.prev || {};
 
-  const roi     = data.ad_spend  > 0 ? ((data.revenue - data.ad_spend) / data.ad_spend) * 100 : 0;
-  const prevRoi = prev.ad_spend  > 0 ? ((prev.revenue - prev.ad_spend) / prev.ad_spend) * 100 : 0;
+  // ROAS = revenue / ad_spend. Reemplaza al ROI viejo (decisión Franco
+  // 2026-05-19): una sola métrica de rentabilidad en todo el dashboard,
+  // unidad inequívoca (Nx) y consistente con BOFU. 1x = empate, >1 = ganás.
+  const roas     = data.ad_spend > 0 ? data.revenue / data.ad_spend : 0;
+  const prevRoas = prev.ad_spend > 0 ? prev.revenue / prev.ad_spend : 0;
 
   setKPI('kpi-revenue',     fmtCurrency(data.revenue));
   setKPI('kpi-spend',       fmtCurrency(data.ad_spend));
-  setKPI('kpi-roi',         fmtPercent(roi));
+  setKPI('kpi-roas',        roas > 0 ? roas.toFixed(2) + 'x' : '—');
   setKPI('kpi-impressions', fmtNumber(data.impressions));
   setKPI('kpi-leads',       fmtNumber(data.leads));
   setKPI('kpi-sales',       fmtNumber(data.closed_sales));
 
   _setDelta('delta-revenue',     data.revenue,      prev.revenue);
   _setDelta('delta-spend',       data.ad_spend,     prev.ad_spend,    true);
-  _setDelta('delta-roi',         roi,               prevRoi);
+  _setDelta('delta-roas',        roas,              prevRoas);
   _setDelta('delta-impressions', data.impressions,  prev.impressions);
   _setDelta('delta-leads',       data.leads,        prev.leads);
   _setDelta('delta-sales',       data.closed_sales, prev.closed_sales);
@@ -764,7 +767,7 @@ var _JOURNEY_STAGE_INFO = {
  * @param {number} val   - cantidad de leads en esta etapa
  * @param {number} total - total de leads del período
  */
-function _openJourneyModal(label, val, total) {
+function _openJourneyModal(label, val, total, breakdown) {
   var modal = document.getElementById('journey-stage-modal');
   if (!modal) return;
 
@@ -790,6 +793,24 @@ function _openJourneyModal(label, val, total) {
 
   var phaseDot = document.getElementById('journey-modal-phase-dot');
   phaseDot.style.background = phase.color;
+
+  /* Desglose campaña / vendedor — solo se muestra si la fila tiene datos. */
+  var bdWrap = document.getElementById('journey-modal-breakdown');
+  if (bdWrap) {
+    var bd = breakdown || { campaign: 0, non_campaign: 0 };
+    var totalBd = bd.campaign + bd.non_campaign;
+    if (totalBd > 0) {
+      var pctCamp = ((bd.campaign / totalBd) * 100).toFixed(0);
+      var pctVend = ((bd.non_campaign / totalBd) * 100).toFixed(0);
+      document.getElementById('journey-modal-bd-camp-val').textContent = fmtNumber(bd.campaign);
+      document.getElementById('journey-modal-bd-camp-pct').textContent = pctCamp + '%';
+      document.getElementById('journey-modal-bd-vend-val').textContent = fmtNumber(bd.non_campaign);
+      document.getElementById('journey-modal-bd-vend-pct').textContent = pctVend + '%';
+      bdWrap.hidden = false;
+    } else {
+      bdWrap.hidden = true;
+    }
+  }
 
   var exampleText = val === 0
     ? 'No hay leads en esta etapa en el período seleccionado.'
@@ -978,6 +999,18 @@ function _updateJourneyInsights(el, labels, vals, total) {
  * Llamado siempre desde renderMofu().
  * @param {object} data - objeto de datos MOFU completo (necesita data.status)
  */
+/**
+ * Devuelve el desglose campaña / vendedor de una columna del journey,
+ * normalizado a números. Usado para enriquecer tooltip y modal.
+ */
+function _journeyBreakdownPair(pair) {
+  if (!pair) return { campaign: 0, non_campaign: 0 };
+  return {
+    campaign:     Number(pair.campaign)     || 0,
+    non_campaign: Number(pair.non_campaign) || 0,
+  };
+}
+
 function _renderJourney(data) {
   _destroyChart('chart-status');
   const ctxSt = document.getElementById('chart-status');
@@ -990,10 +1023,19 @@ function _renderJourney(data) {
   if (prevTip) prevTip.remove();
   ctxSt.style.display = 'none';
 
+  // Desglose campaign/non_campaign por sección, paralelo al array status.data.
+  const bdC  = Array.isArray(data.status.breakdown_campaign)     ? data.status.breakdown_campaign     : [];
+  const bdNC = Array.isArray(data.status.breakdown_non_campaign) ? data.status.breakdown_non_campaign : [];
+
   // Filtrar "Tareas Finalizadas" — columna excluida del display del cliente
   const filteredPairs = data.status.labels.reduce((acc, lbl, i) => {
     if (lbl !== 'Tareas Finalizadas') {
-      acc.push({ label: lbl, val: data.status.data[i] || 0 });
+      acc.push({
+        label:        lbl,
+        val:          data.status.data[i] || 0,
+        campaign:     bdC[i]  || 0,
+        non_campaign: bdNC[i] || 0,
+      });
     }
     return acc;
   }, []);
@@ -1023,6 +1065,7 @@ function _renderJourney(data) {
     existingCols.forEach((col, i) => {
       if (i >= labels.length) return;
       const v     = vals[i];
+      const pair  = filteredPairs[i];
       const pct   = total > 0 ? (v / total) * 100 : 0;
       const barH  = Math.max((v / maxVal) * 100, v > 0 ? 5 : 0);
       const bar   = existingBars[i];
@@ -1042,6 +1085,10 @@ function _renderJourney(data) {
       const pctEl = col.querySelector('.journey-col-pct');
       if (valEl) valEl.textContent = fmtNumber(v);
       if (pctEl) pctEl.textContent = pct.toFixed(1) + '%';
+      // El desglose camp/vend se actualiza vía dataset para reusarlo en tooltip/modal
+      const bd = _journeyBreakdownPair(pair);
+      col.dataset.campaign     = String(bd.campaign);
+      col.dataset.nonCampaign  = String(bd.non_campaign);
     });
 
     const headerVal = existingWrap.querySelector('.journey-header-value');
@@ -1064,7 +1111,8 @@ function _renderJourney(data) {
       var lbl  = labels[i];
       var vCur = vals[i];
       var tot  = total;
-      col.onclick = function() { _openJourneyModal(lbl, vCur, tot); };
+      var bd   = _journeyBreakdownPair(filteredPairs[i]);
+      col.onclick = function() { _openJourneyModal(lbl, vCur, tot, bd); };
     });
 
     return; // No reconstruir el DOM
@@ -1083,16 +1131,25 @@ function _renderJourney(data) {
       '<span class="journey-tooltip-label"></span>' +
       '<span class="journey-tooltip-value"></span>' +
       '<span class="journey-tooltip-pct"></span>' +
-      '<span class="journey-tooltip-phase"></span>';
+      '<span class="journey-tooltip-phase"></span>' +
+      '<div class="journey-tooltip-breakdown" hidden>' +
+        '<span class="journey-tooltip-bd-row"><span class="journey-tooltip-bd-dot journey-tooltip-bd-dot--camp"></span>Campaña <strong class="journey-tooltip-bd-camp"></strong></span>' +
+        '<span class="journey-tooltip-bd-row"><span class="journey-tooltip-bd-dot journey-tooltip-bd-dot--vend"></span>Vendedor <strong class="journey-tooltip-bd-vend"></strong></span>' +
+      '</div>';
     document.body.appendChild(tip);
   }
 
-  function showTip(col, label, val, pctFmt) {
+  function showTip(col, label, val, pctFmt, breakdown) {
     const phase  = _JOURNEY_PHASE_MAP[label] || { name: '', color: '#8FA5A8' };
     const rect   = col.getBoundingClientRect();
-    const tipW   = 200;
+    const tipW   = 220;
     let   left   = rect.left + rect.width / 2 - tipW / 2;
-    const top    = rect.top - 10;
+    // El tooltip usa position:fixed; top relativo al viewport. Si no hay espacio
+    // arriba (hover en columnas de la parte superior), lo desplazamos abajo.
+    const hasBd     = breakdown && (breakdown.campaign > 0 || breakdown.non_campaign > 0);
+    const tipHeight = hasBd ? 130 : 90;
+    const spaceAbove = rect.top;
+    const top = spaceAbove > tipHeight + 8 ? rect.top - tipHeight - 4 : rect.bottom + 8;
     left = Math.max(8, Math.min(left, window.innerWidth - tipW - 8));
 
     tip.querySelector('.journey-tooltip-label').textContent = label;
@@ -1102,9 +1159,18 @@ function _renderJourney(data) {
     phaseEl.textContent = phase.name;
     phaseEl.style.color = phase.color;
 
-    tip.style.position = 'absolute';
+    const bdEl = tip.querySelector('.journey-tooltip-breakdown');
+    if (hasBd) {
+      tip.querySelector('.journey-tooltip-bd-camp').textContent = fmtNumber(breakdown.campaign);
+      tip.querySelector('.journey-tooltip-bd-vend').textContent = fmtNumber(breakdown.non_campaign);
+      bdEl.hidden = false;
+    } else {
+      bdEl.hidden = true;
+    }
+
+    tip.style.position = 'fixed';
     tip.style.left     = left + 'px';
-    tip.style.top      = (top + window.scrollY) + 'px';
+    tip.style.top      = top + 'px';
     tip.classList.add('is-visible');
   }
 
@@ -1157,9 +1223,15 @@ function _renderJourney(data) {
 
     const col = document.createElement('div');
     col.className = 'journey-col';
-    col.setAttribute('aria-label', label + ': ' + fmtNumber(v) + ' leads (' + pctFmt + ')');
+    col.setAttribute('role', 'button');
+    col.setAttribute('tabindex', '0');
+    col.setAttribute('aria-label', label + ': ' + fmtNumber(v) + ' leads (' + pctFmt + ') — click para ver detalle');
 
     const initialH = reducedMotion ? barH.toFixed(1) + '%' : '0%';
+
+    const bd = _journeyBreakdownPair(filteredPairs[i]);
+    col.dataset.campaign    = String(bd.campaign);
+    col.dataset.nonCampaign = String(bd.non_campaign);
 
     col.innerHTML =
       '<div class="journey-col-inner">' +
@@ -1176,11 +1248,19 @@ function _renderJourney(data) {
         '</div>' +
       '</div>';
 
-    col.addEventListener('mouseenter', function() { showTip(col, label, v, pctFmt); });
+    col.addEventListener('mouseenter', function() { showTip(col, label, v, pctFmt, bd); });
     col.addEventListener('mouseleave', hideTip);
-    col.addEventListener('click', (function(lbl, vv, tot) {
-      return function() { _openJourneyModal(lbl, vv, tot); };
-    }(label, v, total)));
+    col.addEventListener('click', (function(lbl, vv, tot, b) {
+      return function() { _openJourneyModal(lbl, vv, tot, b); };
+    }(label, v, total, bd)));
+    col.addEventListener('keydown', (function(lbl, vv, tot, b) {
+      return function(e) {
+        if (e.key === 'Enter' || e.key === ' ') {
+          e.preventDefault();
+          _openJourneyModal(lbl, vv, tot, b);
+        }
+      };
+    }(label, v, total, bd)));
 
     row.appendChild(col);
 
@@ -1673,6 +1753,7 @@ function _applySalesListFilters() {
 
   const filtered = _salesListRows.filter(r => {
     if (sellerVal && r.assignee !== sellerVal) return false;
+    if (completeVal === 'uncounted'  && r.counted !== false) return false;
     if (completeVal === 'incomplete' && r.complete) return false;
     if (completeVal === 'complete'   && !r.complete) return false;
     if (canalVal === 'campaign'     && r.is_campaign !== true)  return false;
@@ -1683,17 +1764,21 @@ function _applySalesListFilters() {
   /* Totales del subset filtrado — viven en el <tfoot> de la tabla */
   const totalRevenue = filtered.reduce((a, r) => a + (Number(r.precio_final) || 0), 0);
   const totalCapitas = filtered.reduce((a, r) => a + (Number(r.capitas)       || 0), 0);
+  const uncountedInView = filtered.reduce((a, r) => a + (r.counted === false ? 1 : 0), 0);
   const totalRevEl   = document.getElementById('sales-list-total-revenue');
   const totalCapEl   = document.getElementById('sales-list-total-capitas');
-  const totalCntEl   = document.getElementById('sales-list-total-count');
   const badgeEl      = document.getElementById('sales-list-count');
   if (totalRevEl) totalRevEl.textContent = totalRevenue > 0 ? fmtCurrency(totalRevenue) : '—';
   if (totalCapEl) totalCapEl.textContent = totalCapitas > 0 ? fmtNumber(totalCapitas) : '—';
-  if (totalCntEl) totalCntEl.textContent = filtered.length + (filtered.length === 1 ? ' venta' : ' ventas');
-  if (badgeEl)    badgeEl.textContent    = `${filtered.length} venta${filtered.length === 1 ? '' : 's'}`;
+  if (badgeEl) {
+    const base = `${filtered.length} venta${filtered.length === 1 ? '' : 's'}`;
+    badgeEl.textContent = uncountedInView > 0
+      ? `${base} · ${uncountedInView} sin contabilizar`
+      : base;
+  }
 
   if (filtered.length === 0) {
-    tbody.innerHTML = '<tr><td colspan="7" class="pending-empty">Sin ventas para los filtros seleccionados.</td></tr>';
+    tbody.innerHTML = '<tr><td colspan="8" class="pending-empty">Sin ventas para los filtros seleccionados.</td></tr>';
     return;
   }
 
@@ -1709,23 +1794,39 @@ function _applySalesListFilters() {
     const caps   = r.capitas > 0 ? r.capitas : '<span class="muted">—</span>';
     const plan   = r.plan_code || '<span class="muted">—</span>';
 
-    /* Badge de faltante */
+    /* Segmento: Voluntario / Monotributista / Obligatorio. Si el tag no fue
+       cargado en MeisterTask, queda vacío y mostramos un guión muted — el
+       badge "Sin tipificación" en la columna Faltante refuerza la señal. */
+    const segVal   = (r.tipification || '').trim();
+    const segValid = /^(voluntario|monotributista|obligatorio)$/i.test(segVal);
+    const segmento = segValid
+      ? `<span class="sales-segment sales-segment--${segVal.toLowerCase()}">${segVal}</span>`
+      : '<span class="muted">—</span>';
+
+    /* Badge de faltante. Si la venta no entra en el KPI (counted=false),
+       priorizamos un badge ámbar "Sin contabilizar" que indica al equipo
+       que falta cargar la data monetaria para que entre en el total. */
     let missingBadge;
-    if (r.complete) {
+    if (r.counted === false) {
+      missingBadge = '<span class="sales-uncounted-badge" title="No entra en el KPI: falta cargar lead_monetary">Sin contabilizar</span>';
+    } else if (r.complete) {
       missingBadge = '<span class="sales-complete-badge">Completo</span>';
     } else {
       const tags = (r.missing || []).map(m => `<span class="sales-missing-tag">${m}</span>`).join(' ');
       missingBadge = tags || '<span class="muted">—</span>';
     }
 
+    const rowClass = r.counted === false ? 'pending-row sales-row-uncounted' : 'pending-row';
+
     return `
-      <tr class="pending-row" data-mid="${r.meistertask_id}" style="cursor:pointer" role="button" tabindex="0" aria-label="Ver detalle de ${nombre}">
+      <tr class="${rowClass}" data-mid="${r.meistertask_id}" style="cursor:pointer" role="button" tabindex="0" aria-label="Ver detalle de ${nombre}">
         <td class="pending-name">${nombre}</td>
         <td class="pending-asesor">${asesor}</td>
         <td class="pending-date th-num">${closeFmt}</td>
         <td class="pending-date th-num">${precio}</td>
         <td class="pending-date th-num">${caps}</td>
         <td class="pending-tip">${plan}</td>
+        <td class="pending-segment">${segmento}</td>
         <td class="pending-origin">${missingBadge}</td>
       </tr>
     `;
@@ -1760,94 +1861,194 @@ function _openLeadDetailModal(mid) {
   const overlay = document.getElementById('lead-detail-modal');
   if (!overlay) return;
 
-  /* Título */
-  const titleEl = document.getElementById('lead-modal-title');
-  if (titleEl) titleEl.textContent = `${row.nombre || '#' + mid} (${row.canal || 'sin canal'})`;
+  /* ── Helpers locales ─────────────────────────────────────── */
+  const fmtDate = (dateStr) => {
+    if (!dateStr) return '—';
+    const d = new Date(dateStr);
+    return isNaN(d) ? '—' : d.toLocaleDateString('es-AR', { day: '2-digit', month: '2-digit', year: 'numeric' });
+  };
 
-  /* Calcular días en CRM */
-  const creado = row.lead_created_at ? new Date(row.lead_created_at) : null;
-  const diasCRM = creado
+  /* Días en CRM */
+  const creado  = row.lead_created_at ? new Date(row.lead_created_at) : null;
+  const diasCRM = creado && !isNaN(creado)
     ? Math.floor((Date.now() - creado.getTime()) / 86400000)
     : null;
-  const diasStr = diasCRM !== null ? `${diasCRM} día${diasCRM === 1 ? '' : 's'}` : '—';
+  const diasStr  = diasCRM !== null ? `${diasCRM} día${diasCRM === 1 ? '' : 's'}` : '—';
+  const fechaStr = fmtDate(row.lead_created_at);
+  const closeStr = fmtDate(row.close_date);
 
-  const fechaStr = creado
-    ? creado.toLocaleDateString('es-AR', { day: '2-digit', month: '2-digit', year: 'numeric' })
-    : '—';
+  /* ── Header: título, subtítulo, badges ───────────────────── */
+  const titleEl = document.getElementById('lead-modal-title');
+  if (titleEl) titleEl.textContent = row.nombre || `#${mid}`;
 
-  /* Grid de datos básicos */
+  const subEl = document.getElementById('lead-modal-subtitle');
+  if (subEl) {
+    const parts = [
+      `ID ${mid}`,
+      row.canal ? `Canal: ${row.canal}` : null,
+      row.close_date ? `Cerrada el ${closeStr}` : null,
+    ].filter(Boolean);
+    subEl.textContent = parts.join(' · ');
+  }
+
+  /* Badges: mismos que aparecen en la tabla — counted / completo / missing */
+  const badgesEl = document.getElementById('lead-modal-badges');
+  if (badgesEl) {
+    const badges = [];
+    if (row.counted === false) {
+      badges.push('<span class="sales-uncounted-badge" title="No entra en el KPI: falta cargar lead_monetary">Sin contabilizar</span>');
+    } else if (row.complete) {
+      badges.push('<span class="sales-complete-badge">Completo</span>');
+    }
+    (row.missing || []).forEach(m => {
+      badges.push(`<span class="sales-missing-tag">${_escapeHtml(m)}</span>`);
+    });
+    // Pill de campaña / vendedor — útil para entender el origen del lead.
+    if (row.is_campaign === true) {
+      badges.push('<span class="origin-badge origin-campaign">Campaña</span>');
+    } else if (row.is_campaign === false) {
+      badges.push('<span class="origin-badge origin-vendor">Vendedor</span>');
+    }
+    badgesEl.innerHTML = badges.join(' ');
+  }
+
+  /* ── Datos comerciales: precio, cápitas, plan, segmento, asesor, KPI ── */
+  const commEl   = document.getElementById('lead-modal-commercial');
+  const commSect = document.getElementById('lead-modal-commercial-section');
+  if (commEl && commSect) {
+    const segVal   = (row.tipification || '').trim();
+    const segValid = /^(voluntario|monotributista|obligatorio)$/i.test(segVal);
+    const segmentoHtml = segValid
+      ? `<span class="sales-segment sales-segment--${segVal.toLowerCase()}">${_escapeHtml(segVal)}</span>`
+      : '<span class="muted">Sin tipificación</span>';
+
+    const precioHtml = row.precio_final > 0
+      ? fmtCurrency(row.precio_final)
+      : '<span class="muted">—</span>';
+    const capitasHtml = row.capitas > 0
+      ? row.capitas
+      : '<span class="muted">—</span>';
+    const planHtml = row.plan_code
+      ? _escapeHtml(row.plan_code)
+      : '<span class="muted">—</span>';
+    const kpiHtml = row.counted
+      ? '<span class="sales-complete-badge">Sí</span>'
+      : '<span class="sales-uncounted-badge">No</span>';
+
+    commEl.innerHTML = `
+      <div class="lead-modal-field"><span class="lead-modal-label">Precio final</span><span class="lead-modal-value">${precioHtml}</span></div>
+      <div class="lead-modal-field"><span class="lead-modal-label">Cápitas</span><span class="lead-modal-value">${capitasHtml}</span></div>
+      <div class="lead-modal-field"><span class="lead-modal-label">Plan</span><span class="lead-modal-value">${planHtml}</span></div>
+      <div class="lead-modal-field"><span class="lead-modal-label">Segmento</span><span class="lead-modal-value">${segmentoHtml}</span></div>
+      <div class="lead-modal-field"><span class="lead-modal-label">Asesor</span><span class="lead-modal-value">${_escapeHtml(row.assignee || '—')}</span></div>
+      <div class="lead-modal-field"><span class="lead-modal-label">Fecha de cierre</span><span class="lead-modal-value">${closeStr}</span></div>
+      <div class="lead-modal-field"><span class="lead-modal-label">¿Cuenta en KPI?</span><span class="lead-modal-value">${kpiHtml}</span></div>
+    `;
+    commSect.hidden = false;
+  }
+
+  /* ── Datos del lead: canal, etapa, fecha ingreso, días, origen ───── */
   const gridEl = document.getElementById('lead-modal-basics');
   if (gridEl) {
+    const origenStr = row.is_campaign === true ? 'Campaña' :
+                      row.is_campaign === false ? 'Vendedor (manual)' : '—';
     gridEl.innerHTML = `
-      <div class="lead-modal-field"><span class="lead-modal-label">Canal</span><span class="lead-modal-value">${row.canal || '—'}</span></div>
-      <div class="lead-modal-field"><span class="lead-modal-label">Asesor</span><span class="lead-modal-value">${row.assignee || '—'}</span></div>
-      <div class="lead-modal-field"><span class="lead-modal-label">Tipificación</span><span class="lead-modal-value">${row.tipification || '—'}</span></div>
-      <div class="lead-modal-field"><span class="lead-modal-label">Etapa actual</span><span class="lead-modal-value">${row.section || '—'}</span></div>
+      <div class="lead-modal-field"><span class="lead-modal-label">Canal</span><span class="lead-modal-value">${_escapeHtml(row.canal || '—')}</span></div>
+      <div class="lead-modal-field"><span class="lead-modal-label">Origen</span><span class="lead-modal-value">${origenStr}</span></div>
+      <div class="lead-modal-field"><span class="lead-modal-label">Etapa actual</span><span class="lead-modal-value">${_escapeHtml(row.section || '—')}</span></div>
       <div class="lead-modal-field"><span class="lead-modal-label">Fecha de ingreso</span><span class="lead-modal-value">${fechaStr}</span></div>
       <div class="lead-modal-field"><span class="lead-modal-label">Días en CRM</span><span class="lead-modal-value">${diasStr}</span></div>
     `;
   }
 
-  /* Historial de cambios de sección */
+  /* ── Acciones rápidas: copiar ID, filtrar tabla por asesor.
+        Sin emojis (decisión Franco 2026-05-19). El link a MeisterTask se
+        eliminó porque el patrón de URL no funcionaba con todas las cuentas. */
+  const actionsEl = document.getElementById('lead-modal-actions');
+  if (actionsEl) {
+    const sellerEscaped = (row.assignee || '').replace(/"/g, '&quot;');
+    actionsEl.innerHTML = `
+      <span class="lead-modal-section-label">Acciones</span>
+      <div class="lead-modal-actions-row">
+        <button type="button" class="lead-modal-action-btn" data-action="copy-id" data-mid="${mid}">
+          Copiar ID
+        </button>
+        ${row.assignee ? `
+        <button type="button" class="lead-modal-action-btn" data-action="filter-seller" data-seller="${sellerEscaped}">
+          Ver ventas de ${_escapeHtml(row.assignee)}
+        </button>` : ''}
+      </div>
+    `;
+    const copyBtn = actionsEl.querySelector('[data-action="copy-id"]');
+    if (copyBtn) {
+      copyBtn.onclick = async () => {
+        try {
+          await navigator.clipboard.writeText(String(mid));
+          copyBtn.textContent = 'ID copiado';
+          setTimeout(() => { copyBtn.textContent = 'Copiar ID'; }, 1500);
+        } catch (e) { /* clipboard no disponible — ignorar */ }
+      };
+    }
+    const filterBtn = actionsEl.querySelector('[data-action="filter-seller"]');
+    if (filterBtn) {
+      filterBtn.onclick = () => {
+        const seller = filterBtn.dataset.seller || '';
+        const sellerSelect = document.getElementById('sales-list-filter-seller');
+        if (sellerSelect) {
+          sellerSelect.value = seller;
+          if (typeof _applySalesListFilters === 'function') _applySalesListFilters();
+        }
+        _closeLeadDetailModal();
+        const tableEl = document.getElementById('sales-list-table');
+        if (tableEl) tableEl.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      };
+    }
+  }
+
+  /* ── Historial de cambios de sección (si el backend lo provee algún día) ── */
   const histEl = document.getElementById('lead-modal-history');
   if (histEl) {
     if (row.lead_section_history && row.lead_section_history.length) {
       histEl.innerHTML = row.lead_section_history.map(h => {
-        const d = new Date(h.date).toLocaleDateString('es-AR', { day: '2-digit', month: '2-digit', year: 'numeric' });
-        return `<li class="lead-modal-history-item"><span class="lead-modal-history-date">${d}</span><span class="lead-modal-history-move">${h.from} &rarr; ${h.to}</span></li>`;
+        const d = fmtDate(h.date);
+        return `<li class="lead-modal-history-item"><span class="lead-modal-history-date">${d}</span><span class="lead-modal-history-move">${_escapeHtml(h.from)} &rarr; ${_escapeHtml(h.to)}</span></li>`;
       }).join('');
     } else {
       histEl.innerHTML = '<li class="lead-modal-history-empty">Sin historial disponible.</li>';
     }
   }
 
-  /* Datos monetarios */
-  const moneyEl     = document.getElementById('lead-modal-monetary');
-  const moneySect   = document.getElementById('lead-modal-monetary-section');
-  if (moneyEl && moneySect) {
-    if (row.lead_monetary) {
-      const m = row.lead_monetary;
-      const updatedAt = m.updated_at
-        ? new Date(m.updated_at).toLocaleDateString('es-AR', { day: '2-digit', month: '2-digit', year: 'numeric' })
-        : '—';
-      moneyEl.innerHTML = `
-        <div class="lead-modal-field"><span class="lead-modal-label">Precio final</span><span class="lead-modal-value">${m.precio_final != null ? fmtCurrency(m.precio_final) : '—'}</span></div>
-        <div class="lead-modal-field"><span class="lead-modal-label">Capitas</span><span class="lead-modal-value">${m.capitas != null ? m.capitas : '—'}</span></div>
-        <div class="lead-modal-field"><span class="lead-modal-label">Cerrado</span><span class="lead-modal-value">${m.is_closed ? 'Si' : 'No'}</span></div>
-        <div class="lead-modal-field"><span class="lead-modal-label">Actualizado</span><span class="lead-modal-value">${updatedAt}</span></div>
-      `;
-      moneySect.hidden = false;
-    } else {
-      moneySect.hidden = true;
-    }
-  }
-
-  /* Actividad y seguimientos: viene de leads.comments — el textarea de
-     MeisterTask donde el vendedor escribe notas, llamadas, observaciones.
-     Cada bloque suele venir separado por saltos de línea o con prefijos
-     tipo "DD/MM:" — los detectamos para formatear como timeline. */
+  /* ── Actividad y seguimientos.
+        Viene desde la tabla `lead_activity` (parseada por el normalizer
+        de MeisterTask desde el campo `comments` del CSV). Cada entrada
+        tiene {author, body, commented_at}. Se renderiza como timeline,
+        ordenada de más reciente a más vieja para que el vendedor lea
+        primero lo último. */
   const actEl   = document.getElementById('lead-modal-activity');
   const actSect = document.getElementById('lead-modal-activity-section');
   if (actEl && actSect) {
-    const raw = (row.comments || '').trim();
-    if (!raw) {
+    const entries = Array.isArray(row.activity) ? row.activity.slice() : [];
+    if (entries.length === 0) {
       actEl.innerHTML = '<p class="lead-modal-empty">Sin actividad registrada por el vendedor todavía.</p>';
     } else {
-      // Cortar por línea/párrafo y filtrar vacíos. Cada bloque es una "entrada"
-      // del vendedor. Si el bloque arranca con un patrón fecha (DD/MM o DD-MM),
-      // lo extraemos como header del item.
-      const blocks = raw.split(/\n\s*\n|\r\n\s*\r\n/).map(b => b.trim()).filter(Boolean);
-      const entries = blocks.length ? blocks : raw.split(/\n+/).map(l => l.trim()).filter(Boolean);
-      actEl.innerHTML = '<ol class="lead-modal-activity-list">' + entries.map(text => {
-        const dateMatch = text.match(/^([0-9]{1,2}[/\-][0-9]{1,2}(?:[/\-][0-9]{2,4})?)[:\s.\-]+(.+)$/s);
-        if (dateMatch) {
-          return `<li class="lead-modal-activity-item">
-            <span class="lead-modal-activity-date">${dateMatch[1]}</span>
-            <p class="lead-modal-activity-text">${_escapeHtml(dateMatch[2].trim())}</p>
-          </li>`;
-        }
-        return `<li class="lead-modal-activity-item lead-modal-activity-item--no-date">
-          <p class="lead-modal-activity-text">${_escapeHtml(text)}</p>
+      // Ordenar descendente (más reciente arriba)
+      entries.sort((a, b) => {
+        const da = a.commented_at || '';
+        const db = b.commented_at || '';
+        return db.localeCompare(da);
+      });
+      actEl.innerHTML = '<ol class="lead-modal-activity-list">' + entries.map(entry => {
+        const dateStr = entry.commented_at
+          ? new Date(entry.commented_at).toLocaleDateString('es-AR', {
+              day: '2-digit', month: '2-digit', year: 'numeric',
+            })
+          : '';
+        const author = (entry.author || '').trim();
+        const body   = (entry.body || '').trim();
+        const meta = [dateStr, author].filter(Boolean).join(' · ');
+        return `<li class="lead-modal-activity-item">
+          ${meta ? `<span class="lead-modal-activity-date">${_escapeHtml(meta)}</span>` : ''}
+          <p class="lead-modal-activity-text">${_escapeHtml(body).replace(/\n/g, '<br>')}</p>
         </li>`;
       }).join('') + '</ol>';
     }
@@ -1950,7 +2151,7 @@ function _renderSparkline(id, values, positive, labels) {
  * Renders sparklines for all 6 Performance KPI cards.
  * Prefers doubled sparkline data (current + previous period) when available.
  * Revenue and spend come directly from trend data.
- * ROI, impressions, leads, sales are derived point-by-point.
+ * ROAS, impressions, leads, sales are derived point-by-point.
  */
 function renderSparklines(data) {
   if (!data.trend) return;
@@ -1961,9 +2162,9 @@ function renderSparklines(data) {
   const revenue = src.revenue;
   const spend   = src.spend;
 
-  /* ROI per data point */
-  const roi = revenue.map((r, i) =>
-    spend[i] > 0 ? ((r - spend[i]) / spend[i]) * 100 : 0
+  /* ROAS por punto: revenue/spend (mismo criterio que el KPI). */
+  const roas = revenue.map((r, i) =>
+    spend[i] > 0 ? r / spend[i] : 0
   );
 
   /* Impressions: scale proportionally from revenue shape */
@@ -1985,7 +2186,7 @@ function renderSparklines(data) {
 
   _renderSparkline('sparkline-revenue',     revenue,     isUp(revenue),     labels);
   _renderSparkline('sparkline-spend',       spend,       !isUp(spend),      labels); /* lower spend = better */
-  _renderSparkline('sparkline-roi',         roi,         isUp(roi),         labels);
+  _renderSparkline('sparkline-roas',        roas,        isUp(roas),        labels);
   _renderSparkline('sparkline-impressions', impressions, isUp(impressions), labels);
   _renderSparkline('sparkline-leads',       leads,       isUp(leads),       labels);
   _renderSparkline('sparkline-sales',       sales,       isUp(sales),       labels);

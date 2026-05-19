@@ -34,6 +34,19 @@ try {
     // is_campaign_lead=true son de esa campaña — sin diferencia funcional.
     // TODO multi-campaña: refactor a leer de mofu_facts con filtro campaign_id.
     $campaign_filter = $_GET['campaign_id'] ?? '';
+
+    // Filtro de canal del lead (2026-05-19, paridad con BOFU). Valores:
+    //   campaign     → solo leads de campaña (is_campaign_lead = true).
+    //   non_campaign → solo leads particulares (Propio, Referido, vacíos).
+    //   all          → ambos (default en MOFU para no alterar comportamiento histórico).
+    //
+    // Por defecto MOFU usa 'all' porque el customer journey históricamente
+    // incluyó todos los leads. El usuario puede filtrar para entender mejor
+    // qué porción del journey viene de campaña vs vendedor.
+    $canal_filter = $_GET['canal'] ?? 'all';
+    if (!in_array($canal_filter, ['campaign', 'non_campaign', 'all'], true)) {
+        $canal_filter = 'all';
+    }
     // 1. Funnel stages config: section_name → flags (high_intent, lost, incubating, etc.)
     //    Incluye display_order para construir el journey en el mismo orden que el CRM.
     $stages = supabase_query('funnel_stages', [
@@ -53,7 +66,7 @@ try {
     //                       (columna generada por Postgres, ver migration 008)
     $leads = supabase_query('leads', [
         'client_slug' => 'eq.' . CLIENT_SLUG,
-        'select'      => 'meistertask_id,section,tipification,canal,is_campaign_lead,lead_created_at',
+        'select'      => 'meistertask_id,section,tipification,canal,is_campaign_lead,lead_created_at,status_updated_at',
         'limit'       => '5000',
     ]);
 
@@ -82,12 +95,14 @@ try {
         }
     }
 
-    // 5. Agrupar leads de campaña por fecha (lead_created_at::date)
+    // 5. Agrupar leads de campaña por fecha. Usamos to_app_date() para que
+    //    el bucket coincida con "la fecha que aparece en la tarea" en
+    //    MeisterTask (hora Argentina), evitando off-by-one para tareas
+    //    creadas cerca de medianoche UTC.
     $by_date = [];
     foreach ($campaign_leads as $l) {
-        $created = $l['lead_created_at'] ?? null;
-        if (!$created) continue;
-        $d = substr($created, 0, 10);
+        $d = to_app_date($l['lead_created_at'] ?? null);
+        if (!$d) continue;
         if (!isset($by_date[$d])) {
             $by_date[$d] = [
                 'total_leads' => 0,
@@ -103,9 +118,10 @@ try {
     $period = $_GET['period'] ?? '30d';
     $dates  = array_keys($by_date);
     if (empty($dates)) api_error('Sin leads en Supabase para ' . CLIENT_SLUG, 404);
-    $last = end($dates);
 
-    [$start, $end] = period_dates($period, $last, $dates[0] ?? null);
+    // Rango temporal unificado (ver lib/config.php::global_period_dates).
+    // Anclado en HOY (APP_TZ) para que todos los endpoints calculen idéntica ventana.
+    [$start, $end] = global_period_dates($period, $dates[0] ?? null);
 
     // Período previo: mismo length, terminando el día antes de $start
     $period_days = (strtotime($end) - strtotime($start)) / 86400 + 1;
@@ -162,10 +178,8 @@ try {
     // con el customer journey y con la BD (audit 2026-05-15).
     // Nota: no se suman a total_leads porque esa métrica mide rendimiento de campaña.
     foreach ($non_campaign_leads as $l) {
-        $created = $l['lead_created_at'] ?? null;
-        if (!$created) continue;
-        $d = substr($created, 0, 10);
-        if ($d < $start || $d > $end) continue;
+        $d = to_app_date($l['lead_created_at'] ?? null);
+        if (!$d || $d < $start || $d > $end) continue;
         $c_nc = $classify($l);
         if ($c_nc['closed_won']) $leads_closed_won++;
     }
@@ -214,59 +228,87 @@ try {
         'closed_won_leads'  => $pr_closed_won,
     ];
 
-    // 10. Status breakdown — 14 columnas literales de MeisterTask, en orden del journey.
-    //    Se construye a partir de $stage_by_section (ya ordenado por display_order.asc).
-    //    Las secciones de funnel_stage != 'bofu' cuentan solo campaign_leads (mide
-    //    rendimiento de campaña). La sección is_closed_won=true ("Ventas Ganadas")
-    //    cuenta TODOS los leads del período (campaign + no_campaign) porque la regla
-    //    de negocio es: toda venta en esa columna del CRM cuenta como venta ganada,
-    //    independientemente del canal de origen. Esto hace coincidir el número con
-    //    lo que ve Franco en MeisterTask y en la BD (audit 2026-05-15).
-    //    Las secciones con stage='excluded' (Erroneos, Tareas Finalizadas) se incluyen:
-    //    Erroneos aporta información de calidad del lead; Tareas Finalizadas indica
-    //    limpieza del CRM. Franco confirma si quiere excluirlas del render frontend.
+    // 10. Status breakdown — Customer Journey.
+    //
+    //    AUDITORIA 2026-05-19 (Franco) — dos cambios clave para que MOFU
+    //    y BOFU sean coherentes en "Ventas Ganadas":
+    //
+    //    (a) Las columnas closed_won se cuentan por `status_updated_at`
+    //        (fecha en que el lead llegó a esa sección) en lugar de
+    //        `lead_created_at`. Antes la columna mostraba "leads creados
+    //        en el período que HOY están en Ventas Ganadas" — una vista
+    //        cohorte. Ahora muestra "leads cerrados en el período" — vista
+    //        de evento, igual semántica que BOFU.closed_sales.
+    //        Resto del journey sigue contando por lead_created_at (cohorte
+    //        de leads que ENTRARON en el período).
+    //
+    //    (b) Respeta el filtro $canal_filter. Si canal=campaign, solo
+    //        cuenta is_campaign_lead=true. Si canal=non_campaign, solo
+    //        manuales. Default 'all' mantiene el comportamiento histórico.
+    //
+    //    Además: status_canal_breakdown expone, por cada sección, el
+    //    desglose campaign vs vendedor — para que el frontend muestre
+    //    la línea "X campaña · Y vendedor" debajo del número.
     $C = COLORS;
 
-    // Inicializar mapa sección → count, respetando el orden del journey
-    $status_counts = [];
-    foreach ($stage_by_section as $name => $_cfg) {
-        $status_counts[$name] = 0;
-    }
-
-    // Contar campaign_leads del período por sección
-    foreach ($selected as $_d => $bucket) {
-        foreach ($bucket['leads'] as $l) {
-            $sec = $l['section'] ?? '';
-            if (array_key_exists($sec, $status_counts)) {
-                $status_counts[$sec]++;
-            }
-        }
-    }
-
-    // Para secciones is_closed_won=true: sumar también non_campaign leads del período.
-    // Los leads manuales (Propio/Referido) que llegan a "Ventas Ganadas" son ventas
-    // reales — excluirlos del journey hace que el número no coincida con el CRM.
-    // El filtro de período usa lead_created_at (igual que el resto del journey).
     $closed_won_section_names = [];
     foreach ($stage_by_section as $name => $cfg) {
         if (!empty($cfg['is_closed_won'])) {
             $closed_won_section_names[$name] = true;
         }
     }
-    foreach ($non_campaign_leads as $l) {
-        $sec     = $l['section'] ?? '';
-        $created = $l['lead_created_at'] ?? null;
-        if (!$created || !isset($closed_won_section_names[$sec])) continue;
-        $d = substr($created, 0, 10);
-        if ($d < $start || $d > $end) continue;
-        if (array_key_exists($sec, $status_counts)) {
-            $status_counts[$sec]++;
+
+    $canal_match = function(array $lead) use ($canal_filter): bool {
+        $is_campaign = !empty($lead['is_campaign_lead']);
+        if ($canal_filter === 'campaign')     return $is_campaign;
+        if ($canal_filter === 'non_campaign') return !$is_campaign;
+        return true;
+    };
+
+    // Inicializar contadores por sección con desglose por canal
+    $status_counts = [];
+    $status_canal_breakdown = [];
+    foreach ($stage_by_section as $name => $_cfg) {
+        $status_counts[$name] = 0;
+        $status_canal_breakdown[$name] = ['campaign' => 0, 'non_campaign' => 0];
+    }
+
+    // Iterar TODOS los leads (no solo campaign), filtrar por canal + período
+    // según la regla de cada sección.
+    foreach ($leads as $l) {
+        $sec = $l['section'] ?? '';
+        if (!array_key_exists($sec, $status_counts)) continue;
+
+        // Para closed_won: filtrar por close date (status_updated_at).
+        // Para el resto: filtrar por lead_created_at (cohorte que entró).
+        $is_closed_won = isset($closed_won_section_names[$sec]);
+        $date_field    = $is_closed_won ? 'status_updated_at' : 'lead_created_at';
+        $d = to_app_date($l[$date_field] ?? null);
+        if (!$d || $d < $start || $d > $end) continue;
+
+        if (!$canal_match($l)) continue;
+
+        $status_counts[$sec]++;
+        if (!empty($l['is_campaign_lead'])) {
+            $status_canal_breakdown[$sec]['campaign']++;
+        } else {
+            $status_canal_breakdown[$sec]['non_campaign']++;
         }
     }
 
     // Construir arrays de labels y data en el mismo orden del journey
     $status_labels = array_keys($status_counts);
     $status_data   = array_values($status_counts);
+
+    // Override de leads_closed_won para coherencia con la nueva semántica
+    // de status_counts (close date + canal filter). Antes se computaba en
+    // la sección 7 con lead_created_at; ahora reflejamos exactamente lo
+    // que muestra la columna "Ventas Ganadas" del journey — y por ende
+    // matchea con BOFU.closed_sales.
+    $leads_closed_won = 0;
+    foreach ($closed_won_section_names as $name => $_) {
+        $leads_closed_won += $status_counts[$name] ?? 0;
+    }
 
     // Segmentos: top 5 operatorias por count
     arsort($segs);
@@ -283,10 +325,8 @@ try {
     //     las métricas de campaña.
     $nc_total = 0; $nc_high = 0; $nc_lost = 0; $nc_incub = 0;
     foreach ($non_campaign_leads as $l) {
-        $created = $l['lead_created_at'] ?? null;
-        if (!$created) continue;
-        $d = substr($created, 0, 10);
-        if ($d < $start || $d > $end) continue;
+        $d = to_app_date($l['lead_created_at'] ?? null);
+        if (!$d || $d < $start || $d > $end) continue;
         $nc_total++;
         $c = $classify($l);
         if ($c['high_intent']) $nc_high++;
@@ -294,7 +334,18 @@ try {
         if ($c['incubating'])  $nc_incub++;
     }
 
+    // status_canal_breakdown: para cada sección, arrays paralelos a status.data
+    // con el desglose campaña vs vendedor. El frontend renderiza una línea
+    // pequeña debajo de cada columna del journey "X campaña · Y vendedor".
+    $status_breakdown_campaign     = [];
+    $status_breakdown_non_campaign = [];
+    foreach ($status_labels as $sec) {
+        $status_breakdown_campaign[]     = $status_canal_breakdown[$sec]['campaign'] ?? 0;
+        $status_breakdown_non_campaign[] = $status_canal_breakdown[$sec]['non_campaign'] ?? 0;
+    }
+
     echo json_encode([
+        'canal'             => $canal_filter,
         'total_leads'       => $total_leads,
         'cpl'               => $cpl,
         'tipification_rate' => $tipification_rate,
@@ -307,6 +358,9 @@ try {
             // Colors are overridden by charts.js semantic palette; this array is a
             // structural placeholder with the correct length for schema validation.
             'colors' => array_fill(0, count($status_labels), $C['slate']),
+            // Desglose campaign / non_campaign por sección, mismo orden que labels.
+            'breakdown_campaign'     => $status_breakdown_campaign,
+            'breakdown_non_campaign' => $status_breakdown_non_campaign,
         ],
         'segments' => [
             'labels' => $seg_labels,

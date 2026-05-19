@@ -7,10 +7,53 @@ Formato basado en [Keep a Changelog](https://keepachangelog.com/es/1.0.0/).
 
 ## [Unreleased]
 
-- Fase 2: conexión de datos reales al dashboard (PHP → Google Sheets → charts)
-- Fase 3: integración Meta Ads API
-- Fase 4: login real con MySQL por subdominio
-- Fase 5: MeisterTask API para MOFU automático
+### Backlog (post-MVP)
+- Fase 2: integración Meta Ads API (extractor creado, falta wiring + credenciales)
+- Fase 3: MeisterTask API directa (hoy via CSV manual)
+- Fase 4: login real con MySQL por subdominio (hoy `PHASE1_BYPASS = true`)
+- Fase 5: capa IA — llamada a Claude API para resúmenes ejecutivos en sección Inicio
+- Liquid glass formato para "elementos" (idea en `notasFran.md`)
+- Líneas de tendencia para todos los gráficos de evolución
+- Sidebar tablet (640-1023px) auto-colapsable
+- `sellers-table` mobile: vista de cards apiladas en lugar de scroll horizontal
+
+---
+
+## [1.5.0] — 2026-05-19 — **MVP cerrado**
+
+Cierre formal del MVP. Dashboard en producción en `prepagas.umohcrew.com` con TOFU/MOFU/BOFU funcionando con datos reales, responsive en desktop/tablet/celular, autenticación bypass (PHASE1) para entregar al cliente, y pipeline Python corriendo cada 6h.
+
+### Added
+- Customer Journey: dropdown propio de canal en MOFU (sincronizado con BOFU)
+- Journey modal: bloque "Origen de los leads" con desglose campaña / vendedor (% + valor absoluto)
+- Journey tooltip: desglose campaña / vendedor en hover
+- Mobile fixes quirúrgicos (<640px): bloque `@media` aditivo al final del CSS que ataca KPI grids (5/6/4/3 cols → 2 cols), tablas anchas (scroll horizontal con touch nativo iOS), modales bottom-sheet, charts grids a 1 col, customer journey adaptado, filtros canal apilados, section header compactado
+
+### Fixed
+- Customer Journey: dropdown de canal (MOFU + BOFU) ahora actualiza ambas secciones — `_applyCanalFilter` esperaba secuencialmente los refreshes (antes el guard `_loading` descartaba la 2da llamada y dejaba la sección no-activa stale)
+- Customer Journey: la sección SALES vuelve a respetar el filtro de canal del journey al cambiarlo (consecuencia del fix anterior)
+- MOFU + BOFU: coherencia de "Ventas Ganadas" entre ambas secciones, fix de timezone, canal en journey
+- BOFU: alineación de ventana de período con `summary.php` para que totales matcheen
+- BOFU + summary: ranking de vendedores con mismo criterio que `closed_sales`
+
+### Changed
+- Customer Journey: removidas las micro-etiquetas `journey-col-breakdown` ("X camp · Y vend") debajo de cada columna — ruido visual redundante con el dropdown de canal
+- BOFU modal: actividad real desde `lead_activity` + UX cleanup
+- BOFU modal de ventas: badges, datos comerciales y acciones contextuales
+- BOFU: columna Segmento + flag de ventas no contabilizadas + unificación ROAS
+- API: rango temporal unificado en todos los endpoints (auditoría)
+- Deploy: canary + verificación post-deploy en staging
+
+### Docs
+- v2 handoff doc con bootstrap prompt + protocolo accionable
+- Knowhow transfer document UMOH → repo de finanzas
+
+### Tech debt asumida en MVP (documentada en `docs/estado-del-proyecto.md`)
+- `PHASE1_BYPASS = true` (auth no activada)
+- Meta Ads no integrada al pipeline
+- MeisterTask sigue via CSV manual
+- IA en sección Inicio: tabla `ai_summaries` creada, llamada a Claude pendiente
+- Node 24 en GitHub Actions: deadline junio 2026
 
 ---
 

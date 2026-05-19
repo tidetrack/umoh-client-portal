@@ -19,6 +19,8 @@
  * @returns JSON  { user_name, period_label, ai_summary, section_kpis }
  */
 
+require_once __DIR__ . '/../lib/config.php';
+
 header('Content-Type: application/json');
 header('Cache-Control: no-store');
 
@@ -106,15 +108,10 @@ $mofu_data    = null;
 $bofu_data    = null;
 
 if ($supabase_url && $supabase_key) {
-    // Fecha límite según período
-    $date_from = match($period) {
-        '7d'  => date('Y-m-d', strtotime('-7 days')),
-        '90d' => date('Y-m-d', strtotime('-90 days')),
-        default => date('Y-m-d', strtotime('-30 days')),
-    };
-    if ($period === 'custom' && $start) {
-        $date_from = $start;
-    }
+    // Rango unificado anclado en HOY (APP_TZ) — mismo helper que el resto de
+    // los endpoints. Garantiza que los 4 KPIs de Inicio matcheen con los
+    // de las secciones (Performance / TOFU / MOFU / BOFU).
+    [$g_start, $g_end] = global_period_dates($period);
 
     $headers = [
         'apikey: ' . $supabase_key,
@@ -122,61 +119,104 @@ if ($supabase_url && $supabase_key) {
         'Content-Type: application/json',
     ];
 
-    // Helper para fetch JSON de Supabase
     $fetch = function (string $u) use ($headers) {
         $ch = curl_init($u);
         curl_setopt_array($ch, [
             CURLOPT_RETURNTRANSFER => true,
             CURLOPT_HTTPHEADER     => $headers,
-            CURLOPT_TIMEOUT        => 5,
+            CURLOPT_TIMEOUT        => 6,
         ]);
         $raw = curl_exec($ch);
         curl_close($ch);
         return is_string($raw) ? (json_decode($raw, true) ?: []) : [];
     };
 
-    // Las tablas *_facts ya están agregadas por (client_slug, date, campaign_id)
-    // y son las que usa el script run_inicio_summary.py. Leer de aquí garantiza
-    // consistencia entre el dashboard y el resumen IA cacheado en ai_summaries.
+    // Auditoría 2026-05-19 (Franco): inicio.php leía de `tofu_facts`/`mofu_facts`/
+    // `bofu_facts` (tablas precomputadas por el script Python), mientras que el
+    // resto de los endpoints lee de tablas RAW. Eso producía discrepancias entre
+    // el KPI del Inicio y el de cada sección. Migrado a las mismas queries raw +
+    // misma dedup que summary.php/bofu.php para garantizar coherencia exacta.
 
-    // TOFU
-    $rows = $fetch($supabase_url . '/rest/v1/tofu_facts'
+    // TOFU — sum impressions/clicks/spend de tofu_ads_daily en [start, end]
+    $rows = $fetch($supabase_url . '/rest/v1/tofu_ads_daily'
         . '?select=impressions,clicks,spend'
         . '&client_slug=eq.prepagas'
-        . '&date=gte.' . urlencode($date_from));
-    if (!empty($rows)) {
+        . '&date=gte.' . urlencode($g_start)
+        . '&date=lte.' . urlencode($g_end)
+        . '&limit=1000');
+    if (is_array($rows)) {
+        $impr  = array_sum(array_column($rows, 'impressions'));
+        $clk   = array_sum(array_column($rows, 'clicks'));
+        $spend = array_sum(array_column($rows, 'spend'));
         $tofu_data = [
-            'impressions' => array_sum(array_column($rows, 'impressions')),
-            'clicks'      => array_sum(array_column($rows, 'clicks')),
-            'spend'       => array_sum(array_column($rows, 'spend')),
+            'impressions' => (int)$impr,
+            'clicks'      => (int)$clk,
+            'spend'       => (float)$spend,
+            'cpc'         => $clk > 0 ? $spend / $clk : 0,
         ];
-        $tofu_data['cpc'] = $tofu_data['clicks'] > 0
-            ? $tofu_data['spend'] / $tofu_data['clicks']
-            : 0;
     }
 
-    // MOFU
-    $rows = $fetch($supabase_url . '/rest/v1/mofu_facts'
-        . '?select=total_leads,closed_won_leads'
+    // MOFU — leads de campaña creados en [start, end]
+    $rows = $fetch($supabase_url . '/rest/v1/leads'
+        . '?select=meistertask_id,is_campaign_lead,lead_created_at'
         . '&client_slug=eq.prepagas'
-        . '&date=gte.' . urlencode($date_from));
-    if (!empty($rows)) {
-        $total_leads = array_sum(array_column($rows, 'total_leads'));
-        $spend       = $tofu_data['spend'] ?? 0;
-        $mofu_data   = [
+        . '&is_campaign_lead=eq.true'
+        . '&lead_created_at=gte.' . urlencode($g_start)
+        . '&lead_created_at=lt.'  . urlencode(date('Y-m-d', strtotime($g_end . ' +1 day')))
+        . '&limit=5000');
+    if (is_array($rows)) {
+        $total_leads = count($rows);
+        $tofu_spend  = $tofu_data['spend'] ?? 0;
+        $mofu_data = [
             'total_leads'   => $total_leads,
-            'cost_per_lead' => ($total_leads > 0 && $spend > 0) ? $spend / $total_leads : 0,
+            'cost_per_lead' => ($total_leads > 0 && $tofu_spend > 0) ? $tofu_spend / $total_leads : 0,
         ];
     }
 
-    // BOFU
-    $rows = $fetch($supabase_url . '/rest/v1/bofu_facts'
-        . '?select=sales_count,revenue,avg_ticket,conversion_rate_mes'
+    // BOFU — ventas cerradas: lead_monetary is_closed=true, dedup por mid,
+    // filtrar a campaña vía leads.is_campaign_lead, sumar precio_final
+    // donde updated_at::date in [start, end]. Mismo criterio que summary.php.
+    $lm_rows = $fetch($supabase_url . '/rest/v1/lead_monetary'
+        . '?select=meistertask_id,precio_final,updated_at'
         . '&client_slug=eq.prepagas'
-        . '&date=gte.' . urlencode($date_from));
-    if (!empty($rows)) {
-        $count   = array_sum(array_column($rows, 'sales_count'));
-        $revenue = array_sum(array_column($rows, 'revenue'));
+        . '&is_closed=eq.true'
+        . '&limit=5000');
+    $leads_rows = $fetch($supabase_url . '/rest/v1/leads'
+        . '?select=meistertask_id,is_campaign_lead'
+        . '&client_slug=eq.prepagas'
+        . '&limit=5000');
+    if (is_array($lm_rows) && is_array($leads_rows)) {
+        // Dedup por meistertask_id: preferir precio_final > 0, desempate updated_at
+        $closed_by_mid = [];
+        foreach ($lm_rows as $row) {
+            $mid = $row['meistertask_id'] ?? null;
+            if ($mid === null) continue;
+            $cur = $closed_by_mid[$mid] ?? null;
+            if (!$cur) { $closed_by_mid[$mid] = $row; continue; }
+            $cur_p = (float)($cur['precio_final'] ?? 0);
+            $new_p = (float)($row['precio_final'] ?? 0);
+            if ($new_p > 0 && $cur_p <= 0) { $closed_by_mid[$mid] = $row; continue; }
+            if ($new_p <= 0 && $cur_p > 0) continue;
+            if (strcmp((string)($row['updated_at'] ?? ''), (string)($cur['updated_at'] ?? '')) > 0) {
+                $closed_by_mid[$mid] = $row;
+            }
+        }
+        $is_campaign_by_id = [];
+        foreach ($leads_rows as $l) {
+            $is_campaign_by_id[$l['meistertask_id']] = !empty($l['is_campaign_lead']);
+        }
+
+        $count = 0; $revenue = 0.0;
+        foreach ($closed_by_mid as $mid => $c) {
+            $d = to_app_date($c['updated_at'] ?? null);
+            if (!$d || $d < $g_start || $d > $g_end) continue;
+            // Solo campaña — coherente con Performance (summary.php) que también
+            // separa campaign de non_campaign para los KPIs principales.
+            if (empty($is_campaign_by_id[$mid])) continue;
+            $count++;
+            $revenue += (float)($c['precio_final'] ?? 0);
+        }
+
         $bofu_data = [
             'closed_sales'    => $count,
             'total_revenue'   => $revenue,
@@ -207,16 +247,19 @@ if (!$bofu_data) {
 }
 
 $spend = $tofu_data['spend'] ?? 0;
-$roi   = ($spend > 0 && isset($bofu_data['total_revenue']))
-    ? (($bofu_data['total_revenue'] - $spend) / $spend)
+// Unificación 2026-05-19: una sola métrica de rentabilidad en todo el portal,
+// el ROAS (revenue/spend, formato Nx). Antes acá había un híbrido inconsistente
+// (variable $roi pero valor en formato "Nx" que en realidad era ROAS).
+$roas = ($spend > 0 && isset($bofu_data['total_revenue']))
+    ? ($bofu_data['total_revenue'] / $spend)
     : 0;
 
 // ── Section KPIs ─────────────────────────────────────────────────────────────
 
 $section_kpis = [
     'performance' => [
-        'label'     => 'ROI',
-        'value'     => $roi >= 0 ? sprintf('%.1fx', ($bofu_data['total_revenue'] / max($spend, 1))) : '—',
+        'label'     => 'ROAS',
+        'value'     => $roas > 0 ? sprintf('%.2fx', $roas) : '—',
         'delta_pct' => 0,
     ],
     'tofu' => [
@@ -350,10 +393,10 @@ if ($closed_sales > 0 && $conv_rate > 0) {
     );
 }
 
-if ($roi > 0) {
+if ($roas > 1) {
     $highlights[] = sprintf(
-        'ROI positivo de %.1fx: cada peso invertido generó %.1f pesos en ingresos.',
-        ($revenue / max($spend, 1)), ($revenue / max($spend, 1))
+        'ROAS positivo de %.2fx: cada peso invertido generó %.2f pesos en ingresos.',
+        $roas, $roas
     );
 } elseif ($revenue === 0 && $spend > 0) {
     $highlights[] = sprintf(
@@ -377,8 +420,8 @@ if ($ctr < 2 && $impressions > 5000) {
     $recommendation = 'La tasa de conversión de leads a ventas está baja. El equipo comercial debería revisar la velocidad de contacto y la calidad de los leads que ingresan al CRM.';
 } elseif ($total_leads === 0 && $impressions > 0) {
     $recommendation = 'Hay tráfico pero sin leads. Revisá el formulario de contacto y la landing page — puede haber un problema de UX que está impidiendo que los visitantes conviertan.';
-} elseif ($roi > 2) {
-    $recommendation = 'El ROI está en terreno muy positivo. Este es el momento ideal para escalar presupuesto en las campañas con mejor CPC y mantener el mix de palabras clave ganador.';
+} elseif ($roas > 3) {
+    $recommendation = 'El ROAS está en terreno muy positivo (>3x). Este es el momento ideal para escalar presupuesto en las campañas con mejor CPC y mantener el mix de palabras clave ganador.';
 } else {
     $recommendation = 'Revisá los datos del período anterior para identificar variaciones significativas. Un análisis semanal del CPL y la tasa de tipificación puede revelar oportunidades de optimización.';
 }
