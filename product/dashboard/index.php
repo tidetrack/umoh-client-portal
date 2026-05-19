@@ -79,18 +79,26 @@ $_asset_v = defined('ASSET_VERSION') ? ASSET_VERSION : filemtime(__DIR__ . '/ass
   ══════════════════════════════════════════════ -->
   <aside class="dashboard-sidebar" id="dashboard-sidebar" aria-label="Panel de navegación">
 
-    <!-- A. Header del sidebar: logo PNG asterisco UMOH + nombre + botón colapsar -->
+    <!-- A. Header del sidebar: logo + nombre + botón colapsar
+         Logo dinámico según rol de sesión:
+           - admin → asterisco UMOH (interno del equipo)
+           - client → logo del cliente activo (ej: Prevención Salud)
+         TODO Fase 4 multi-cliente: resolver client-logo.webp por CLIENT_SLUG. -->
+    <?php
+      $_role = $_SESSION['umoh_role'] ?? 'client';
+      $_is_admin = ($_role === 'admin');
+      $_logo_src = $_is_admin ? 'assets/img/umoh-asterisk.png' : 'assets/img/client-logo.webp';
+      $_logo_alt = $_is_admin ? 'UMOH' : 'Logo cliente';
+      $_brand_label = $_is_admin ? 'Equipo UMOH' : 'Prevención Salud';
+    ?>
     <div class="sb-header">
       <div class="sb-brand">
-        <!-- Logo del cliente — ocupa el lugar del asterisco UMOH en el header del sidebar.
-             El asterisco UMOH se mantiene disponible para uso en login/loading screens.
-             TODO Fase 4 multi-cliente: resolver client-logo.webp dinámicamente via CLIENT_SLUG -->
         <div class="sb-client-logo-wrap" aria-hidden="true">
-          <img src="assets/img/client-logo.webp" alt="Logo cliente" class="sb-client-logo">
+          <img src="<?php echo $_logo_src; ?>" alt="<?php echo $_logo_alt; ?>" class="sb-client-logo">
         </div>
         <div class="sb-brand-text sb-label">
           <span class="sb-brand-agency">umoh</span>
-          <span class="sb-brand-client">Prevención Salud</span>
+          <span class="sb-brand-client"><?php echo $_brand_label; ?></span>
         </div>
       </div>
       <button class="sb-collapse-btn" id="sb-collapse-btn" aria-label="Colapsar sidebar" title="Colapsar">
