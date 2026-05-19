@@ -1,8 +1,9 @@
 # Estado del Proyecto — UMOH Client Portal
 
-**Ultima actualizacion:** 2026-05-11
-**Rama activa:** `staging` (produccion: `main`)
+**Ultima actualizacion:** 2026-05-19
+**Rama activa:** `main` (MVP cerrado en produccion)
 **Cliente activo:** Prevención Salud (`prepagas.umohcrew.com`)
+**Tag de release:** `v1.0.0-mvp`
 
 ---
 
@@ -19,26 +20,23 @@ Se actualiza cada vez que cierra un sprint o cambia el estado de una fase import
 
 ## Estado actual por fase
 
-### Fase 1 — MVP funcional (EN PRODUCCION con deuda tecnica)
+### Fase 1 — MVP **CERRADO** (en produccion, presentable)
 
-**Estado real:** El MVP esta en produccion desde 2026-05-05, pero con varias secciones validadas parcialmente. La nomenclatura de "Fase 1 completa" en CLAUDE.md es imprecisa — hay tareas MVP sin cerrar.
+**Estado real:** MVP cerrado el 2026-05-19 con tag `v1.0.0-mvp`. Dashboard en produccion en `prepagas.umohcrew.com` con TOFU + MOFU + BOFU funcionando con datos reales, responsive desktop/tablet/celular, y customer journey CRM completo con interacciones (tooltip + modal + dropdown de canal sincronizado entre secciones).
 
 **Que funciona en produccion hoy:**
-- Dashboard SPA completo con sidebar lateral (Sprint UX 2.1), 5 secciones (Inicio, Performance, TOFU, MOFU, BOFU)
-- Datos TOFU reales de Google Ads en Supabase. Pipeline corre cada 6h via GitHub Actions.
-- MOFU con datos reales: 77 leads de campaña, CPL $6.6k, journey CRM de 13 etapas con motion.
-- Seller ranking con datos reales desde `seller_facts`.
-- Filtro global de campaña activa (sprint 1.8).
-- Google Sheets espejo del cliente (3 facts tables: tofu/mofu/bofu).
-- Customer Journey CRM: 13 etapas con paleta cromatica semantica + animaciones.
+- Dashboard SPA completo con sidebar lateral, 5 secciones (Inicio, Performance, TOFU, MOFU, BOFU)
+- Datos TOFU reales de Google Ads en Supabase. Pipeline cada 6h via GitHub Actions.
+- MOFU con datos reales, journey CRM de 13 etapas con motion + insights automaticos + dropdown de canal funcional
+- BOFU con datos reales: KPIs (Ingresos, Ventas, Ticket, Conversion, ROAS, Capitas), modal de detalle de venta con badges + actividad, ranking de vendedores, tabla "Ventas ganadas" con filtros y totales
+- Seller ranking con datos reales desde `seller_facts`
+- Filtro global de campana activa
+- Filtro de canal del lead (campana / vendedor / todos) sincronizado entre MOFU journey y BOFU sales
+- Customer Journey CRM: 13 etapas con paleta semantica + animaciones + tooltip + modal didactico
+- Google Sheets espejo del cliente (3 facts tables: tofu/mofu/bofu)
+- Responsive en celular (<640px): KPI grids a 2 cols, modales bottom-sheet, tablas con scroll horizontal nativo, journey adaptado
 
-**Pendiente para cerrar el MVP (bloquea lanzamiento al cliente):**
-- `1.3` BOFU con datos reales — validar numeros (baja complejidad).
-- `1.4` SUMMARY con datos reales — validar portada del dashboard (baja complejidad).
-- `1.5` Mapa geografico — conectar `tofu_geo` de Supabase (media complejidad).
-- `1.6` Canal/dispositivo en cero — diagnosticar (puede ser limitacion de PMAX).
-- `1.11` Estandarizacion schema Supabase + `campaign_id` en todas las tablas (alta complejidad).
-- `3.1` Actualizar Node.js en GitHub Actions a Node 24 (deadline: junio 2026).
+**Lo que queda pendiente NO bloquea el MVP** (es backlog post-cierre, ver seccion siguiente).
 
 ### Fase 2 — Meta Ads API (PENDIENTE)
 
@@ -135,16 +133,23 @@ Browser → sidebar.js + filters.js → api.js
 | 2026-05-07 | Sprint UX 2.0: sidebar lateral + seccion Inicio + Sprint 1.8 finalizado |
 | 2026-05-07 | BACKLOG actualizado: 4 tareas MVP abiertas (1.3, 1.4, 1.5, 1.6), 1 tecnica (1.11, 3.1) |
 | 2026-05-11 | Sprint UX 2.1: sidebar dropdowns + motion + theme + resumen heuristico |
+| 2026-05-16 | BOFU sales modal con badges, actividad real desde `lead_activity`, columna Segmento, flag ventas no contabilizadas, unificacion ROAS. Filtro canal sincronizado MOFU+BOFU. |
+| 2026-05-19 | **MVP CERRADO** — tag `v1.0.0-mvp`. Customer journey final con tooltip + modal + dropdown de canal sin bug de race. Responsive mobile (<640px) quirurgico aplicado. Merge `staging` → `main` y deploy a produccion. |
 
 ---
 
-## Proximos pasos sugeridos (en orden de prioridad)
+## Proximos pasos sugeridos (post-MVP, en orden de prioridad)
 
-1. **Validar BOFU y SUMMARY con datos reales** (tareas 1.3 y 1.4) — bloqueantes para lanzamiento.
-2. **Investigar canal/dispositivo en cero** (tarea 1.6) — puede ser limitacion de PMAX o bug del extractor.
-3. **Validar mapa geografico** (tarea 1.5) — el dato esta en Supabase, es cuestion de conectarlo.
-4. **Node.js 24 en GitHub Actions** (tarea 3.1) — tiene deadline junio 2026.
-5. **Entregar credenciales de acceso al cliente** (Prevención Salud) — lanzamiento.
+1. **Entregar credenciales y onboarding al cliente** (Prevención Salud) — el MVP esta listo para uso real.
+2. **Activar autenticacion real** (Fase 4): hoy `PHASE1_BYPASS = true`. Login page existe, falta conectar MySQL Hostinger.
+3. **Capa IA en seccion Inicio** (Fase 5): tabla `ai_summaries` ya creada en Supabase. Falta llamada a Claude API.
+4. **Integrar Meta Ads al pipeline** (Fase 2): extractor existe, falta credenciales en GitHub Secrets + wiring.
+5. **MeisterTask API directa** (Fase 3): hoy CSV manual. Decision: postergar hasta que volumen lo justifique.
+6. **Validar mapa geografico TOFU** (tarea 1.5): `tofu_geo` esta en Supabase, falta conectarlo al chart de Leaflet.
+7. **Investigar canal/dispositivo en cero** (tarea 1.6): puede ser limitacion de PMAX.
+8. **Node.js 24 en GitHub Actions** (tarea 3.1): deadline junio 2026.
+9. **Liquid glass UI + lineas de tendencia** (ideas en `notasFran.md`): polish post-MVP.
+10. **Sidebar tablet auto-colapsable** (UX refinement): requiere JS en `filters.js`.
 
 ---
 
